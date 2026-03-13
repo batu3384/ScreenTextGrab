@@ -39,6 +39,10 @@ jobs:
       RELEASE_PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease || 'false' }}
       RELEASE_NOTARIZE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.notarize || 'true' }}
       SCREEN_TEXT_GRAB_TEAM_ID: ${{ secrets.SCREEN_TEXT_GRAB_TEAM_ID }}
+      SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64: ${{ secrets.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64 }}
+      SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD: ${{ secrets.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD }}
+      SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD: ${{ secrets.SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD }}
+      SCREEN_TEXT_GRAB_ASC_KEY_BASE64: ${{ secrets.SCREEN_TEXT_GRAB_ASC_KEY_BASE64 }}
       SCREEN_TEXT_GRAB_ASC_KEY_ID: ${{ secrets.SCREEN_TEXT_GRAB_ASC_KEY_ID }}
       SCREEN_TEXT_GRAB_ASC_ISSUER_ID: ${{ secrets.SCREEN_TEXT_GRAB_ASC_ISSUER_ID }}
 
@@ -49,19 +53,29 @@ jobs:
       - name: Validate release configuration
         run: |
           test -n "${RELEASE_TAG}" || { echo "Release tag is required." >&2; exit 1; }
-          test -n "${SCREEN_TEXT_GRAB_TEAM_ID}" || { echo "Missing secret: SCREEN_TEXT_GRAB_TEAM_ID" >&2; exit 1; }
-          test -n "${{ secrets.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64 }}" || { echo "Missing secret: SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64" >&2; exit 1; }
-          test -n "${{ secrets.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD }}" || { echo "Missing secret: SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD" >&2; exit 1; }
-          test -n "${{ secrets.SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD }}" || { echo "Missing secret: SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD" >&2; exit 1; }
+          if [[ -z "${SCREEN_TEXT_GRAB_TEAM_ID}" || -z "${SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64}" || -z "${SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD}" || -z "${SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD}" ]]; then
+            echo "RELEASE_WORKFLOW_READY=false" >> "${GITHUB_ENV}"
+            echo "Skipping release packaging because signing secrets are not configured for this repository."
+            exit 0
+          fi
+
+          echo "RELEASE_WORKFLOW_READY=true" >> "${GITHUB_ENV}"
+
+          if [[ "${RELEASE_NOTARIZE}" == "true" && ( -z "${SCREEN_TEXT_GRAB_ASC_KEY_BASE64}" || -z "${SCREEN_TEXT_GRAB_ASC_KEY_ID}" ) ]]; then
+            echo "RELEASE_NOTARIZE=false" >> "${GITHUB_ENV}"
+            echo "Skipping notarization because App Store Connect secrets are not configured."
+          fi
 
       - name: Install build dependencies
+        if: env.RELEASE_WORKFLOW_READY == 'true'
         run: brew install xcodegen ripgrep
 
       - name: Import Developer ID certificate
+        if: env.RELEASE_WORKFLOW_READY == 'true'
         env:
-          BUILD_CERTIFICATE_BASE64: ${{ secrets.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64 }}
-          BUILD_CERTIFICATE_PASSWORD: ${{ secrets.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD }}
+          BUILD_CERTIFICATE_BASE64: ${{ env.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64 }}
+          BUILD_CERTIFICATE_PASSWORD: ${{ env.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ env.SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD }}
         run: |
           CERT_PATH="${RUNNER_TEMP}/ScreenTextGrab-DeveloperID.p12"
           KEYCHAIN_PATH="${RUNNER_TEMP}/ScreenTextGrab-signing.keychain-db"
@@ -89,33 +103,32 @@ jobs:
           security find-identity -v -p codesigning "${KEYCHAIN_PATH}"
 
       - name: Build signed release bundle
+        if: env.RELEASE_WORKFLOW_READY == 'true'
         run: ./scripts/build_release.sh
 
       - name: Prepare notarization credentials
-        if: env.RELEASE_NOTARIZE == 'true'
+        if: env.RELEASE_WORKFLOW_READY == 'true' && env.RELEASE_NOTARIZE == 'true'
         env:
-          ASC_KEY_BASE64: ${{ secrets.SCREEN_TEXT_GRAB_ASC_KEY_BASE64 }}
+          ASC_KEY_BASE64: ${{ env.SCREEN_TEXT_GRAB_ASC_KEY_BASE64 }}
         run: |
-          test -n "${ASC_KEY_BASE64}" || { echo "Missing secret: SCREEN_TEXT_GRAB_ASC_KEY_BASE64" >&2; exit 1; }
-          test -n "${SCREEN_TEXT_GRAB_ASC_KEY_ID}" || { echo "Missing secret: SCREEN_TEXT_GRAB_ASC_KEY_ID" >&2; exit 1; }
-
           KEY_PATH="${RUNNER_TEMP}/AuthKey_${SCREEN_TEXT_GRAB_ASC_KEY_ID}.p8"
           echo "${ASC_KEY_BASE64}" | base64 --decode > "${KEY_PATH}"
           echo "SCREEN_TEXT_GRAB_ASC_KEY_PATH=${KEY_PATH}" >> "${GITHUB_ENV}"
 
       - name: Notarize release
-        if: env.RELEASE_NOTARIZE == 'true'
+        if: env.RELEASE_WORKFLOW_READY == 'true' && env.RELEASE_NOTARIZE == 'true'
         run: ./scripts/notarize_release.sh
 
       - name: Verify public release
-        if: env.RELEASE_NOTARIZE == 'true'
+        if: env.RELEASE_WORKFLOW_READY == 'true' && env.RELEASE_NOTARIZE == 'true'
         run: APP_PATH=dist/ScreenTextGrab.app ./scripts/verify_release.sh
 
       - name: Verify local release
-        if: env.RELEASE_NOTARIZE != 'true'
+        if: env.RELEASE_WORKFLOW_READY == 'true' && env.RELEASE_NOTARIZE != 'true'
         run: APP_PATH=dist/ScreenTextGrab.app VERIFY_MODE=local ./scripts/verify_release.sh
 
       - name: Upload build artifact
+        if: env.RELEASE_WORKFLOW_READY == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ScreenTextGrab-${{ env.RELEASE_TAG }}
@@ -124,6 +137,7 @@ jobs:
             dist/ScreenTextGrab.zip
 
       - name: Publish GitHub release
+        if: env.RELEASE_WORKFLOW_READY == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
