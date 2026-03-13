@@ -18,6 +18,35 @@ It is designed for fast everyday capture, code snippets, subtitles, and spreadsh
 - Keeps a local copy history for recent captures
 - Runs as a focused menu bar utility instead of a full desktop workspace
 
+## Quick install
+
+### Option 1: install the latest release
+
+This is the easiest path for most people:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/batu3384/ScreenTextGrab/main/scripts/install_release.sh | bash
+```
+
+What it does:
+
+- downloads the latest GitHub release
+- installs `ScreenTextGrab.app` into `/Applications`
+- cleans old copies so Spotlight shows the right app
+- launches the app
+
+On first launch, macOS will ask for Screen Recording permission once. After you allow it, reopen the app and continue normally.
+
+### Option 2: build from source in one command
+
+If you cloned the repository and want to install from source:
+
+```bash
+./scripts/install.sh
+```
+
+This builds the app locally, installs it into `/Applications`, cleans stale copies, and launches the canonical app so Spotlight can find it.
+
 ## Why ScreenTextGrab exists
 
 Most OCR tools are good at turning pixels into text, but weak at preserving intent. A subtitle should not be treated like a terminal log, and a table should not come back as a flat paragraph.
@@ -67,16 +96,9 @@ ScreenTextGrab does not upload screenshots or OCR results to a remote service. O
 ## Requirements
 
 - macOS 14 or newer
-- Xcode 15 or newer
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+- For source builds: Xcode 15 or newer
 
 ## Local development
-
-Generate the project:
-
-```bash
-xcodegen generate --spec project.yml
-```
 
 Run the repository audit:
 
@@ -123,31 +145,12 @@ xcodebuild build \
   CODE_SIGN_IDENTITY=''
 ```
 
-## Public release
+## Maintainer release flow
 
-For a public macOS release you still need:
-
-1. Your own Apple Developer team in Xcode with `Developer ID Application`
-2. Notarization credentials through one of these paths:
-   - `xcrun notarytool store-credentials`
-   - `SCREEN_TEXT_GRAB_APPLE_ID` + `SCREEN_TEXT_GRAB_APP_SPECIFIC_PASSWORD`
-   - App Store Connect API key environment variables
-
-Build, notarize, and verify:
-
-```bash
-SCREEN_TEXT_GRAB_TEAM_ID="<YOUR_TEAM_ID>" \
-./scripts/build_release.sh
-
-SCREEN_TEXT_GRAB_NOTARY_PROFILE="your-notary-profile" \
-./scripts/notarize_release.sh
-
-./scripts/verify_release.sh
-```
-
-Release detail:
+If you are publishing signed public releases, the full signing and notarization flow is documented here instead of the main README:
 
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)
+- [docs/GITHUB_PUBLISHING.md](docs/GITHUB_PUBLISHING.md)
 - [RELEASE_NOTES.md](RELEASE_NOTES.md)
 - [CHANGELOG.md](CHANGELOG.md)
 

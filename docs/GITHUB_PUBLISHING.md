@@ -96,6 +96,10 @@ gh release create v1.0.1 \
   --notes-file RELEASE_NOTES.md
 ```
 
+Keep the release asset name as `ScreenTextGrab.zip`. The public installer script
+[`scripts/install_release.sh`](../scripts/install_release.sh) downloads that
+exact asset from the latest GitHub release.
+
 ## Suggested release body structure
 
 - What the app does in one sentence
