@@ -10,9 +10,12 @@ xcodegen generate --spec project.yml
 - Build the release archive and export a `Developer ID Application` package:
 
 ```bash
-SCREEN_TEXT_GRAB_TEAM_ID="<YOUR_TEAM_ID>" \
 ./scripts/build_release.sh
 ```
+
+  If the release Mac already has a matching Apple Developer signing identity,
+  the script auto-detects the team ID. `SCREEN_TEXT_GRAB_TEAM_ID` is only
+  needed when auto-detection is not possible.
 
 - To build, notarize, verify, and publish the GitHub release in one local command:
 

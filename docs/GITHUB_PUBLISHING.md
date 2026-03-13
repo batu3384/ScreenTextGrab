@@ -74,9 +74,12 @@ gh repo edit \
 Build the distributable artifacts first:
 
 ```bash
-SCREEN_TEXT_GRAB_TEAM_ID="<YOUR_TEAM_ID>" \
 ./scripts/build_release.sh
 ```
+
+On a Mac that already has the matching Apple Developer signing identity,
+`build_release.sh` auto-detects the team ID. Set `SCREEN_TEXT_GRAB_TEAM_ID`
+only when detection fails or you need to override it.
 
 If you are shipping the public `.app`, notarize it before release:
 
@@ -101,6 +104,10 @@ Or use the new wrapper script:
 ```bash
 ./scripts/publish_release.sh v1.0.1 --draft
 ```
+
+On a properly configured release Mac, the wrapper can also reuse the current
+Xcode account session for notarization, so no extra notary environment
+variables are required for local publishing.
 
 ## Automated GitHub Release workflow
 

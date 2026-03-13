@@ -26,6 +26,36 @@ require_command() {
 require_command xcrun
 require_command ditto
 require_command codesign
+require_command openssl
+
+detect_team_id() {
+  local certificate_pem=""
+  local subject=""
+  local team_id=""
+  local keychains=("$HOME/Library/Keychains/login.keychain-db" "/Library/Keychains/System.keychain")
+
+  certificate_pem="$(security find-certificate -a -c "Developer ID Application" -p "${keychains[@]}" 2>/dev/null || true)"
+  if [[ -z "${certificate_pem}" ]]; then
+    certificate_pem="$(security find-certificate -a -c "Apple Development" -p "${keychains[@]}" 2>/dev/null || true)"
+  fi
+
+  if [[ -z "${certificate_pem}" ]]; then
+    return 1
+  fi
+
+  subject="$(printf '%s\n' "${certificate_pem}" | openssl x509 -noout -subject 2>/dev/null || true)"
+  team_id="$(printf '%s\n' "${subject}" | sed -nE 's/.*OU=([^,\\/]+).*/\1/p' | head -n 1)"
+
+  if [[ -z "${team_id}" ]]; then
+    return 1
+  fi
+
+  printf '%s\n' "${team_id}"
+}
+
+if [[ -z "${TEAM_ID}" ]]; then
+  TEAM_ID="$(detect_team_id || true)"
+fi
 
 if [[ ! -d "${APP_PATH}" ]]; then
   echo "Release app not found: ${APP_PATH}" >&2
@@ -110,6 +140,7 @@ run_xcode_account_flow() {
   upload_export_path="${ROOT_DIR}/.build/notary-upload"
   upload_options_plist="${ROOT_DIR}/.build/notary-upload-options.plist"
   mkdir -p "${ROOT_DIR}/.build"
+  rm -rf "${upload_export_path}"
 
   cat > "${upload_options_plist}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -142,6 +173,7 @@ PLIST
   while (( SECONDS < deadline )); do
     export_path="${ROOT_DIR}/.build/notarized-export-attempt-${attempt}"
     export_log="/tmp/ScreenTextGrab-notarized-export-${attempt}.log"
+    rm -rf "${export_path}"
 
     if xcodebuild -exportNotarizedApp \
       -archivePath "${ARCHIVE_PATH}" \

@@ -24,11 +24,43 @@ require_command xcodebuild
 require_command codesign
 require_command security
 require_command ditto
+require_command openssl
+
+detect_team_id() {
+  local certificate_pem=""
+  local subject=""
+  local team_id=""
+  local keychains=("$HOME/Library/Keychains/login.keychain-db" "/Library/Keychains/System.keychain")
+
+  certificate_pem="$(security find-certificate -a -c "Developer ID Application" -p "${keychains[@]}" 2>/dev/null || true)"
+  if [[ -z "${certificate_pem}" ]]; then
+    certificate_pem="$(security find-certificate -a -c "Apple Development" -p "${keychains[@]}" 2>/dev/null || true)"
+  fi
+
+  if [[ -z "${certificate_pem}" ]]; then
+    return 1
+  fi
+
+  subject="$(printf '%s\n' "${certificate_pem}" | openssl x509 -noout -subject 2>/dev/null || true)"
+  team_id="$(printf '%s\n' "${subject}" | sed -nE 's/.*OU=([^,\\/]+).*/\1/p' | head -n 1)"
+
+  if [[ -z "${team_id}" ]]; then
+    return 1
+  fi
+
+  printf '%s\n' "${team_id}"
+}
+
+if [[ -z "${TEAM_ID}" ]]; then
+  TEAM_ID="$(detect_team_id || true)"
+fi
 
 if [[ -z "${TEAM_ID}" ]]; then
   echo "Set SCREEN_TEXT_GRAB_TEAM_ID to your own Apple Developer Team ID before creating a signed public release." >&2
   exit 1
 fi
+
+echo "==> Using Apple Developer Team ID: ${TEAM_ID}"
 
 echo "==> Generating Xcode project"
 xcodegen generate --spec "${ROOT_DIR}/project.yml"

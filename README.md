@@ -163,8 +163,8 @@ Shortcut:
 ```
 
 This script builds `dist/ScreenTextGrab.zip`, runs notarization when credentials
-are present, verifies the result, and creates or updates the matching GitHub
-release.
+are present or when the release Mac already has an active Xcode notary session,
+verifies the result, and creates or updates the matching GitHub release.
 
 ## GitHub publishing
 
