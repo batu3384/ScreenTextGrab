@@ -1,0 +1,67 @@
+name: ScreenTextGrab
+options:
+  bundleIdPrefix: dev.screentextgrab
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+targets:
+  ScreenTextGrab:
+    type: application
+    platform: macOS
+    sources:
+      - path: ScreenTextGrab
+        excludes:
+          - "**/*.xcassets/*/Contents.json"
+    scheme:
+      testTargets:
+        - ScreenTextGrabTests
+        - ScreenTextGrabUITests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.screentextgrab.app
+        INFOPLIST_FILE: ScreenTextGrab/Info.plist
+        PRODUCT_NAME: ScreenTextGrab
+        MARKETING_VERSION: "1.0.1"
+        CURRENT_PROJECT_VERSION: "2"
+        GENERATE_INFOPLIST_FILE: false
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+        ENABLE_HARDENED_RUNTIME: true
+        CODE_SIGN_STYLE: Automatic
+      configs:
+        Release:
+          CODE_SIGN_ENTITLEMENTS: ScreenTextGrab/ScreenTextGrab.entitlements
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+
+  ScreenTextGrabTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: ScreenTextGrabTests
+    dependencies:
+      - target: ScreenTextGrab
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.screentextgrab.app.tests
+        GENERATE_INFOPLIST_FILE: true
+        CODE_SIGN_STYLE: Automatic
+
+  ScreenTextGrabUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: ScreenTextGrabUITests
+    dependencies:
+      - target: ScreenTextGrab
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.screentextgrab.app.uitests
+        GENERATE_INFOPLIST_FILE: true
+        CODE_SIGN_STYLE: Automatic

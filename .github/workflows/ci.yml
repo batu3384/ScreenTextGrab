@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate --spec project.yml
+
+      - name: Repository audit
+        run: ./scripts/repo_audit.sh
+
+      - name: Unit tests
+        run: |
+          xcodebuild test \
+            -project ScreenTextGrab.xcodeproj \
+            -scheme ScreenTextGrab \
+            -only-testing:ScreenTextGrabTests \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=''
+
+      - name: UI tests
+        run: |
+          xcodebuild test \
+            -project ScreenTextGrab.xcodeproj \
+            -scheme ScreenTextGrab \
+            -only-testing:ScreenTextGrabUITests \
+            -destination 'platform=macOS' \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY='-' \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            DEVELOPMENT_TEAM=''
+
+      - name: Release build smoke test
+        run: |
+          xcodebuild build \
+            -project ScreenTextGrab.xcodeproj \
+            -scheme ScreenTextGrab \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=''
