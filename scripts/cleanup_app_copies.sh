@@ -41,6 +41,15 @@ remove_path() {
   REMOVED=$((REMOVED + 1))
 }
 
+unregister_app_path() {
+  local path="$1"
+  if [[ ! -d "$path" || "$path" == "$CANONICAL_PATH" ]]; then
+    return
+  fi
+
+  /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -u "$path" >/dev/null 2>&1 || true
+}
+
 remove_app_path "$HOME/Applications/${APP_NAME}"
 remove_app_path "$HOME/Desktop/${APP_NAME}"
 remove_app_path "$HOME/Downloads/${APP_NAME}"
@@ -64,6 +73,18 @@ done < <(find /private/tmp -maxdepth 1 -iname 'ScreenTextGrab*' 2>/dev/null | so
 remove_path "${REPO_ROOT}/dist"
 remove_path "${REPO_ROOT}/.build/release"
 remove_path "${REPO_ROOT}/.build/local-install"
+
+while IFS= read -r path; do
+  [[ -z "$path" ]] && continue
+  [[ "$path" == "$CANONICAL_PATH" ]] && continue
+  unregister_app_path "$path"
+
+  case "$path" in
+    */DerivedData/*|*/.build/*|*/dist/*|/private/tmp/*|/tmp/*)
+      remove_app_path "$path"
+      ;;
+  esac
+done < <(mdfind "kMDItemFSName == '${APP_NAME}'" | sort -u)
 
 if [[ "$RESET_TCC" == "true" ]]; then
   echo "==> Resetting TCC ScreenCapture entry for ${BUNDLE_ID}"
