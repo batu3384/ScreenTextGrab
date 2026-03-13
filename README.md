@@ -1,85 +1,89 @@
 # ScreenTextGrab
 
 [![CI](https://github.com/batu3384/ScreenTextGrab/actions/workflows/ci.yml/badge.svg)](https://github.com/batu3384/ScreenTextGrab/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/batu3384/ScreenTextGrab)](https://github.com/batu3384/ScreenTextGrab/releases/latest)
 
-ScreenTextGrab is a macOS menu bar OCR app for capturing text from any on-screen region and pasting it back in the format that fits the job.
+ScreenTextGrab is a local-first macOS menu bar OCR app for capturing text from any on-screen region and pasting it back in the format that fits the job.
 
-It is designed for fast everyday capture, code snippets, subtitles, and spreadsheet-like tables. OCR runs locally with Apple's Vision framework, so screenshots and recognized text stay on the device.
+It is built for everyday text capture, subtitles, code snippets, and spreadsheet-like tables. OCR runs locally with Apple's Vision framework, so screenshots and recognized text stay on the device.
 
+Latest notarized release: [GitHub Releases](https://github.com/batu3384/ScreenTextGrab/releases/latest)
 
-## What it does well
+## Install
 
-- Captures text from any on-screen region without changing apps
-- Exposes a global shortcut for quick region selection
-- Switches between `Standard`, `Subtitle`, `Code`, and `Table` OCR modes
-- Copies results as `Plain Text`, `Cleaned`, `Markdown`, `JSON`, or rich `Office` output
-- Preserves row and column structure for Excel, Numbers, and Word workflows
-- Includes a table review editor for fixing OCR-extracted tables before pasting again
-- Keeps a local copy history for recent captures
-- Runs as a focused menu bar utility instead of a full desktop workspace
-
-## Quick install
-
-### Option 1: one-command install from GitHub
-
-This is the shortest install path:
+### One-command install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/batu3384/ScreenTextGrab/main/scripts/bootstrap_install.sh | bash
 ```
 
-What it does:
+This command:
 
-- downloads ScreenTextGrab from GitHub
-- uses the latest release if one exists
-- otherwise falls back to a local source build
+- downloads the latest release when available
 - installs `ScreenTextGrab.app` into `/Applications`
-- cleans old copies so Spotlight shows the right app
+- cleans stale copies so Spotlight finds the correct app
 - launches the app
 
-On first launch, macOS will ask for Screen Recording permission once. After you allow it, reopen the app and continue normally.
+After installation you can open it from Spotlight with `ScreenTextGrab` or from Terminal with:
 
-### Option 2: install from a local clone
+```bash
+open -a ScreenTextGrab
+```
 
-If you already cloned the repository:
+On first launch, macOS asks for Screen Recording permission once. After you allow it, reopen the app and continue normally.
+
+### Install from a local clone
 
 ```bash
 ./scripts/install.sh
 ```
 
-This builds the app locally, installs it into `/Applications`, cleans stale copies, and launches the canonical app so Spotlight can find it.
+## Why it is useful
 
-## Why ScreenTextGrab exists
+- Captures text from any screen region without switching apps
+- Supports `Standard`, `Subtitle`, `Code`, and `Table` OCR modes
+- Copies results as `Plain Text`, `Cleaned`, `Markdown`, `JSON`, or rich `Office` output
+- Preserves row and column structure for Excel, Numbers, Word, and Pages workflows
+- Includes a table review editor for fixing OCR-extracted tables before pasting again
+- Keeps local clipboard history for recent captures
+- Runs as a focused menu bar utility instead of a large desktop workspace
 
-Most OCR tools are good at turning pixels into text, but weak at preserving intent. A subtitle should not be treated like a terminal log, and a table should not come back as a flat paragraph.
+## How it works
 
-ScreenTextGrab changes the OCR strategy based on the content you are capturing, then formats the clipboard output for the target workflow. The result is a smaller, faster macOS utility that is much better at practical copy-paste work.
+1. Open ScreenTextGrab from the menu bar or global shortcut.
+2. Choose the capture mode that matches the content.
+3. Select a screen region.
+4. Review the result and paste it in the target app.
 
-## Core workflows
+## Capture modes
 
-### Capture modes
+| Mode | Best for |
+| --- | --- |
+| `Standard` | documents, UI text, dashboards, general interface copy |
+| `Subtitle` | video subtitles, overlays, repeated lower-third text |
+| `Code` | code blocks, logs, terminals, developer tools |
+| `Table` | spreadsheets, price lists, multi-column layouts |
 
-- `Standard`: balanced OCR for documents, app UI, dashboards, and general interface text
-- `Subtitle`: tuned for lower-third text, repeated subtitle sampling, and video overlays
-- `Code`: preserves line structure, symbols, and whitespace more carefully
-- `Table`: extracts rows and columns for office apps and spreadsheet-like layouts
+## Output formats
 
-### Output presets
+| Output | Use case |
+| --- | --- |
+| `Smart` | best default output for the selected mode |
+| `Plain Text` | raw text paste |
+| `Cleaned` | cleaned OCR output from noisy captures |
+| `Office` | rich paste for Excel, Numbers, Word, and Pages |
+| `Markdown` | notes, docs, code blocks |
+| `JSON` | automation and structured post-processing |
 
-- `Smart`: best default output for the selected capture mode
-- `Plain Text`: direct unformatted text
-- `Cleaned`: OCR cleanup for noisy captures
-- `Office`: rich clipboard output for Excel, Numbers, Word, and Pages
-- `Markdown`: structured output for notes, docs, and code blocks
-- `JSON`: structured output for automation or post-processing
+## Office-ready tables
 
-### Office-ready table workflow
+For the best spreadsheet workflow:
 
 1. Choose `Table` mode.
 2. Choose `Office` output.
-3. Capture the table region.
-4. If needed, fix rows or columns in the built-in table review window.
-5. Paste into Excel, Numbers, Word, or Pages with preserved structure.
+3. Capture the table.
+4. Adjust rows or columns in the built-in table review window if needed.
+5. Paste into Excel, Numbers, Word, or Pages.
 
 ## Screenshots
 
@@ -93,87 +97,18 @@ ScreenTextGrab changes the OCR strategy based on the content you are capturing, 
 
 ## Privacy
 
-ScreenTextGrab does not upload screenshots or OCR results to a remote service. OCR runs locally with Apple's Vision framework. The app asks only for Screen Recording permission because macOS requires it for region capture.
+ScreenTextGrab does not upload screenshots or OCR results to a remote service. OCR runs locally with Apple's Vision framework. The app requests Screen Recording permission because macOS requires it for region capture.
 
 ## Requirements
 
 - macOS 14 or newer
-- For source builds: Xcode 15 or newer
+- Xcode 15 or newer only if you are building from source
 
-## Local development
+## Project docs
 
-Run the repository audit:
-
-```bash
-./scripts/repo_audit.sh
-```
-
-Run unit tests:
-
-```bash
-xcodebuild test \
-  -project ScreenTextGrab.xcodeproj \
-  -scheme ScreenTextGrab \
-  -only-testing:ScreenTextGrabTests \
-  -destination 'platform=macOS' \
-  CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGN_IDENTITY=''
-```
-
-Run UI tests:
-
-```bash
-xcodebuild test \
-  -project ScreenTextGrab.xcodeproj \
-  -scheme ScreenTextGrab \
-  -only-testing:ScreenTextGrabUITests \
-  -destination 'platform=macOS' \
-  CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY='-' \
-  AD_HOC_CODE_SIGNING_ALLOWED=YES \
-  DEVELOPMENT_TEAM=''
-```
-
-Build a local release candidate without signing:
-
-```bash
-xcodebuild build \
-  -project ScreenTextGrab.xcodeproj \
-  -scheme ScreenTextGrab \
-  -configuration Release \
-  CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGN_IDENTITY=''
-```
-
-## Maintainer release flow
-
-If you are publishing signed public releases, the full signing and notarization flow is documented here instead of the main README:
-
-- [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)
-- [docs/GITHUB_PUBLISHING.md](docs/GITHUB_PUBLISHING.md)
-- [RELEASE_NOTES.md](RELEASE_NOTES.md)
-- [CHANGELOG.md](CHANGELOG.md)
-
-Shortcut:
-
-```bash
-./scripts/publish_release.sh v1.0.1 --draft
-```
-
-This script builds `dist/ScreenTextGrab.zip`, runs notarization when credentials
-are present or when the release Mac already has an active Xcode notary session,
-verifies the result, and creates or updates the matching GitHub release.
-
-## GitHub publishing
-
-Repository publishing commands, release workflow, suggested repo description, and `gh` CLI steps are documented here:
-
-- [docs/GITHUB_PUBLISHING.md](docs/GITHUB_PUBLISHING.md)
-
-## Open source project files
-
-- [CONTRIBUTING.md](CONTRIBUTING.md)
-- [SECURITY.md](SECURITY.md)
-- [LICENSE](LICENSE)
+- [Release downloads](https://github.com/batu3384/ScreenTextGrab/releases/latest)
+- [Contributing guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Release checklist](RELEASE_CHECKLIST.md)
+- [GitHub publishing guide](docs/GITHUB_PUBLISHING.md)
+- [License](LICENSE)
