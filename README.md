@@ -6,7 +6,6 @@ ScreenTextGrab is a macOS menu bar OCR app for capturing text from any on-screen
 
 It is designed for fast everyday capture, code snippets, subtitles, and spreadsheet-like tables. OCR runs locally with Apple's Vision framework, so screenshots and recognized text stay on the device.
 
-![ScreenTextGrab menu panel](docs/screenshots/menu-panel.png)
 
 ## What it does well
 
