@@ -1,47 +1,69 @@
 # ScreenTextGrab
 
-ScreenTextGrab is a macOS menu bar OCR app for grabbing text from any on-screen region, then pasting it back in the format that fits the job.
+[![CI](https://github.com/batu3384/ScreenTextGrab/actions/workflows/ci.yml/badge.svg)](https://github.com/batu3384/ScreenTextGrab/actions/workflows/ci.yml)
 
-It is built for fast daily capture, code snippets, subtitles, and spreadsheet-like tables. OCR runs locally with Apple's Vision framework and keeps screenshots and recognized text on the device.
+ScreenTextGrab is a macOS menu bar OCR app for capturing text from any on-screen region and pasting it back in the format that fits the job.
 
-![Launch panel](docs/screenshots/launch-panel.png)
+It is designed for fast everyday capture, code snippets, subtitles, and spreadsheet-like tables. OCR runs locally with Apple's Vision framework, so screenshots and recognized text stay on the device.
 
-## Why it exists
+![ScreenTextGrab menu panel](docs/screenshots/menu-panel.png)
 
-- Capture text from anywhere on screen without switching apps
-- Use a global shortcut for fast region selection
-- Switch between `Standard`, `Subtitle`, `Code`, and `Table` capture modes
-- Paste results as plain text, cleaned text, Markdown, JSON, or `Office`-compatible rich content
-- Repair OCR-extracted tables in a dedicated table editor before copying again
-- Keep a local searchable history of captured text
+## What it does well
 
-## Screenshots
+- Captures text from any on-screen region without changing apps
+- Exposes a global shortcut for quick region selection
+- Switches between `Standard`, `Subtitle`, `Code`, and `Table` OCR modes
+- Copies results as `Plain Text`, `Cleaned`, `Markdown`, `JSON`, or rich `Office` output
+- Preserves row and column structure for Excel, Numbers, and Word workflows
+- Includes a table review editor for fixing OCR-extracted tables before pasting again
+- Keeps a local copy history for recent captures
+- Runs as a focused menu bar utility instead of a full desktop workspace
 
-| Launch Panel | Settings | Table Review |
-| --- | --- | --- |
-| ![Launch panel](docs/screenshots/launch-panel.png) | ![Settings](docs/screenshots/settings-general.png) | ![Table review](docs/screenshots/table-review.png) |
+## Why ScreenTextGrab exists
+
+Most OCR tools are good at turning pixels into text, but weak at preserving intent. A subtitle should not be treated like a terminal log, and a table should not come back as a flat paragraph.
+
+ScreenTextGrab changes the OCR strategy based on the content you are capturing, then formats the clipboard output for the target workflow. The result is a smaller, faster macOS utility that is much better at practical copy-paste work.
 
 ## Core workflows
 
 ### Capture modes
 
-- `Standard`: balanced OCR for documents, UI text, dashboards, and general app content
-- `Subtitle`: tuned for lower-third text and repeated subtitle sampling
-- `Code`: preserves line structure and whitespace more carefully
-- `Table`: extracts row and column structure for Excel, Numbers, and Word workflows
+- `Standard`: balanced OCR for documents, app UI, dashboards, and general interface text
+- `Subtitle`: tuned for lower-third text, repeated subtitle sampling, and video overlays
+- `Code`: preserves line structure, symbols, and whitespace more carefully
+- `Table`: extracts rows and columns for office apps and spreadsheet-like layouts
 
 ### Output presets
 
-- `Smart`: best default output for the active capture mode
+- `Smart`: best default output for the selected capture mode
 - `Plain Text`: direct unformatted text
 - `Cleaned`: OCR cleanup for noisy captures
-- `Office`: rich clipboard output for Word and Excel
-- `Markdown`: good for code blocks and structured notes
+- `Office`: rich clipboard output for Excel, Numbers, Word, and Pages
+- `Markdown`: structured output for notes, docs, and code blocks
 - `JSON`: structured output for automation or post-processing
+
+### Office-ready table workflow
+
+1. Choose `Table` mode.
+2. Choose `Office` output.
+3. Capture the table region.
+4. If needed, fix rows or columns in the built-in table review window.
+5. Paste into Excel, Numbers, Word, or Pages with preserved structure.
+
+## Screenshots
+
+| Menu Panel | Launch Panel |
+| --- | --- |
+| ![Menu panel](docs/screenshots/menu-panel.png) | ![Launch panel](docs/screenshots/launch-panel.png) |
+
+| Settings | Table Review |
+| --- | --- |
+| ![Settings](docs/screenshots/settings-general.png) | ![Table review](docs/screenshots/table-review.png) |
 
 ## Privacy
 
-ScreenTextGrab does not upload screenshots or OCR results to a remote service. OCR runs locally with Apple's Vision framework. The app asks only for Screen Recording permission because that is required to capture the selected area.
+ScreenTextGrab does not upload screenshots or OCR results to a remote service. OCR runs locally with Apple's Vision framework. The app asks only for Screen Recording permission because macOS requires it for region capture.
 
 ## Requirements
 
@@ -57,7 +79,13 @@ Generate the project:
 xcodegen generate --spec project.yml
 ```
 
-Run the unit tests:
+Run the repository audit:
+
+```bash
+./scripts/repo_audit.sh
+```
+
+Run unit tests:
 
 ```bash
 xcodebuild test \
@@ -70,7 +98,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY=''
 ```
 
-Run the UI tests with ad-hoc signing for the runner:
+Run UI tests:
 
 ```bash
 xcodebuild test \
@@ -96,12 +124,6 @@ xcodebuild build \
   CODE_SIGN_IDENTITY=''
 ```
 
-Run the repository audit:
-
-```bash
-./scripts/repo_audit.sh
-```
-
 ## Public release
 
 For a public macOS release you still need:
@@ -124,7 +146,7 @@ SCREEN_TEXT_GRAB_NOTARY_PROFILE="your-notary-profile" \
 ./scripts/verify_release.sh
 ```
 
-More detail:
+Release detail:
 
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)
 - [RELEASE_NOTES.md](RELEASE_NOTES.md)
@@ -132,11 +154,11 @@ More detail:
 
 ## GitHub publishing
 
-Repository publishing, release commands, suggested repository description, and terminal workflow are documented here:
+Repository publishing commands, release workflow, suggested repo description, and `gh` CLI steps are documented here:
 
 - [docs/GITHUB_PUBLISHING.md](docs/GITHUB_PUBLISHING.md)
 
-## Open source hygiene
+## Open source project files
 
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [SECURITY.md](SECURITY.md)

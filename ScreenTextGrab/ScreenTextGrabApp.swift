@@ -424,11 +424,17 @@ private struct UITestConfiguration {
 }
 
 private enum ScreenshotLaunchMode {
+    case menuPanel
     case launchPanel
     case settings
     case tableReview
 
     init?(arguments: [String]) {
+        if arguments.contains("--screenshot-menu-panel") {
+            self = .menuPanel
+            return
+        }
+
         if arguments.contains("--screenshot-launch-panel") {
             self = .launchPanel
             return
@@ -911,6 +917,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @MainActor
+    private func configureMenuPanelPreviewState() {
+        configurePreviewState()
+        appState.statusMessage = "Hazır"
+        appState.launchAtLoginState = .disabled
+        appState.watchState = .inactive
+        appState.hotkeyDisplayLabel = HotkeyConfiguration.defaultValue.displayLabel
+    }
+
     private func screenshotHistoryEntries() -> [ClipboardHistoryEntry] {
         [
             ClipboardHistoryEntry(
@@ -936,6 +951,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func showPreview(for mode: ScreenshotLaunchMode) {
         switch mode {
+        case .menuPanel:
+            configureMenuPanelPreviewState()
+            showPreviewWindow(
+                title: "ScreenTextGrab",
+                size: NSSize(width: 404, height: 892),
+                styleMask: [.borderless],
+                isOpaque: false,
+                backgroundColor: .clear,
+                hasShadow: true,
+                canBecomeKey: false
+            ) {
+                MenuBarView()
+                    .environmentObject(self.appState)
+                    .padding(22)
+                    .background(Color(red: 0.03, green: 0.07, blue: 0.10))
+                    .frame(width: 404, height: 892, alignment: .top)
+            }
         case .launchPanel:
             showLaunchPanel(force: true)
         case .settings:
@@ -963,6 +995,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showPreviewWindow<Content: View>(
         title: String,
         size: NSSize,
+        styleMask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable],
+        isOpaque: Bool = true,
+        backgroundColor: NSColor = .windowBackgroundColor,
+        hasShadow: Bool = true,
+        canBecomeKey: Bool = true,
         @ViewBuilder content: () -> Content
     ) {
         if let window = previewWindowController?.window {
@@ -973,7 +1010,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: size),
-            styleMask: [.titled, .closable, .miniaturizable],
+            styleMask: styleMask,
             backing: .buffered,
             defer: false
         )
@@ -982,7 +1019,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = title
         window.isReleasedWhenClosed = false
         window.isMovableByWindowBackground = true
-        window.backgroundColor = .windowBackgroundColor
+        window.backgroundColor = backgroundColor
+        window.isOpaque = isOpaque
+        window.hasShadow = hasShadow
+        window.titleVisibility = styleMask.contains(.titled) ? .visible : .hidden
         window.center()
         window.contentView = NSHostingView(rootView: content())
         window.setContentSize(size)
@@ -990,7 +1030,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         previewWindowController = controller
         NSApp.activate(ignoringOtherApps: true)
         controller.showWindow(nil)
-        window.makeKeyAndOrderFront(nil)
+        if canBecomeKey {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            window.orderFrontRegardless()
+        }
         window.orderFrontRegardless()
     }
 
