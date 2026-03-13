@@ -553,6 +553,45 @@ enum InstalledAppLocator {
         return candidate
     }
 
+    static func preferredInstallDestination(
+        currentURL: URL,
+        bundleIdentifier: String?,
+        searchRoots: [URL] = defaultSearchRoots(),
+        fileManager: FileManager = .default
+    ) -> URL? {
+        let appName = currentURL.lastPathComponent
+        let bundledCandidates = searchRoots.flatMap { root in
+            appBundleCandidates(in: root, fileManager: fileManager)
+        }
+        let directNameCandidates = searchRoots.map {
+            $0.appendingPathComponent(appName, isDirectory: true)
+        }
+
+        let existingCandidates = uniqueURLs(from: directNameCandidates + bundledCandidates)
+            .filter { candidate in
+                guard let bundleIdentifier else {
+                    return candidate.lastPathComponent == appName
+                }
+
+                return appBundleIdentifier(for: candidate) == bundleIdentifier
+            }
+            .sorted { lhs, rhs in
+                ranking(for: lhs, preferredAppName: appName) < ranking(for: rhs, preferredAppName: appName)
+            }
+
+        if let existingCandidate = existingCandidates.first {
+            return existingCandidate
+        }
+
+        for root in searchRoots {
+            if ensureInstallRootExistsAndIsWritable(root, fileManager: fileManager) {
+                return root.appendingPathComponent(appName, isDirectory: true)
+            }
+        }
+
+        return nil
+    }
+
     static func defaultSearchRoots(homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) -> [URL] {
         [
             URL(fileURLWithPath: "/Applications", isDirectory: true),
@@ -597,6 +636,74 @@ enum InstalledAppLocator {
 
     private static func standardizedPath(for url: URL) -> String {
         url.resolvingSymlinksInPath().standardizedFileURL.path
+    }
+
+    private static func ensureInstallRootExistsAndIsWritable(_ root: URL, fileManager: FileManager) -> Bool {
+        let path = standardizedPath(for: root)
+        var isDirectory: ObjCBool = false
+
+        if fileManager.fileExists(atPath: path, isDirectory: &isDirectory) {
+            return isDirectory.boolValue && fileManager.isWritableFile(atPath: path)
+        }
+
+        do {
+            try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+            return fileManager.isWritableFile(atPath: path)
+        } catch {
+            return false
+        }
+    }
+}
+
+enum InstalledAppRelocatorError: LocalizedError {
+    case noInstallDestination
+    case copyFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .noInstallDestination:
+            return L10n.installRootUnavailable
+        case .copyFailed(let message):
+            return "\(L10n.installCopyFailedPrefix) \(message)"
+        }
+    }
+}
+
+enum InstalledAppRelocator {
+    static func installCurrentCopy(
+        from currentURL: URL,
+        bundleIdentifier: String?,
+        searchRoots: [URL] = InstalledAppLocator.defaultSearchRoots(),
+        fileManager: FileManager = .default
+    ) throws -> URL {
+        guard let destinationURL = InstalledAppLocator.preferredInstallDestination(
+            currentURL: currentURL,
+            bundleIdentifier: bundleIdentifier,
+            searchRoots: searchRoots,
+            fileManager: fileManager
+        ) else {
+            throw InstalledAppRelocatorError.noInstallDestination
+        }
+
+        let sourceURL = currentURL.resolvingSymlinksInPath().standardizedFileURL
+        let targetURL = destinationURL.resolvingSymlinksInPath().standardizedFileURL
+
+        if sourceURL.path == targetURL.path {
+            return targetURL
+        }
+
+        do {
+            try fileManager.createDirectory(at: targetURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+            if fileManager.fileExists(atPath: targetURL.path) {
+                try fileManager.removeItem(at: targetURL)
+            }
+
+            try fileManager.copyItem(at: sourceURL, to: targetURL)
+            return targetURL
+        } catch {
+            throw InstalledAppRelocatorError.copyFailed(error.localizedDescription)
+        }
     }
 }
 
@@ -783,14 +890,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             currentURL: currentURL,
             bundleIdentifier: Bundle.main.bundleIdentifier
         ) else {
-            STGLog.lifecycle.warning("Canonical app not found; allowing current path: \(currentPath, privacy: .public)")
-            return true
+            do {
+                let relocatedURL = try InstalledAppRelocator.installCurrentCopy(
+                    from: currentURL,
+                    bundleIdentifier: Bundle.main.bundleIdentifier
+                )
+
+                STGLog.lifecycle.info("Relocated app to canonical path: \(relocatedURL.path, privacy: .public)")
+                appState.captureState = .idle
+                appState.permissionState = .unknown
+                appState.statusMessage = L10n.installRelocatingStatus
+
+                unregisterNonCanonicalCopyFromLaunchServicesIfNeeded(currentURL)
+                NSWorkspace.shared.open(relocatedURL)
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    NSApplication.shared.terminate(nil)
+                }
+
+                return false
+            } catch {
+                STGLog.lifecycle.warning("Canonical install relocation failed: \(error.localizedDescription, privacy: .public)")
+                appState.statusMessage = L10n.installOpenFromApplicationsStatus
+                presentInstallLocationAlert(for: currentURL, error: error)
+                return true
+            }
         }
 
         STGLog.lifecycle.error("Unsupported app path: \(currentPath, privacy: .public)")
         appState.captureState = .failed
         appState.permissionState = .unknown
-        appState.statusMessage = "⚠️ Yüklü uygulama kopyası açılıyor..."
+        appState.statusMessage = L10n.installOpeningInstalledCopyStatus
 
         unregisterNonCanonicalCopyFromLaunchServicesIfNeeded(currentURL)
 
@@ -802,6 +932,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         return false
         #endif
+    }
+
+    private func presentInstallLocationAlert(for appURL: URL, error: Error) {
+        guard !isRunningUnderTests else {
+            return
+        }
+
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = L10n.installAlertTitle
+        alert.informativeText = [
+            L10n.installAlertBody,
+            error.localizedDescription
+        ].joined(separator: "\n\n")
+        alert.addButton(withTitle: L10n.actionOpenApplicationsFolder)
+        alert.addButton(withTitle: L10n.actionContinue)
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            let destinationFolder = InstalledAppLocator.defaultSearchRoots().first ?? appURL.deletingLastPathComponent()
+            NSWorkspace.shared.open(destinationFolder)
+        }
     }
 
     private func unregisterNonCanonicalCopyFromLaunchServicesIfNeeded(_ appURL: URL) {

@@ -96,6 +96,34 @@ gh release create v1.0.1 \
   --notes-file RELEASE_NOTES.md
 ```
 
+Or use the new wrapper script:
+
+```bash
+./scripts/publish_release.sh v1.0.1 --draft
+```
+
+## Automated GitHub Release workflow
+
+The repository now includes [`.github/workflows/release.yml`](../.github/workflows/release.yml).
+
+- `git push origin v1.0.1` will trigger a signed release build on GitHub Actions
+- `workflow_dispatch` can publish a release manually without creating the tag first
+- if notarization is enabled, the workflow also runs notarization and public verification
+- the workflow uploads `dist/ScreenTextGrab.zip` both as an artifact and as the GitHub release asset
+
+Required GitHub repository secrets:
+
+- `SCREEN_TEXT_GRAB_TEAM_ID`
+- `SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64`
+- `SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD`
+- `SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD`
+
+Required for notarization in GitHub Actions:
+
+- `SCREEN_TEXT_GRAB_ASC_KEY_BASE64`
+- `SCREEN_TEXT_GRAB_ASC_KEY_ID`
+- `SCREEN_TEXT_GRAB_ASC_ISSUER_ID` if your App Store Connect key uses an issuer id
+
 Keep the release asset name as `ScreenTextGrab.zip`. The public installer script
 [`scripts/install_release.sh`](../scripts/install_release.sh) downloads that
 exact asset from the latest GitHub release.

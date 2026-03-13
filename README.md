@@ -156,6 +156,16 @@ If you are publishing signed public releases, the full signing and notarization 
 - [RELEASE_NOTES.md](RELEASE_NOTES.md)
 - [CHANGELOG.md](CHANGELOG.md)
 
+Shortcut:
+
+```bash
+./scripts/publish_release.sh v1.0.1 --draft
+```
+
+This script builds `dist/ScreenTextGrab.zip`, runs notarization when credentials
+are present, verifies the result, and creates or updates the matching GitHub
+release.
+
 ## GitHub publishing
 
 Repository publishing commands, release workflow, suggested repo description, and `gh` CLI steps are documented here:

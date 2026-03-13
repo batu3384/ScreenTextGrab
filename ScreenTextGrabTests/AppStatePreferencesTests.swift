@@ -393,6 +393,96 @@ final class AppStatePreferencesTests: XCTestCase {
         XCTAssertEqual(preferred?.lastPathComponent, installedApp.lastPathComponent)
     }
 
+    func testPreferredInstallDestinationUsesExistingInstalledBundlePathForUpgrade() throws {
+        let sandbox = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        let installedRoot = sandbox.appendingPathComponent("Applications", isDirectory: true)
+        let downloadsRoot = sandbox.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: installedRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: downloadsRoot, withIntermediateDirectories: true)
+
+        let installedApp = try makeFakeApp(
+            named: "ScreenTextGrab Pro.app",
+            version: "2",
+            bundleIdentifier: "dev.screentextgrab.app",
+            in: installedRoot
+        )
+        let downloadedApp = try makeFakeApp(
+            named: "ScreenTextGrab.app",
+            version: "3",
+            bundleIdentifier: "dev.screentextgrab.app",
+            in: downloadsRoot
+        )
+
+        let destination = InstalledAppLocator.preferredInstallDestination(
+            currentURL: downloadedApp,
+            bundleIdentifier: "dev.screentextgrab.app",
+            searchRoots: [installedRoot]
+        )
+
+        XCTAssertEqual(destination?.lastPathComponent, installedApp.lastPathComponent)
+    }
+
+    func testPreferredInstallDestinationFallsBackToWritableUserApplicationsRoot() throws {
+        let sandbox = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        let lockedRoot = sandbox.appendingPathComponent("SystemApplications", isDirectory: true)
+        let userRoot = sandbox.appendingPathComponent("UserApplications", isDirectory: true)
+        let downloadsRoot = sandbox.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: lockedRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: userRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: downloadsRoot, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: lockedRoot.path)
+
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: lockedRoot.path)
+        }
+
+        let downloadedApp = try makeFakeApp(
+            named: "ScreenTextGrab.app",
+            version: "3",
+            bundleIdentifier: "dev.screentextgrab.app",
+            in: downloadsRoot
+        )
+
+        let destination = InstalledAppLocator.preferredInstallDestination(
+            currentURL: downloadedApp,
+            bundleIdentifier: "dev.screentextgrab.app",
+            searchRoots: [lockedRoot, userRoot]
+        )
+
+        XCTAssertEqual(destination, userRoot.appendingPathComponent("ScreenTextGrab.app", isDirectory: true))
+    }
+
+    func testInstalledAppRelocatorCopiesBundleIntoPreferredInstallDestination() throws {
+        let sandbox = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        let installedRoot = sandbox.appendingPathComponent("Applications", isDirectory: true)
+        let downloadsRoot = sandbox.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: installedRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: downloadsRoot, withIntermediateDirectories: true)
+
+        let downloadedApp = try makeFakeApp(
+            named: "ScreenTextGrab.app",
+            version: "7",
+            bundleIdentifier: "dev.screentextgrab.app",
+            in: downloadsRoot
+        )
+
+        let relocatedURL = try InstalledAppRelocator.installCurrentCopy(
+            from: downloadedApp,
+            bundleIdentifier: "dev.screentextgrab.app",
+            searchRoots: [installedRoot]
+        )
+
+        XCTAssertEqual(relocatedURL.standardizedFileURL.path, installedRoot.appendingPathComponent("ScreenTextGrab.app", isDirectory: true).standardizedFileURL.path)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: relocatedURL.appendingPathComponent("Contents/Info.plist").path))
+        XCTAssertEqual(Bundle(url: relocatedURL)?.bundleIdentifier, "dev.screentextgrab.app")
+    }
+
     func testPreferredTableSourceTextPrefersTabSeparatedRawValue() {
         let entry = ClipboardHistoryEntry(
             text: "| Urun | Fiyat |\n| --- | --- |\n| Elma | 12.99 |",

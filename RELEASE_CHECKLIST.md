@@ -14,6 +14,12 @@ SCREEN_TEXT_GRAB_TEAM_ID="<YOUR_TEAM_ID>" \
 ./scripts/build_release.sh
 ```
 
+- To build, notarize, verify, and publish the GitHub release in one local command:
+
+```bash
+./scripts/publish_release.sh v1.0.1 --draft
+```
+
 - The script uses Xcode's `developer-id` export flow. Make sure the selected Apple Developer team in Xcode has access to create or use Developer ID signing assets.
 
 - Submit the signed app for notarization and staple the ticket:
@@ -46,6 +52,14 @@ SCREEN_TEXT_GRAB_APP_SPECIFIC_PASSWORD="<app-specific-password>" \
 ```bash
 ./scripts/notarize_release.sh
 ```
+
+- GitHub Actions can run the same public release flow from [`.github/workflows/release.yml`](.github/workflows/release.yml).
+  Required secrets:
+  - `SCREEN_TEXT_GRAB_TEAM_ID`
+  - `SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64`
+  - `SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD`
+  - `SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD`
+  - for notarization: `SCREEN_TEXT_GRAB_ASC_KEY_BASE64`, `SCREEN_TEXT_GRAB_ASC_KEY_ID`, and `SCREEN_TEXT_GRAB_ASC_ISSUER_ID` when your App Store Connect key uses an issuer id
 
 - If Apple processing is slow, increase the Xcode polling timeout:
 

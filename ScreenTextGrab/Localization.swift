@@ -26,7 +26,17 @@ enum L10n {
     static let actionDefault = NSLocalizedString("action.default", value: "Varsayılan", comment: "")
     static let actionChange = NSLocalizedString("action.change", value: "Değiştir", comment: "")
     static let actionCancel = NSLocalizedString("action.cancel", value: "İptal", comment: "")
+    static let actionOpenApplicationsFolder = NSLocalizedString("action.open_applications_folder", value: "Applications Klasörünü Aç", comment: "")
+    static let actionContinue = NSLocalizedString("action.continue", value: "Devam Et", comment: "")
     static let ocrAutomaticLanguage = NSLocalizedString("ocr.automatic_language", value: "Dili otomatik algıla", comment: "")
+
+    static let installRootUnavailable = NSLocalizedString("install.root_unavailable", value: "Applications klasöründe yazılabilir bir hedef bulunamadı.", comment: "")
+    static let installCopyFailedPrefix = NSLocalizedString("install.copy_failed_prefix", value: "Uygulama Applications klasörüne taşınamadı:", comment: "")
+    static let installRelocatingStatus = NSLocalizedString("install.relocating_status", value: "⚠️ Uygulama Applications klasörüne taşınıyor...", comment: "")
+    static let installOpenFromApplicationsStatus = NSLocalizedString("install.open_from_applications_status", value: "⚠️ Uygulamayı Applications klasöründen aç", comment: "")
+    static let installOpeningInstalledCopyStatus = NSLocalizedString("install.opening_installed_copy_status", value: "⚠️ Yüklü uygulama kopyası açılıyor...", comment: "")
+    static let installAlertTitle = NSLocalizedString("install.alert_title", value: "Uygulamayı Applications klasöründen aç", comment: "")
+    static let installAlertBody = NSLocalizedString("install.alert_body", value: "ScreenTextGrab izinleri ve Spotlight kaydını stabil tutmak için Applications klasöründen çalışmalıdır.", comment: "")
 
     static let accessibilityQuitApp = NSLocalizedString("accessibility.quit_app", value: "Uygulamadan çık", comment: "")
     static let accessibilityResetHotkey = NSLocalizedString("accessibility.reset_hotkey", value: "Kısayolu varsayılana döndür", comment: "")

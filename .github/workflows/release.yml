@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (for example v1.0.2)"
+        required: true
+        type: string
+      draft:
+        description: "Create the release as a draft"
+        required: false
+        default: true
+        type: boolean
+      prerelease:
+        description: "Mark the release as a prerelease"
+        required: false
+        default: false
+        type: boolean
+      notarize:
+        description: "Run notarization and public verification"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+      RELEASE_DRAFT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.draft || 'false' }}
+      RELEASE_PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease || 'false' }}
+      RELEASE_NOTARIZE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.notarize || 'true' }}
+      SCREEN_TEXT_GRAB_TEAM_ID: ${{ secrets.SCREEN_TEXT_GRAB_TEAM_ID }}
+      SCREEN_TEXT_GRAB_ASC_KEY_ID: ${{ secrets.SCREEN_TEXT_GRAB_ASC_KEY_ID }}
+      SCREEN_TEXT_GRAB_ASC_ISSUER_ID: ${{ secrets.SCREEN_TEXT_GRAB_ASC_ISSUER_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Validate release configuration
+        run: |
+          test -n "${RELEASE_TAG}" || { echo "Release tag is required." >&2; exit 1; }
+          test -n "${SCREEN_TEXT_GRAB_TEAM_ID}" || { echo "Missing secret: SCREEN_TEXT_GRAB_TEAM_ID" >&2; exit 1; }
+          test -n "${{ secrets.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64 }}" || { echo "Missing secret: SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64" >&2; exit 1; }
+          test -n "${{ secrets.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD }}" || { echo "Missing secret: SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD" >&2; exit 1; }
+          test -n "${{ secrets.SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD }}" || { echo "Missing secret: SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD" >&2; exit 1; }
+
+      - name: Install build dependencies
+        run: brew install xcodegen ripgrep
+
+      - name: Import Developer ID certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64 }}
+          BUILD_CERTIFICATE_PASSWORD: ${{ secrets.SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD }}
+        run: |
+          CERT_PATH="${RUNNER_TEMP}/ScreenTextGrab-DeveloperID.p12"
+          KEYCHAIN_PATH="${RUNNER_TEMP}/ScreenTextGrab-signing.keychain-db"
+
+          echo "${BUILD_CERTIFICATE_BASE64}" | base64 --decode > "${CERT_PATH}"
+
+          security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
+          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security import "${CERT_PATH}" \
+            -k "${KEYCHAIN_PATH}" \
+            -P "${BUILD_CERTIFICATE_PASSWORD}" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security \
+            -T /usr/bin/xcodebuild
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "${KEYCHAIN_PASSWORD}" \
+            "${KEYCHAIN_PATH}"
+
+          EXISTING_KEYCHAINS="$(security list-keychains -d user | tr -d '"')"
+          security list-keychains -d user -s "${KEYCHAIN_PATH}" ${EXISTING_KEYCHAINS}
+          security default-keychain -d user -s "${KEYCHAIN_PATH}"
+          security find-identity -v -p codesigning "${KEYCHAIN_PATH}"
+
+      - name: Build signed release bundle
+        run: ./scripts/build_release.sh
+
+      - name: Prepare notarization credentials
+        if: env.RELEASE_NOTARIZE == 'true'
+        env:
+          ASC_KEY_BASE64: ${{ secrets.SCREEN_TEXT_GRAB_ASC_KEY_BASE64 }}
+        run: |
+          test -n "${ASC_KEY_BASE64}" || { echo "Missing secret: SCREEN_TEXT_GRAB_ASC_KEY_BASE64" >&2; exit 1; }
+          test -n "${SCREEN_TEXT_GRAB_ASC_KEY_ID}" || { echo "Missing secret: SCREEN_TEXT_GRAB_ASC_KEY_ID" >&2; exit 1; }
+
+          KEY_PATH="${RUNNER_TEMP}/AuthKey_${SCREEN_TEXT_GRAB_ASC_KEY_ID}.p8"
+          echo "${ASC_KEY_BASE64}" | base64 --decode > "${KEY_PATH}"
+          echo "SCREEN_TEXT_GRAB_ASC_KEY_PATH=${KEY_PATH}" >> "${GITHUB_ENV}"
+
+      - name: Notarize release
+        if: env.RELEASE_NOTARIZE == 'true'
+        run: ./scripts/notarize_release.sh
+
+      - name: Verify public release
+        if: env.RELEASE_NOTARIZE == 'true'
+        run: APP_PATH=dist/ScreenTextGrab.app ./scripts/verify_release.sh
+
+      - name: Verify local release
+        if: env.RELEASE_NOTARIZE != 'true'
+        run: APP_PATH=dist/ScreenTextGrab.app VERIFY_MODE=local ./scripts/verify_release.sh
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScreenTextGrab-${{ env.RELEASE_TAG }}
+          path: |
+            dist/ScreenTextGrab.app
+            dist/ScreenTextGrab.zip
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EDIT_ARGS=(
+            --title "ScreenTextGrab ${RELEASE_TAG}"
+            --notes-file RELEASE_NOTES.md
+          )
+          CREATE_ARGS=(
+            --title "ScreenTextGrab ${RELEASE_TAG}"
+            --notes-file RELEASE_NOTES.md
+          )
+
+          if [[ "${RELEASE_DRAFT}" == "true" ]]; then
+            EDIT_ARGS+=(--draft)
+            CREATE_ARGS+=(--draft)
+          else
+            EDIT_ARGS+=(--draft=false)
+          fi
+
+          if [[ "${RELEASE_PRERELEASE}" == "true" ]]; then
+            EDIT_ARGS+=(--prerelease)
+            CREATE_ARGS+=(--prerelease)
+          fi
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release edit "${RELEASE_TAG}" "${EDIT_ARGS[@]}"
+            gh release upload "${RELEASE_TAG}" dist/ScreenTextGrab.zip --clobber
+          else
+            gh release create "${RELEASE_TAG}" dist/ScreenTextGrab.zip "${CREATE_ARGS[@]}"
+          fi

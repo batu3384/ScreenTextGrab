@@ -21,7 +21,16 @@
 "action.default" = "Default";
 "action.change" = "Change";
 "action.cancel" = "Cancel";
+"action.open_applications_folder" = "Open Applications Folder";
+"action.continue" = "Continue";
 "ocr.automatic_language" = "Automatically detect language";
+"install.root_unavailable" = "No writable install destination was found in Applications.";
+"install.copy_failed_prefix" = "The app could not be moved to Applications:";
+"install.relocating_status" = "⚠️ Moving the app to Applications...";
+"install.open_from_applications_status" = "⚠️ Open the app from Applications";
+"install.opening_installed_copy_status" = "⚠️ Opening the installed app copy...";
+"install.alert_title" = "Open the app from Applications";
+"install.alert_body" = "ScreenTextGrab should run from Applications so permissions and Spotlight registration stay stable.";
 "accessibility.quit_app" = "Quit app";
 "accessibility.reset_hotkey" = "Reset shortcut to default";
 "accessibility.launch_at_login_toggle" = "Launch at login";
