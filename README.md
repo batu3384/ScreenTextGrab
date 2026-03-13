@@ -20,32 +20,34 @@ It is designed for fast everyday capture, code snippets, subtitles, and spreadsh
 
 ## Quick install
 
-### Option 1: build from source in one command
+### Option 1: one-command install from GitHub
 
-If you cloned the repository and want the app installed locally:
+This is the shortest install path:
 
 ```bash
-./scripts/install.sh
+curl -fsSL https://raw.githubusercontent.com/batu3384/ScreenTextGrab/main/scripts/bootstrap_install.sh | bash
 ```
 
 What it does:
 
-- builds the app locally
+- downloads ScreenTextGrab from GitHub
+- uses the latest release if one exists
+- otherwise falls back to a local source build
 - installs `ScreenTextGrab.app` into `/Applications`
 - cleans old copies so Spotlight shows the right app
 - launches the app
 
 On first launch, macOS will ask for Screen Recording permission once. After you allow it, reopen the app and continue normally.
 
-### Option 2: install the latest release
+### Option 2: install from a local clone
 
-If you publish a GitHub release with `ScreenTextGrab.zip`, people can also install it without opening Xcode:
+If you already cloned the repository:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/batu3384/ScreenTextGrab/main/scripts/install_release.sh | bash
+./scripts/install.sh
 ```
 
-That installer is ready in the repo, but it depends on a published GitHub release asset.
+This builds the app locally, installs it into `/Applications`, cleans stale copies, and launches the canonical app so Spotlight can find it.
 
 ## Why ScreenTextGrab exists
 

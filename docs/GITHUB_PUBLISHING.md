@@ -100,6 +100,10 @@ Keep the release asset name as `ScreenTextGrab.zip`. The public installer script
 [`scripts/install_release.sh`](../scripts/install_release.sh) downloads that
 exact asset from the latest GitHub release.
 
+The one-line public bootstrap installer
+[`scripts/bootstrap_install.sh`](../scripts/bootstrap_install.sh) prefers that
+release asset when it exists, then falls back to a source install.
+
 ## Suggested release body structure
 
 - What the app does in one sentence

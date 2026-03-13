@@ -21,7 +21,8 @@ EOF
 }
 
 MODE="source"
-ARGS=()
+COMMON_ARGS=()
+SOURCE_ONLY_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -34,7 +35,11 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --reset-screen-capture|--no-launch|--allow-adhoc)
-      ARGS+=("$1")
+      if [[ "$1" == "--allow-adhoc" ]]; then
+        SOURCE_ONLY_ARGS+=("$1")
+      else
+        COMMON_ARGS+=("$1")
+      fi
       shift
       ;;
     -h|--help)
@@ -51,9 +56,24 @@ done
 
 case "${MODE}" in
   source)
-    exec "${ROOT_DIR}/scripts/install_local_app.sh" "${ARGS[@]}"
+    INSTALL_CMD=("${ROOT_DIR}/scripts/install_local_app.sh")
+    if [[ ${#COMMON_ARGS[@]} -gt 0 ]]; then
+      INSTALL_CMD+=("${COMMON_ARGS[@]}")
+    fi
+    if [[ ${#SOURCE_ONLY_ARGS[@]} -gt 0 ]]; then
+      INSTALL_CMD+=("${SOURCE_ONLY_ARGS[@]}")
+    fi
+    exec "${INSTALL_CMD[@]}"
     ;;
   release)
-    exec "${ROOT_DIR}/scripts/install_release.sh" "${ARGS[@]}"
+    if [[ ${#SOURCE_ONLY_ARGS[@]} -gt 0 ]]; then
+      echo "--allow-adhoc is only supported with --source installs." >&2
+      exit 1
+    fi
+    INSTALL_CMD=("${ROOT_DIR}/scripts/install_release.sh")
+    if [[ ${#COMMON_ARGS[@]} -gt 0 ]]; then
+      INSTALL_CMD+=("${COMMON_ARGS[@]}")
+    fi
+    exec "${INSTALL_CMD[@]}"
     ;;
 esac
