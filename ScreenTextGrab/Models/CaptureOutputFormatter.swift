@@ -39,7 +39,8 @@ enum CaptureOutputFormatter {
         captureMode: CaptureMode,
         contentKind: ClipboardHistoryEntry.ContentKind,
         preset: CaptureOutputPreset,
-        source: ClipboardHistoryEntry.SourceContext? = nil
+        source: ClipboardHistoryEntry.SourceContext? = nil,
+        targetBundleIdentifier: String? = nil
     ) -> ClipboardPayload {
         let formattedText = format(
             rawText: rawText,
@@ -60,7 +61,9 @@ enum CaptureOutputFormatter {
         let officeTableText = captureMode == .table
             ? preferredOfficeTableText(primary: formattedText, fallback: rawText)
             : nil
-        let targetProfile = ClipboardTargetProfile.resolve(for: source?.bundleIdentifier)
+        let targetProfile = ClipboardTargetProfile.resolve(
+            for: targetBundleIdentifier ?? source?.bundleIdentifier
+        )
 
         return ClipboardPayload(
             string: officeTableText ?? formattedText,

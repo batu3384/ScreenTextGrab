@@ -4,6 +4,14 @@ Thanks for contributing to `ScreenTextGrab`.
 
 ## Setup
 
+Use the checked-in Xcode project directly:
+
+```bash
+open ScreenTextGrab.xcodeproj
+```
+
+Regenerate the project only when `project.yml` changes and `xcodegen` is installed:
+
 ```bash
 xcodegen generate --spec project.yml
 ```

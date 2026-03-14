@@ -13,6 +13,7 @@ struct MenuBarView: View {
     @State private var outputPresetFeedback: InlineFeedback?
     @State private var ocrFeedback: InlineFeedback?
     @State private var smartActionFeedback: InlineFeedback?
+    @State private var isImportDropTargeted = false
     @State private var hotkeyRecorderMonitor: Any?
 
     var body: some View {
@@ -20,9 +21,19 @@ struct MenuBarView: View {
             background
             panelContent
                 .padding(panelPadding)
+
+            if isImportDropTargeted {
+                importDropOverlay
+                    .padding(panelPadding)
+            }
         }
         .frame(width: panelWidth)
         .frame(maxHeight: panelMaxHeight)
+        .onDrop(of: [UTType.fileURL], isTargeted: $isImportDropTargeted, perform: handleImportDrop(providers:))
+        .onChange(of: appState.settingsPresentationToken) { _, token in
+            guard token != nil else { return }
+            openWindow(id: ScreenTextGrabApp.settingsWindowID)
+        }
         .onAppear {
             refreshLaunchAtLoginState()
             refreshPermission()
@@ -39,6 +50,10 @@ struct MenuBarView: View {
             if let notice = helperNotice {
                 noticePanel(notice)
             }
+
+             if let activeSavedSnippetQuickPickPanel {
+                 activeSavedSnippetQuickPickPanel
+             }
 
             actions
         }
@@ -397,6 +412,10 @@ struct MenuBarView: View {
 
                     Spacer()
 
+                    if let confidenceBadge {
+                        statusBadge(text: confidenceBadge.text, tint: confidenceBadge.tint)
+                    }
+
                     statusBadge(text: permissionBadge, tint: permissionTint)
                 }
 
@@ -411,14 +430,14 @@ struct MenuBarView: View {
     private var primaryAction: some View {
         Button(action: startCapture) {
             HStack(spacing: 12) {
-                Image(systemName: "viewfinder")
+                Image(systemName: primaryActionIcon)
                     .font(.system(size: isCompactPanel ? 15 : 17, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: isCompactPanel ? 32 : 36, height: isCompactPanel ? 32 : 36)
                     .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: isCompactPanel ? 10 : 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(canStartCapture ? "Metni Yakala" : "Yakalama Hazır Değil")
+                    Text(primaryActionTitle)
                         .font(.system(size: isCompactPanel ? 14 : 15, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
 
@@ -453,37 +472,111 @@ struct MenuBarView: View {
 
     private func noticePanel(_ notice: NoticeContent) -> some View {
         card {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: notice.icon)
-                    .font(.system(size: isCompactPanel ? 12 : 13, weight: .bold))
-                    .foregroundStyle(notice.tint)
-                    .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: notice.icon)
+                        .font(.system(size: isCompactPanel ? 12 : 13, weight: .bold))
+                        .foregroundStyle(notice.tint)
+                        .padding(.top, 1)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(notice.title)
-                        .font(.system(size: isCompactPanel ? 11 : 11.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(notice.title)
+                            .font(.system(size: isCompactPanel ? 11 : 11.5, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
 
-                    Text(notice.message)
-                        .font(.system(size: isCompactPanel ? 10 : 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.66))
-                        .lineLimit(isCompactPanel ? 2 : 3)
+                        Text(notice.message)
+                            .font(.system(size: isCompactPanel ? 10 : 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.white.opacity(0.66))
+                            .lineLimit(isCompactPanel ? 2 : 3)
+                    }
+                }
+
+                if let actionTitle = notice.actionTitle,
+                   let action = notice.action {
+                    compactInlineButton(
+                        title: actionTitle,
+                        icon: "sparkles",
+                        tint: notice.tint,
+                        action: action
+                    )
                 }
             }
         }
     }
 
     private var actions: some View {
-        HStack(spacing: 8) {
-            if appState.permissionState == .denied || appState.permissionState == .unknown {
-                secondaryButton(title: L10n.actionAllow, icon: "lock.open.display", tint: .accentAmber, action: requestPermission)
-            } else if appState.permissionState == .requiresRestart {
-                secondaryButton(title: L10n.actionSystemSettings, icon: "gearshape.2", tint: .accentNeutral, action: openSystemSettings)
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                if appState.permissionState == .denied || appState.permissionState == .unknown {
+                    secondaryButton(title: L10n.actionAllow, icon: "lock.open.display", tint: .accentAmber, action: requestPermission)
+                } else if appState.permissionState == .requiresRestart {
+                    secondaryButton(title: L10n.actionSystemSettings, icon: "gearshape.2", tint: .accentNeutral, action: openSystemSettings)
+                }
+
+                secondaryButton(title: L10n.actionSettings, icon: "slider.horizontal.3", tint: .accentNeutral, action: openSettingsWindow)
+                secondaryButton(title: L10n.actionRefresh, icon: "arrow.clockwise", tint: .accentMint, action: refreshPermission)
             }
 
-            secondaryButton(title: L10n.actionSettings, icon: "slider.horizontal.3", tint: .accentNeutral, action: openSettingsWindow)
-            secondaryButton(title: L10n.actionRefresh, icon: "arrow.clockwise", tint: .accentMint, action: refreshPermission)
+            HStack(spacing: 8) {
+                secondaryButton(
+                    title: L10n.actionClipboardImage,
+                    icon: "photo.on.rectangle",
+                    tint: .accentCool,
+                    action: startClipboardImageCapture
+                )
+
+                secondaryButton(
+                    title: L10n.actionImageFile,
+                    icon: "photo",
+                    tint: .accentNeutral,
+                    action: startImageFileCapture
+                )
+            }
+
+            HStack(spacing: 8) {
+                secondaryButton(
+                    title: L10n.actionPDFFile,
+                    icon: "doc.text.viewfinder",
+                    tint: .accentWarm,
+                    action: startPDFFileCapture
+                )
+
+                secondaryButton(
+                    title: L10n.actionSearchablePDF,
+                    icon: "doc.badge.gearshape",
+                    tint: .accentMint,
+                    action: exportSearchablePDF
+                )
+            }
         }
+    }
+
+    private var importDropOverlay: some View {
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .fill(Color.black.opacity(0.54))
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(Color.accentMint.opacity(0.7), style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
+            )
+            .overlay {
+                VStack(spacing: 10) {
+                    Image(systemName: "doc.badge.plus")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(Color.accentMint)
+
+                    Text("Görsel veya PDF bırak")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+
+                    Text("Görsel dosyası OCR’a gider, PDF dosyası doğrudan içe alınır.")
+                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.white.opacity(0.72))
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 220)
+                }
+                .padding(18)
+            }
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
     }
 
     private var smartActions: [SmartActionDescriptor] {
@@ -787,6 +880,26 @@ struct MenuBarView: View {
         appState.watchState != .selecting
     }
 
+    private var primaryQuickStartRegion: SavedCaptureRegion? {
+        guard canStartCapture else {
+            return nil
+        }
+
+        return appState.primaryQuickStartRegion
+    }
+
+    private var primaryActionTitle: String {
+        if primaryQuickStartRegion != nil {
+            return "Kayıtlı Bölgeyi Yakala"
+        }
+
+        return canStartCapture ? "Metni Yakala" : "Yakalama Hazır Değil"
+    }
+
+    private var primaryActionIcon: String {
+        primaryQuickStartRegion == nil ? "viewfinder" : "scope"
+    }
+
     private var headerLine: String {
         if appState.captureMode == .subtitle {
             return appState.isHotkeyAvailable
@@ -885,6 +998,14 @@ struct MenuBarView: View {
 
         switch appState.permissionState {
         case .granted:
+            if let region = primaryQuickStartRegion {
+                switch appState.activeSavedCaptureRegionSuggestion?.matchKind {
+                case .windowTitle(let windowTitle):
+                    return "\"\(windowTitle)\" için \(region.name) otomatik seçildi."
+                case .application, .none:
+                    return "\(region.name) hızlı başlangıç için otomatik seçildi."
+                }
+            }
             return appState.captureMode.readyDescription
         case .requiresRestart:
             return "Önce uygulamayı yeniden aç."
@@ -981,6 +1102,26 @@ struct MenuBarView: View {
             )
         }
 
+        if let activeAppProfileNotice {
+            return activeAppProfileNotice
+        }
+
+        if let activeSavedRegionNotice {
+            return activeSavedRegionNotice
+        }
+
+        if let activeSavedSnippetNotice {
+            return activeSavedSnippetNotice
+        }
+
+        if let activeSavedSnippetCollectionNotice {
+            return activeSavedSnippetCollectionNotice
+        }
+
+        if let lowConfidenceNotice {
+            return lowConfidenceNotice
+        }
+
         if appState.captureState == .failed, let lastError = appState.lastError {
             return NoticeContent(
                 title: "Son hata",
@@ -993,7 +1134,243 @@ struct MenuBarView: View {
         return nil
     }
 
+    private var activeAppProfileNotice: NoticeContent? {
+        guard let suggestion = appState.activeAppProfileSuggestion else {
+            return nil
+        }
+
+        let sourceName = suggestion.source.displayName
+        return NoticeContent(
+            title: "\(sourceName) profili hazır",
+            message: "Bu uygulama için \(suggestion.profile.summary) yakalaması kayıtlı. Yakalama bu profili zaten kullanır; panelde de aynı ayarları görmek istersen eşitle.",
+            icon: "sparkles.rectangle.stack",
+            tint: .accentMint,
+            actionTitle: "Paneli Eşitle",
+            action: {
+                applyActiveAppProfileSuggestion(suggestion)
+            }
+        )
+    }
+
+    private var activeSavedRegionNotice: NoticeContent? {
+        guard let suggestion = appState.activeSavedCaptureRegionSuggestion,
+              appState.watchState == .inactive,
+              appState.permissionState == .granted,
+              !appState.captureState.isBusy else {
+            return nil
+        }
+
+        let message: String
+        switch suggestion.matchKind {
+        case .application:
+            if suggestion.regionCount == 1 {
+                message = "\(suggestion.primaryRegion.name) bu uygulama için kayıtlı. Aynı bölgeyi tek tıkla yeniden yakalayabilirsin."
+            } else {
+                message = "\(suggestion.regionCount) kayıtlı bölgeden en güncel olanı \(suggestion.primaryRegion.name). İstersen hemen bu bölgeyi çalıştır."
+            }
+        case .windowTitle(let windowTitle):
+            if suggestion.regionCount == 1 {
+                message = "\"\(windowTitle)\" penceresiyle eşleşen kayıtlı bölge \(suggestion.primaryRegion.name). Aynı görünümü tek tıkla yeniden yakalayabilirsin."
+            } else {
+                message = "\"\(windowTitle)\" penceresi için \(suggestion.regionCount) eşleşen bölge bulundu. En güncel olan \(suggestion.primaryRegion.name)."
+            }
+        }
+
+        let title: String
+        switch suggestion.matchKind {
+        case .application:
+            title = "\(suggestion.source.displayName) için kayıtlı bölge bulundu"
+        case .windowTitle:
+            title = "\(suggestion.source.displayName) için pencere eşleşmesi bulundu"
+        }
+
+        return NoticeContent(
+            title: title,
+            message: message,
+            icon: "rectangle.on.rectangle.circle",
+            tint: .accentCool,
+            actionTitle: "Bölgeyi Çalıştır",
+            action: {
+                runActiveSavedCaptureRegionSuggestion(suggestion)
+            }
+        )
+    }
+
+    private var activeSavedSnippetCollectionNotice: NoticeContent? {
+        guard let suggestion = appState.activeSavedSnippetCollectionSuggestion,
+              appState.activeSavedSnippetSuggestion == nil,
+              !appState.captureState.isBusy else {
+            return nil
+        }
+
+        let message: String
+        switch suggestion.matchKind {
+        case .application:
+            if suggestion.snippetCount == 1 {
+                message = "\(suggestion.collection.name) koleksiyonunda \(suggestion.source.displayName) kaynaklı bir snippet hazır. Ayarlar > Geçmiş içinden doğrudan açabilirsin."
+            } else {
+                message = "\(suggestion.collection.name) koleksiyonunda \(suggestion.source.displayName) kaynaklı \(suggestion.snippetCount) snippet var. İlgili görünümü tek tıkla açabilirsin."
+            }
+        case .windowTitle(let windowTitle):
+            if suggestion.snippetCount == 1 {
+                message = "\"\(windowTitle)\" penceresiyle eşleşen \(suggestion.collection.name) koleksiyonunda 1 snippet var. Aynı filtreyle hızlıca açabilirsin."
+            } else {
+                message = "\"\(windowTitle)\" penceresiyle eşleşen \(suggestion.collection.name) koleksiyonunda \(suggestion.snippetCount) snippet var."
+            }
+        }
+
+        let title: String
+        switch suggestion.matchKind {
+        case .application:
+            title = "\(suggestion.source.displayName) snippet koleksiyonu hazır"
+        case .windowTitle:
+            title = "\(suggestion.source.displayName) için snippet eşleşmesi bulundu"
+        }
+
+        return NoticeContent(
+            title: title,
+            message: message,
+            icon: "square.stack.3d.up.fill",
+            tint: .accentAmber,
+            actionTitle: "Koleksiyonu Aç",
+            action: {
+                openSavedSnippetCollectionSuggestion(suggestion)
+            }
+        )
+    }
+
+    private var activeSavedSnippetNotice: NoticeContent? {
+        guard let suggestion = appState.activeSavedSnippetSuggestion,
+              !appState.captureState.isBusy else {
+            return nil
+        }
+
+        let message: String
+        switch (suggestion.matchKind, suggestion.selectionKind) {
+        case (.application, .onlyMatch):
+            message = "\"\(suggestion.snippet.name)\" \(suggestion.collection.name) koleksiyonundan bu uygulama için hazır. Tek tıkla aynı biçimde panoya kopyalayabilirsin."
+        case (.application, .learnedPreference):
+            message = "\"\(suggestion.snippet.name)\" bu uygulamada daha önce kullandığın snippet olarak öne çıkarıldı. İstersen tek tıkla yeniden panoya kopyala."
+        case let (.windowTitle(windowTitle), .onlyMatch):
+            message = "\"\(windowTitle)\" penceresiyle eşleşen \"\(suggestion.snippet.name)\" snippet'i hazır. İstersen doğrudan panoya kopyala."
+        case let (.windowTitle(windowTitle), .learnedPreference):
+            message = "\"\(windowTitle)\" penceresinde daha önce kullandığın \"\(suggestion.snippet.name)\" snippet'i öne çıkarıldı."
+        }
+
+        let title: String
+        switch (suggestion.matchKind, suggestion.selectionKind) {
+        case (.application, .onlyMatch):
+            title = "\(suggestion.source.displayName) için hazır snippet"
+        case (.application, .learnedPreference):
+            title = "\(suggestion.source.displayName) için öncelikli snippet"
+        case (.windowTitle, .onlyMatch):
+            title = "\(suggestion.source.displayName) için pencere snippet'i hazır"
+        case (.windowTitle, .learnedPreference):
+            title = "\(suggestion.source.displayName) için öğrenilen snippet hazır"
+        }
+
+        return NoticeContent(
+            title: title,
+            message: message,
+            icon: "text.badge.star",
+            tint: .accentAmber,
+            actionTitle: "Snippet'i Kopyala",
+            action: {
+                copyActiveSavedSnippetSuggestion(suggestion)
+            }
+        )
+    }
+
+    private var activeSavedSnippetQuickPickPanel: AnyView? {
+        guard let suggestion = appState.activeSavedSnippetCollectionSuggestion,
+              !appState.captureState.isBusy else {
+            return nil
+        }
+
+        let quickPicks = appState.activeSavedSnippetQuickPicks
+        guard !quickPicks.isEmpty else {
+            return nil
+        }
+
+        let hiddenCount = max(0, suggestion.snippetCount - quickPicks.count)
+
+        return AnyView(
+            card {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "text.badge.plus")
+                            .font(.system(size: isCompactPanel ? 12 : 13, weight: .bold))
+                            .foregroundStyle(Color.accentAmber)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Hazır snippet'ler")
+                                .font(.system(size: isCompactPanel ? 11 : 11.5, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white)
+
+                            Text(activeSavedSnippetQuickPickSummary(for: suggestion, hiddenCount: hiddenCount))
+                                .font(.system(size: isCompactPanel ? 10 : 11, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.white.opacity(0.66))
+                                .lineLimit(isCompactPanel ? 2 : 3)
+                        }
+
+                        Spacer()
+                    }
+
+                    VStack(spacing: 8) {
+                        ForEach(quickPicks, id: \.id) { snippet in
+                            savedSnippetQuickPickButton(snippet)
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    private var confidenceBadge: (text: String, tint: Color)? {
+        guard let indicator = appState.lastCopiedEntry?.confidenceIndicator else {
+            return nil
+        }
+
+        switch indicator {
+        case .low:
+            return (indicator.shortTitle, .accentRose)
+        case .medium:
+            return (indicator.shortTitle, .accentAmber)
+        case .high:
+            return (indicator.shortTitle, .accentMint)
+        }
+    }
+
+    private var lowConfidenceNotice: NoticeContent? {
+        guard let entry = appState.lastCopiedEntry,
+              entry.confidenceIndicator == .low,
+              !appState.captureState.isBusy else {
+            return nil
+        }
+
+        let message: String
+        if entry.captureMode == .table {
+            message = "Son tablo yakalaması düşük güvenle çıktı. Yapıştırmadan önce Tablo Düzenleyici ile satır ve sütunları kontrol etmen iyi olur."
+        } else if entry.captureMode == .code {
+            message = "Son kod yakalaması düşük güvenle çıktı. Özellikle girinti, noktalama ve benzer karakterleri kontrol et."
+        } else {
+            message = entry.confidenceIndicator?.detail ?? "Son OCR çıktısını gözden geçirmek iyi olur."
+        }
+
+        return NoticeContent(
+            title: "Son OCR çıktısını kontrol et",
+            message: message,
+            icon: "exclamationmark.triangle.fill",
+            tint: .accentRose
+        )
+    }
+
     private func startCapture() {
+        if let region = primaryQuickStartRegion {
+            appState.coordinator?.captureSavedRegion(region, sessionOverrides: nil)
+            return
+        }
+
         appState.coordinator?.startCapture(trigger: .menu)
     }
 
@@ -1113,6 +1490,20 @@ struct MenuBarView: View {
         )
     }
 
+    private func applyActiveAppProfileSuggestion(_ suggestion: ActiveAppProfileSuggestion) {
+        appState.applyCaptureProfile(suggestion.profile)
+        captureModeFeedback = InlineFeedback(
+            message: "\(suggestion.source.displayName) profili panele uygulandı.",
+            tint: .accentCool
+        )
+        outputPresetFeedback = nil
+        ocrFeedback = nil
+    }
+
+    private func runActiveSavedCaptureRegionSuggestion(_ suggestion: ActiveSavedCaptureRegionSuggestion) {
+        appState.coordinator?.captureSavedRegion(suggestion.primaryRegion, sessionOverrides: nil)
+    }
+
     private var launchAtLoginBinding: Binding<Bool> {
         Binding(
             get: { appState.launchAtLoginState.toggleIsOn },
@@ -1214,6 +1605,100 @@ struct MenuBarView: View {
         appState.coordinator?.refreshPermission()
     }
 
+    private func startClipboardImageCapture() {
+        appState.coordinator?.captureClipboardImage(sessionOverrides: nil)
+    }
+
+    private func startImageFileCapture() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+
+        appState.coordinator?.captureImageFile(at: url, sessionOverrides: nil)
+    }
+
+    private func handleImportDrop(providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first(where: {
+            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+        }) else {
+            return false
+        }
+
+        provider.loadDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier) { data, _ in
+            guard let data,
+                  let url = URL(dataRepresentation: data, relativeTo: nil) else {
+                return
+            }
+
+            Task { @MainActor in
+                routeDroppedImport(url)
+            }
+        }
+
+        return true
+    }
+
+    private func routeDroppedImport(_ url: URL) {
+        switch ImportedDocumentRouter.resolve(url) {
+        case .image(let imageURL):
+            appState.coordinator?.captureImageFile(at: imageURL, sessionOverrides: nil)
+        case .pdf(let pdfURL):
+            appState.coordinator?.capturePDFFile(at: pdfURL, sessionOverrides: nil)
+        case nil:
+            smartActionFeedback = InlineFeedback(
+                message: "Yalnızca görsel veya PDF dosyaları desteklenir.",
+                tint: .accentWarm
+            )
+        }
+    }
+
+    private func startPDFFileCapture() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+
+        appState.coordinator?.capturePDFFile(at: url, sessionOverrides: nil)
+    }
+
+    private func exportSearchablePDF() {
+        let openPanel = NSOpenPanel()
+        openPanel.allowedContentTypes = [.pdf]
+        openPanel.allowsMultipleSelection = false
+        openPanel.canChooseDirectories = false
+        openPanel.canChooseFiles = true
+
+        guard openPanel.runModal() == .OK, let sourceURL = openPanel.url else {
+            return
+        }
+
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.pdf]
+        savePanel.canCreateDirectories = true
+        savePanel.nameFieldStringValue = PDFProcessingService.suggestedSearchableOutputURL(for: sourceURL).lastPathComponent
+
+        guard savePanel.runModal() == .OK, let destinationURL = savePanel.url else {
+            return
+        }
+
+        appState.coordinator?.exportSearchablePDF(
+            at: sourceURL,
+            destinationURL: destinationURL,
+            sessionOverrides: nil
+        )
+    }
+
     private var watchTint: Color {
         switch appState.watchState {
         case .inactive:
@@ -1249,7 +1734,8 @@ struct MenuBarView: View {
                 captureMode: entry.captureMode,
                 contentKind: entry.contentKind,
                 source: entry.source,
-                outputPreset: preset
+                outputPreset: preset,
+                targetBundleIdentifier: appState.activeTargetBundleIdentifier
             ) else {
                 smartActionFeedback = InlineFeedback(
                     message: "Kopyalama servisi şu anda hazır değil.",
@@ -1314,1360 +1800,17 @@ struct MenuBarView: View {
         openWindow(id: ScreenTextGrabApp.settingsWindowID)
     }
 
-    private func quitApp() {
-        NSApplication.shared.terminate(nil)
-    }
-}
-
-private enum SettingsTab: String, Hashable {
-    case general
-    case ocr
-    case diagnostics
-    case history
-}
-
-struct SettingsView: View {
-    @Environment(\.openWindow) private var openWindow
-    @EnvironmentObject var appState: AppState
-
-    @State private var selectedTab: SettingsTab = .general
-    @State private var isRecordingHotkey = false
-    @State private var hotkeyFeedback: HotkeyFeedback?
-    @State private var launchAtLoginFeedback: InlineFeedback?
-    @State private var captureModeFeedback: InlineFeedback?
-    @State private var outputPresetFeedback: InlineFeedback?
-    @State private var watchFeedback: InlineFeedback?
-    @State private var ocrFeedback: InlineFeedback?
-    @State private var historyFeedback: InlineFeedback?
-    @State private var profileFeedback: InlineFeedback?
-    @State private var diagnosticsFeedback: InlineFeedback?
-    @State private var permissionDiagnostics: PermissionDiagnosticSnapshot?
-    @State private var historySearchQuery = ""
-    @State private var watchRegexDraft = ""
-    @State private var hotkeyRecorderMonitor: Any?
-
-    private struct ProfileTarget: Identifiable {
-        let appName: String
-        let bundleIdentifier: String
-
-        var id: String { bundleIdentifier }
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            settingsHeader
-
-            TabView(selection: $selectedTab) {
-                generalTab
-                    .tag(SettingsTab.general)
-                    .tabItem {
-                        Label(L10n.settingsTabGeneral, systemImage: "slider.horizontal.3")
-                    }
-
-                ocrTab
-                    .tag(SettingsTab.ocr)
-                    .tabItem {
-                        Label(L10n.settingsTabOCR, systemImage: "text.viewfinder")
-                    }
-
-                diagnosticsTab
-                    .tag(SettingsTab.diagnostics)
-                    .tabItem {
-                        Label(L10n.settingsTabDiagnostics, systemImage: "stethoscope")
-                    }
-
-                historyTab
-                    .tag(SettingsTab.history)
-                    .tabItem {
-                        Label(L10n.settingsTabHistory, systemImage: "clock.arrow.circlepath")
-                    }
-            }
-            .padding(18)
-        }
-        .background(
-            LinearGradient(
-                colors: [Color.surfaceTop.opacity(0.10), Color.surfaceBottom.opacity(0.06)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .onAppear {
-            refreshLaunchAtLoginState()
-            refreshPermission()
-            refreshPermissionDiagnostics()
-            watchRegexDraft = appState.watchConfiguration.regexFilter
-        }
-        .onDisappear(perform: stopHotkeyRecording)
-    }
-
-    private var settingsHeader: some View {
-        HStack(spacing: 14) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .interpolation(.high)
-                .frame(width: 54, height: 54)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L10n.settingsTitle)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-
-                Text(L10n.settingsSubtitle)
-                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-        }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 18)
-        .background(Color(NSColor.windowBackgroundColor).opacity(0.96))
-        .overlay(alignment: .bottom) {
-            Divider()
+    private func openSavedSnippetCollectionSuggestion(_ suggestion: ActiveSavedSnippetCollectionSuggestion) {
+        NSApp.activate(ignoringOtherApps: true)
+        if !appState.presentSettingsForSavedSnippetCollection(named: suggestion.collection.name) {
+            appState.statusMessage = "⚠️ Snippet koleksiyonu bulunamadı: \(suggestion.collection.name)"
         }
     }
 
-    private var generalTab: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                settingsCard(
-                    title: "Yakalama Modu",
-                    subtitle: "Metin, altyazı, kod veya tablo odaklı yakalama arasında geçiş yap."
-                ) {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 148), spacing: 10)],
-                        alignment: .leading,
-                        spacing: 10
-                    ) {
-                        ForEach(CaptureMode.allCases) { mode in
-                            settingsCaptureModeButton(mode)
-                        }
-                    }
-
-                    Text(appState.captureMode.detail)
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    if let captureModeFeedback {
-                        feedbackLabel(captureModeFeedback.message, tint: captureModeFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: "Çıktı Biçimi",
-                    subtitle: appState.captureOutputPreset.detail
-                ) {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 136), spacing: 10)],
-                        alignment: .leading,
-                        spacing: 10
-                    ) {
-                        ForEach(CaptureOutputPreset.allCases) { preset in
-                            outputPresetButton(preset)
-                        }
-                    }
-
-                    if let outputPresetFeedback {
-                        feedbackLabel(outputPresetFeedback.message, tint: outputPresetFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: "Global Kısayol",
-                    subtitle: isRecordingHotkey
-                        ? "Yeni kombinasyonu gir. Esc ile iptal edebilirsin."
-                        : "Yakalamayı her yerden başlatmak için kullanılır."
-                ) {
-                    HStack(spacing: 10) {
-                        Button(action: toggleHotkeyRecording) {
-                            Text(isRecordingHotkey ? "Tuşa Bas..." : appState.hotkeyDisplayLabel)
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill((isRecordingHotkey ? Color.accentCool : Color.surfaceTop).opacity(isRecordingHotkey ? 0.85 : 0.82))
-                                )
-                        }
-                        .buttonStyle(.plain)
-
-                        settingsActionButton(
-                            title: isRecordingHotkey ? L10n.actionCancel : L10n.actionChange,
-                            icon: isRecordingHotkey ? "xmark" : "keyboard",
-                            tint: isRecordingHotkey ? .accentRose : .accentCool,
-                            action: toggleHotkeyRecording
-                        )
-
-                        settingsActionButton(
-                            title: L10n.actionDefault,
-                            icon: "arrow.counterclockwise",
-                            tint: .accentNeutral,
-                            action: resetHotkey
-                        )
-                    }
-
-                    if let hotkeyFeedback {
-                        feedbackLabel(hotkeyFeedback.message, tint: hotkeyFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: "Açılışta Başlat",
-                    subtitle: appState.launchAtLoginState.detail
-                ) {
-                    HStack(spacing: 12) {
-                        statusPill(appState.launchAtLoginState.title, tint: launchAtLoginTint)
-                        Spacer()
-                        Toggle("", isOn: launchAtLoginBinding)
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                            .accessibilityLabel(L10n.accessibilityLaunchAtLoginToggle)
-                    }
-
-                    HStack(spacing: 10) {
-                        if appState.launchAtLoginState == .requiresApproval {
-                            settingsActionButton(
-                                title: L10n.actionLoginItems,
-                                icon: "person.crop.circle.badge.gearshape",
-                                tint: .accentWarm,
-                                action: openLoginItemsSettings
-                            )
-                        }
-
-                        settingsActionButton(
-                            title: L10n.actionRefresh,
-                            icon: "arrow.clockwise",
-                            tint: .accentNeutral,
-                            action: refreshLaunchAtLoginState
-                        )
-                    }
-
-                    if let launchAtLoginFeedback {
-                        feedbackLabel(launchAtLoginFeedback.message, tint: launchAtLoginFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: "İzleme Kuralları",
-                    subtitle: appState.watchConfiguration.summary
-                ) {
-                    HStack(spacing: 10) {
-                        ForEach(WatchCopyBehavior.allCases) { behavior in
-                            watchBehaviorButton(behavior)
-                        }
-                    }
-
-                    TextField("İsteğe bağlı regex filtresi", text: $watchRegexDraft)
-                        .textFieldStyle(.roundedBorder)
-
-                    HStack(spacing: 10) {
-                        settingsActionButton(
-                            title: "Regex'i Kaydet",
-                            icon: "checkmark.circle",
-                            tint: .accentCool,
-                            action: saveWatchRegex
-                        )
-
-                        settingsActionButton(
-                            title: "Temizle",
-                            icon: "eraser",
-                            tint: .accentNeutral,
-                            action: clearWatchRegex
-                        )
-                    }
-
-                    Text("Regex doluysa izleme yalnızca eşleşen parçaları kopyalar.")
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    if let watchFeedback {
-                        feedbackLabel(watchFeedback.message, tint: watchFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: "Ekran Kaydı İzni",
-                    subtitle: appState.permissionState.uiMessage
-                ) {
-                    HStack(spacing: 12) {
-                        statusPill(permissionTitle, tint: permissionTint)
-                        Spacer()
-                        Text(permissionDescription)
-                            .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.trailing)
-                    }
-
-                    HStack(spacing: 10) {
-                        if appState.permissionState == .denied || appState.permissionState == .unknown {
-                            settingsActionButton(
-                                title: L10n.actionRequestPermission,
-                                icon: "lock.open.display",
-                                tint: .accentWarm,
-                                action: requestPermission
-                            )
-                        }
-
-                        settingsActionButton(
-                            title: L10n.actionSystemSettings,
-                            icon: "gearshape.2",
-                            tint: .accentNeutral,
-                            action: openSystemSettings
-                        )
-
-                        settingsActionButton(
-                            title: L10n.actionRefresh,
-                            icon: "arrow.clockwise",
-                            tint: .accentCool,
-                            action: refreshPermission
-                        )
-
-                        settingsActionButton(
-                            title: L10n.actionDiagnostics,
-                            icon: "stethoscope",
-                            tint: .accentNeutral,
-                            action: { selectedTab = .diagnostics }
-                        )
-                    }
-                }
-
-                settingsCard(
-                    title: "Uygulama Profilleri",
-                    subtitle: appState.appProfiles.isEmpty
-                        ? "Henüz kayıtlı bir uygulama profili yok."
-                        : "\(appState.appProfiles.count) profil kayıtlı."
-                ) {
-                    Menu {
-                        ForEach(profileTargets) { target in
-                            Button {
-                                saveProfile(for: target)
-                            } label: {
-                                Text(target.appName)
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus.circle")
-                            Text("Çalışan Uygulamadan Profil Oluştur")
-                            Spacer()
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.accentMint.opacity(0.12))
-                        )
-                    }
-                    .menuStyle(.borderlessButton)
-                    .disabled(profileTargets.isEmpty)
-                    .opacity(profileTargets.isEmpty ? 0.55 : 1)
-
-                    Text("Profil seçilen uygulama için mod, çıktı biçimi ve OCR dili override eder.")
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    if let profileFeedback {
-                        feedbackLabel(profileFeedback.message, tint: profileFeedback.tint)
-                    }
-
-                    if appState.appProfiles.isEmpty {
-                        Text("Safari, Xcode veya terminal gibi uygulamalar için ayrı profiller kaydedebilirsin.")
-                            .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        VStack(spacing: 10) {
-                            ForEach(appState.appProfiles) { profile in
-                                profileRow(profile)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.bottom, 8)
-        }
-    }
-
-    private var ocrTab: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                settingsCard(
-                    title: "Tanıma Modu",
-                    subtitle: "Otomatik algılamayı açabilir veya tercih ettiğin dilleri sabitleyebilirsin."
-                ) {
-                    Toggle(L10n.ocrAutomaticLanguage, isOn: automaticDetectionBinding)
-                        .toggleStyle(.switch)
-                        .accessibilityLabel(L10n.accessibilityAutomaticLanguage)
-
-                    Text(appState.ocrLanguageSelection.automaticDetection
-                         ? "Vision dilini otomatik seçer. Çok dilli kullanım için uygundur."
-                         : "Aşağıdaki diller öncelikli olarak kullanılacak.")
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    if let ocrFeedback {
-                        feedbackLabel(ocrFeedback.message, tint: ocrFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: "Desteklenen Diller",
-                    subtitle: appState.ocrLanguageSelection.summary
-                ) {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 94), spacing: 10)],
-                        alignment: .leading,
-                        spacing: 10
-                    ) {
-                        ForEach(supportedOCRLanguages) { language in
-                            settingsLanguageToggle(language)
-                        }
-                    }
-                    .opacity(appState.ocrLanguageSelection.automaticDetection ? 0.56 : 1)
-                    .disabled(appState.ocrLanguageSelection.automaticDetection)
-                }
-            }
-            .padding(.bottom, 8)
-        }
-    }
-
-    private var historyTab: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                settingsCard(
-                    title: "Yakalama Geçmişi",
-                    subtitle: appState.copyHistory.isEmpty
-                        ? "Henüz kaydedilmiş bir metin yok."
-                        : "\(filteredHistoryEntries.count)/\(appState.copyHistory.count) kayıt gösteriliyor."
-                ) {
-                    TextField("Geçmişte ara", text: $historySearchQuery)
-                        .textFieldStyle(.roundedBorder)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Dışa Aktarma Biçimi")
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.secondary)
-
-                        LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: 120), spacing: 10)],
-                            alignment: .leading,
-                            spacing: 10
-                        ) {
-                            ForEach(ClipboardHistoryExportFormat.allCases) { format in
-                                historyExportFormatButton(format)
-                            }
-                        }
-                    }
-
-                    HStack(spacing: 10) {
-                        settingsActionButton(
-                            title: L10n.actionExport,
-                            icon: "square.and.arrow.up",
-                            tint: .accentCool,
-                            action: exportHistory
-                        )
-                        .disabled(filteredHistoryEntries.isEmpty)
-                        .opacity(filteredHistoryEntries.isEmpty ? 0.55 : 1)
-
-                        settingsActionButton(
-                            title: L10n.actionClear,
-                            icon: "trash",
-                            tint: .accentRose,
-                            action: clearHistory
-                        )
-                        .disabled(appState.copyHistory.isEmpty)
-                        .opacity(appState.copyHistory.isEmpty ? 0.55 : 1)
-                    }
-
-                    if let historyFeedback {
-                        feedbackLabel(historyFeedback.message, tint: historyFeedback.tint)
-                    }
-
-                    if appState.copyHistory.isEmpty {
-                        historyEmptyState
-                    } else if filteredHistoryEntries.isEmpty {
-                        historySearchEmptyState
-                    } else {
-                        VStack(spacing: 10) {
-                            ForEach(filteredHistoryEntries) { entry in
-                                historyRow(entry)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.bottom, 8)
-        }
-    }
-
-    private var diagnosticsTab: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                settingsCard(
-                    title: "İzin Tanısı",
-                    subtitle: permissionDiagnostics?.currentState.uiMessage ?? appState.permissionState.uiMessage
-                ) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if let permissionDiagnostics {
-                            diagnosticValueRow("Durum", value: permissionDiagnostics.currentState.uiMessage)
-                            diagnosticValueRow("Preflight", value: permissionDiagnostics.preflightLabel)
-                            diagnosticValueRow("Probe", value: permissionDiagnostics.probeState.uiMessage)
-                            diagnosticValueRow(
-                                "Yeniden Açma",
-                                value: permissionDiagnostics.needsRestartAfterGrant ? "Gerekli" : "Gerekmiyor"
-                            )
-                            diagnosticValueRow("Bundle ID", value: permissionDiagnostics.bundleIdentifier)
-                            diagnosticValueRow("Sürüm", value: permissionDiagnostics.versionLabel)
-                            diagnosticValueRow("Uygulama", value: permissionDiagnostics.appPath)
-
-                            if let lastProbeAt = permissionDiagnostics.lastProbeAt {
-                                diagnosticValueRow(
-                                    "Son Probe",
-                                    value: lastProbeAt.formatted(.dateTime.day().month(.abbreviated).hour().minute().second())
-                                )
-                            }
-
-                            if let lastConfirmedGrantAt = permissionDiagnostics.lastConfirmedGrantAt {
-                                diagnosticValueRow(
-                                    "Son Grant Kanıtı",
-                                    value: lastConfirmedGrantAt.formatted(.dateTime.day().month(.abbreviated).hour().minute().second())
-                                )
-                            }
-                        } else {
-                            Text("Henüz tanı verisi yüklenmedi. Yenile ile tekrar dene.")
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        HStack(spacing: 10) {
-                            settingsActionButton(
-                                title: L10n.actionRefresh,
-                                icon: "arrow.clockwise",
-                                tint: .accentCool,
-                                action: refreshPermissionDiagnostics
-                            )
-
-                            settingsActionButton(
-                                title: L10n.actionCopyDiagnostics,
-                                icon: "doc.on.doc",
-                                tint: .accentNeutral,
-                                action: copyPermissionDiagnostics
-                            )
-                        }
-
-                        HStack(spacing: 10) {
-                            settingsActionButton(
-                                title: L10n.actionSupportBundle,
-                                icon: "square.and.arrow.up",
-                                tint: .accentWarm,
-                                action: exportSupportBundle
-                            )
-
-                            settingsActionButton(
-                                title: L10n.actionSystemSettings,
-                                icon: "gearshape.2",
-                                tint: .accentNeutral,
-                                action: openSystemSettings
-                            )
-                        }
-
-                        if let diagnosticsFeedback {
-                            feedbackLabel(diagnosticsFeedback.message, tint: diagnosticsFeedback.tint)
-                        }
-                    }
-                }
-
-                settingsCard(
-                    title: "Uygulama Tanı Kayıtları",
-                    subtitle: appState.diagnostics.isEmpty
-                        ? "Henüz kayıt yok."
-                        : "\(appState.diagnostics.count) kayıt son hata ve uyarıları gösteriyor."
-                ) {
-                    if appState.diagnostics.isEmpty {
-                        Text("İzin, OCR, clipboard ve launch akışından gelen kayıtlar burada listelenecek.")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        VStack(spacing: 10) {
-                            ForEach(appState.diagnostics.reversed()) { entry in
-                                diagnosticEntryRow(entry)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.bottom, 8)
-        }
-    }
-
-    private var historyEmptyState: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(Color(NSColor.controlBackgroundColor))
-            .overlay {
-                VStack(spacing: 8) {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
-
-                    Text("İlk yakalamadan sonra son metinler burada listelenecek.")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(18)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 110)
-    }
-
-    private var historySearchEmptyState: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(Color(NSColor.controlBackgroundColor))
-            .overlay {
-                VStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass.circle")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
-
-                    Text("Aramanla eşleşen bir geçmiş kaydı bulunamadı.")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(18)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 110)
-    }
-
-    private func historyRow(_ entry: ClipboardHistoryEntry) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(entry.previewText)
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .lineLimit(3)
-
-                    Text(entry.date, format: .dateTime.day().month(.abbreviated).hour().minute())
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-            }
-
-            HStack(spacing: 8) {
-                historyMetaBadge(entry.captureMode.title, tint: .accentWarm)
-                historyMetaBadge(entry.outputPreset.title, tint: .accentMint)
-                historyMetaBadge(entry.contentKind.title, tint: .accentCool)
-
-                if let source = entry.source?.displayName {
-                    historyMetaBadge(source, tint: .accentNeutral)
-                }
-            }
-
-            HStack(spacing: 10) {
-                if entry.captureMode == .table, entry.contentKind == .text {
-                    settingsActionButton(
-                        title: "Duzenle",
-                        icon: "tablecells.badge.ellipsis",
-                        tint: .accentMint,
-                        action: { openTableReview(entry) }
-                    )
-                }
-
-                settingsActionButton(
-                    title: L10n.actionCopy,
-                    icon: "doc.on.doc",
-                    tint: .accentCool,
-                    action: { copyHistoryEntry(entry) }
-                )
-
-                settingsActionButton(
-                    title: L10n.actionDelete,
-                    icon: "trash",
-                    tint: .accentRose,
-                    action: { removeHistoryEntry(entry) }
-                )
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(NSColor.controlBackgroundColor))
-        )
-    }
-
-    private var filteredHistoryEntries: [ClipboardHistoryEntry] {
-        appState.copyHistory.filter { $0.matches(query: historySearchQuery) }
-    }
-
-    private var launchAtLoginBinding: Binding<Bool> {
-        Binding(
-            get: { appState.launchAtLoginState.toggleIsOn },
-            set: { setLaunchAtLogin($0) }
-        )
-    }
-
-    private var automaticDetectionBinding: Binding<Bool> {
-        Binding(
-            get: { appState.ocrLanguageSelection.automaticDetection },
-            set: { enabled in
-                appState.setOCRAutomaticDetection(enabled)
-                ocrFeedback = InlineFeedback(
-                    message: enabled
-                        ? "OCR artık dili otomatik algılayacak."
-                        : "OCR seçtiğin dillere öncelik verecek.",
-                    tint: .accentCool
-                )
-            }
-        )
-    }
-
-    private var supportedOCRLanguages: [OCRLanguagePreference] {
-        OCRService.availableLanguagePreferences
-    }
-
-    private var profileTargets: [ProfileTarget] {
-        let ownBundleIdentifier = Bundle.main.bundleIdentifier
-        return NSWorkspace.shared.runningApplications
-            .compactMap { application -> ProfileTarget? in
-                guard let bundleIdentifier = application.bundleIdentifier,
-                      bundleIdentifier != ownBundleIdentifier,
-                      application.activationPolicy != .prohibited else {
-                    return nil
-                }
-
-                let appName = application.localizedName?.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard let appName, !appName.isEmpty else {
-                    return nil
-                }
-
-                return ProfileTarget(appName: appName, bundleIdentifier: bundleIdentifier)
-            }
-            .sorted { $0.appName.localizedCaseInsensitiveCompare($1.appName) == .orderedAscending }
-    }
-
-    private var permissionTitle: String {
-        switch appState.permissionState {
-        case .granted:
-            return "Hazır"
-        case .requiresRestart:
-            return "Yeniden Aç"
-        case .denied:
-            return "Kapalı"
-        case .unknown:
-            return "Belirsiz"
-        case .requestInProgress:
-            return "Bekliyor"
-        }
-    }
-
-    private func diagnosticEntryRow(_ entry: DiagnosticEntry) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                statusPill(entry.severity.rawValue.uppercased(), tint: tint(for: entry.severity))
-                Spacer()
-                Text(entry.timestamp, format: .dateTime.hour().minute().second())
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-
-            Text(entry.summary)
-                .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(NSColor.controlBackgroundColor))
-        )
-    }
-
-    private var permissionDescription: String {
-        switch appState.permissionState {
-        case .granted:
-            return "Uygulama ekran yakalamaya hazır."
-        case .requiresRestart:
-            return "Yetki verildi. Uygulamayı yeniden aç."
-        case .denied:
-            return "macOS izin vermedi veya henüz onaylanmadı."
-        case .unknown:
-            return "Durum doğrulanamadı, tekrar yenile."
-        case .requestInProgress:
-            return "Sistem onayı bekleniyor."
-        }
-    }
-
-    private var permissionTint: Color {
-        switch appState.permissionState {
-        case .granted:
-            return .accentCool
-        case .requiresRestart:
-            return .accentWarm
-        case .denied, .unknown:
-            return .accentRose
-        case .requestInProgress:
-            return .accentNeutral
-        }
-    }
-
-    private func diagnosticValueRow(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(.secondary)
-
-            Text(value)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var launchAtLoginTint: Color {
-        switch appState.launchAtLoginState {
-        case .enabled:
-            return .accentCool
-        case .disabled:
-            return .accentNeutral
-        case .requiresApproval:
-            return .accentWarm
-        case .unavailable:
-            return .accentRose
-        }
-    }
-
-    private func settingsCard<Content: View>(
-        title: String,
-        subtitle: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-
-                Text(subtitle)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-
-            content()
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(NSColor.windowBackgroundColor).opacity(0.92))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
-    }
-
-    private func settingsActionButton(title: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: icon)
-                Text(title)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.84)
-                    .layoutPriority(1)
-            }
-            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .frame(maxWidth: .infinity, minHeight: 36)
-            .foregroundStyle(Color.primary)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(tint.opacity(0.14))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(tint.opacity(0.16), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-    }
-
-    private func historyMetaBadge(_ text: String, tint: Color) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .bold, design: .rounded))
-            .foregroundStyle(tint)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(tint.opacity(0.12), in: Capsule(style: .continuous))
-    }
-
-    private func historyExportFormatButton(_ format: ClipboardHistoryExportFormat) -> some View {
-        let isSelected = appState.historyExportFormat == format
-
-        return Button(action: { appState.setHistoryExportFormat(format) }) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(format.title)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-
-                Text(format.subtitle)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                    .lineLimit(2)
-            }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSelected ? Color.surfaceTop : Color(NSColor.controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isSelected ? Color.accentMint.opacity(0.7) : Color.black.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Geçmiş dışa aktarma biçimi: \(format.title)")
-    }
-
-    private func outputPresetButton(_ preset: CaptureOutputPreset) -> some View {
-        let isSelected = appState.captureOutputPreset == preset
-
-        return Button(action: { setCaptureOutputPreset(preset) }) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(preset.title)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.88)
-
-                Text(preset.detail)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSelected ? Color.surfaceTop : Color(NSColor.controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isSelected ? Color.accentMint.opacity(0.72) : Color.black.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Çıktı biçimi: \(preset.title)")
-    }
-
-    private func watchBehaviorButton(_ behavior: WatchCopyBehavior) -> some View {
-        let isSelected = appState.watchConfiguration.copyBehavior == behavior
-
-        return Button(action: { setWatchCopyBehavior(behavior) }) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(behavior.title)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.88)
-
-                Text(behavior.detail)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSelected ? Color.surfaceTop : Color(NSColor.controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isSelected ? Color.accentCool.opacity(0.72) : Color.black.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func profileRow(_ profile: AppCaptureProfile) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(profile.appName)
-                    .font(.system(size: 12.5, weight: .bold, design: .rounded))
-
-                Text(profile.summary)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-
-                Text(profile.bundleIdentifier)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary.opacity(0.8))
-            }
-
-            Spacer()
-
-            settingsActionButton(
-                title: L10n.actionDelete,
-                icon: "trash",
-                tint: .accentRose,
-                action: { removeProfile(profile) }
-            )
-            .frame(width: 92)
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(NSColor.controlBackgroundColor))
-        )
-    }
-
-    private func statusPill(_ text: String, tint: Color) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: .bold, design: .rounded))
-            .foregroundStyle(tint)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(tint.opacity(0.14), in: Capsule(style: .continuous))
-    }
-
-    private func feedbackLabel(_ message: String, tint: Color) -> some View {
-        Text(message)
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
-            .foregroundStyle(tint)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func settingsLanguageToggle(_ language: OCRLanguagePreference) -> some View {
-        let isSelected = appState.ocrLanguageSelection.contains(language)
-
-        return Button(action: { toggleOCRLanguage(language) }) {
-            VStack(spacing: 4) {
-                Text(language.shortTitle)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                Text(language.title)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSelected ? Color.surfaceTop : Color(NSColor.controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isSelected ? Color.accentCool.opacity(0.7) : Color.black.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(L10n.accessibilityOCRLanguage): \(language.title)")
-    }
-
-    private func settingsCaptureModeButton(_ mode: CaptureMode) -> some View {
-        let isSelected = appState.captureMode == mode
-
-        return Button(action: { setCaptureMode(mode) }) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(mode.title)
-                    .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.88)
-
-                Text(settingsCaptureModeSubtitle(for: mode))
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.9)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSelected ? Color.surfaceTop : Color(NSColor.controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isSelected ? Color.accentWarm.opacity(0.72) : Color.black.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(L10n.accessibilityCaptureMode): \(mode.title)")
-    }
-
-    private func toggleHotkeyRecording() {
-        if isRecordingHotkey {
-            hotkeyFeedback = HotkeyFeedback(
-                message: "Kısayol değiştirme iptal edildi.",
-                tint: .accentNeutral
-            )
-            stopHotkeyRecording()
-            return
-        }
-
-        stopHotkeyRecording()
-        isRecordingHotkey = true
-        hotkeyFeedback = HotkeyFeedback(
-            message: "Yeni kısayol için bir kombinasyona bas.",
-            tint: .accentCool
-        )
-
-        hotkeyRecorderMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            handleHotkeyRecording(event)
-        }
-    }
-
-    private func handleHotkeyRecording(_ event: NSEvent) -> NSEvent? {
-        guard isRecordingHotkey else {
-            return event
-        }
-
-        if event.keyCode == UInt16(kVK_Escape) {
-            hotkeyFeedback = HotkeyFeedback(
-                message: "Kısayol değiştirme iptal edildi.",
-                tint: .accentNeutral
-            )
-            stopHotkeyRecording()
-            return nil
-        }
-
-        guard let configuration = HotkeyConfiguration.from(event: event) else {
-            hotkeyFeedback = HotkeyFeedback(
-                message: "En az bir değiştirici tuş ile geçerli bir tuş kullan.",
-                tint: .accentWarm
-            )
-            return nil
-        }
-
-        guard let hotkeyManager = appState.hotkeyManager else {
-            hotkeyFeedback = HotkeyFeedback(
-                message: "Kısayol servisi şu anda hazır değil.",
-                tint: .accentRose
-            )
-            stopHotkeyRecording()
-            return nil
-        }
-
-        do {
-            try hotkeyManager.updateHotkey(to: configuration)
-            hotkeyFeedback = HotkeyFeedback(
-                message: "Kısayol güncellendi: \(configuration.displayLabel)",
-                tint: .accentCool
-            )
-            stopHotkeyRecording()
-        } catch {
-            hotkeyFeedback = HotkeyFeedback(
-                message: error.localizedDescription,
-                tint: .accentRose
-            )
-        }
-
-        return nil
-    }
-
-    private func stopHotkeyRecording() {
-        if let hotkeyRecorderMonitor {
-            NSEvent.removeMonitor(hotkeyRecorderMonitor)
-            self.hotkeyRecorderMonitor = nil
-        }
-        isRecordingHotkey = false
-    }
-
-    private func resetHotkey() {
-        do {
-            try appState.hotkeyManager?.resetHotkeyToDefault()
-            hotkeyFeedback = HotkeyFeedback(
-                message: "Kısayol varsayılana döndü: \(HotkeyConfiguration.defaultValue.displayLabel)",
-                tint: .accentCool
-            )
-            stopHotkeyRecording()
-        } catch {
-            hotkeyFeedback = HotkeyFeedback(
-                message: error.localizedDescription,
-                tint: .accentRose
-            )
-        }
-    }
-
-    private func setCaptureMode(_ mode: CaptureMode) {
-        guard appState.captureMode != mode else { return }
-        appState.setCaptureMode(mode)
-        captureModeFeedback = InlineFeedback(
-            message: "\(mode.title) modu etkin. \(mode.readyDescription)",
-            tint: .accentCool
-        )
-    }
-
-    private func setCaptureOutputPreset(_ preset: CaptureOutputPreset) {
-        guard appState.captureOutputPreset != preset else { return }
-        appState.setCaptureOutputPreset(preset)
-        outputPresetFeedback = InlineFeedback(
-            message: "Çıktı biçimi \(preset.title) olarak ayarlandı.",
-            tint: .accentCool
-        )
-    }
-
-    private func setWatchCopyBehavior(_ behavior: WatchCopyBehavior) {
-        guard appState.watchConfiguration.copyBehavior != behavior else { return }
-        appState.setWatchCopyBehavior(behavior)
-        watchFeedback = InlineFeedback(
-            message: "İzleme kuralı güncellendi: \(behavior.title)",
-            tint: .accentCool
-        )
-    }
-
-    private func saveWatchRegex() {
-        if appState.setWatchRegexFilter(watchRegexDraft) {
-            watchRegexDraft = appState.watchConfiguration.regexFilter
-            watchFeedback = InlineFeedback(
-                message: watchRegexDraft.isEmpty
-                    ? "Regex filtresi temizlendi."
-                    : "Regex filtresi kaydedildi.",
-                tint: .accentCool
-            )
-        } else {
-            watchFeedback = InlineFeedback(
-                message: "Regex deseni geçersiz. Örneği kontrol edip tekrar dene.",
-                tint: .accentRose
-            )
-        }
-    }
-
-    private func clearWatchRegex() {
-        watchRegexDraft = ""
-        _ = appState.setWatchRegexFilter("")
-        watchFeedback = InlineFeedback(
-            message: "Regex filtresi temizlendi.",
-            tint: .accentNeutral
-        )
-    }
-
-    private func saveProfile(for target: ProfileTarget) {
-        appState.upsertAppProfile(
-            bundleIdentifier: target.bundleIdentifier,
-            appName: target.appName
-        )
-        profileFeedback = InlineFeedback(
-            message: "\(target.appName) için profil kaydedildi.",
-            tint: .accentCool
-        )
-    }
-
-    private func removeProfile(_ profile: AppCaptureProfile) {
-        appState.removeAppProfile(profile)
-        profileFeedback = InlineFeedback(
-            message: "\(profile.appName) profili kaldırıldı.",
-            tint: .accentNeutral
-        )
-    }
-
-    private func settingsCaptureModeSubtitle(for mode: CaptureMode) -> String {
-        switch mode {
-        case .standard:
-            return "Genel OCR"
-        case .subtitle:
-            return "Video ve canlı altyazı"
-        case .code:
-            return "Kod ve terminal"
-        case .table:
-            return "Tablo ve liste"
-        }
-    }
-
-    private func refreshLaunchAtLoginState() {
-        let state = appState.launchAtLoginManager?.refreshLaunchAtLoginState() ?? .unavailable
-        if state != .enabled {
-            launchAtLoginFeedback = nil
-        }
-    }
-
-    private func setLaunchAtLogin(_ enabled: Bool) {
-        guard let launchAtLoginManager = appState.launchAtLoginManager else {
-            launchAtLoginFeedback = InlineFeedback(
-                message: "Başlangıç servisi şu anda hazır değil.",
-                tint: .accentRose
-            )
-            return
-        }
-
-        Task { @MainActor in
-            do {
-                let state = try await launchAtLoginManager.setLaunchAtLogin(enabled: enabled)
-                switch state {
-                case .enabled:
-                    launchAtLoginFeedback = InlineFeedback(
-                        message: "Uygulama artık bilgisayar açıldığında otomatik başlayacak.",
-                        tint: .accentCool
-                    )
-                case .disabled:
-                    launchAtLoginFeedback = InlineFeedback(
-                        message: "Otomatik başlatma kapatıldı.",
-                        tint: .accentNeutral
-                    )
-                case .requiresApproval:
-                    openLoginItemsSettings()
-                    launchAtLoginFeedback = InlineFeedback(
-                        message: "macOS ek onay istiyor. Giriş Öğeleri açıldı; onaydan sonra durum otomatik yenilenecek.",
-                        tint: .accentWarm
-                    )
-                case .unavailable:
-                    launchAtLoginFeedback = InlineFeedback(
-                        message: LaunchAtLoginError.unavailable.errorDescription ?? "Bu özellik şu anda kullanılamıyor.",
-                        tint: .accentRose
-                    )
-                }
-            } catch {
-                launchAtLoginFeedback = InlineFeedback(
-                    message: error.localizedDescription,
-                    tint: .accentRose
-                )
-            }
-        }
-    }
-
-    private func toggleOCRLanguage(_ language: OCRLanguagePreference) {
-        let enabled = !appState.ocrLanguageSelection.contains(language)
-        if appState.setOCRLanguage(language, enabled: enabled) {
-            ocrFeedback = InlineFeedback(
-                message: "OCR dili güncellendi: \(appState.ocrLanguageSelection.summary)",
-                tint: .accentCool
-            )
-        } else {
-            ocrFeedback = InlineFeedback(
-                message: "En az bir OCR dili seçili kalmalı.",
-                tint: .accentWarm
-            )
-        }
-    }
-
-    private func copyHistoryEntry(_ entry: ClipboardHistoryEntry) {
-        guard let result = appState.coordinator?.copyCapturedText(
-            rawText: entry.effectiveRawText,
-            captureMode: entry.captureMode,
-            contentKind: entry.contentKind,
-            source: entry.source,
-            outputPreset: entry.outputPreset
-        ) else {
-            historyFeedback = InlineFeedback(
-                message: "Kopyalama servisi şu anda hazır değil.",
+    private func copyActiveSavedSnippetSuggestion(_ suggestion: ActiveSavedSnippetSuggestion) {
+        guard let result = appState.coordinator?.copySavedSnippet(suggestion.snippet) else {
+            smartActionFeedback = InlineFeedback(
+                message: "Snippet servisi şu anda hazır değil.",
                 tint: .accentRose
             )
             return
@@ -2675,188 +1818,124 @@ struct SettingsView: View {
 
         switch result {
         case .success:
-            historyFeedback = InlineFeedback(
-                message: "Seçilen geçmiş metni yeniden panoya kopyalandı.",
+            smartActionFeedback = InlineFeedback(
+                message: "\(suggestion.snippet.name) panoya kopyalandı.",
                 tint: .accentCool
             )
         case .failedWrite, .failedReadback:
-            historyFeedback = InlineFeedback(
-                message: "Geçmiş metni panoya yazılamadı.",
+            smartActionFeedback = InlineFeedback(
+                message: "Snippet panoya yazılamadı.",
                 tint: .accentRose
             )
         }
     }
 
-    private func openTableReview(_ entry: ClipboardHistoryEntry) {
-        appState.presentTableReview(for: entry)
-        NSApp.activate(ignoringOtherApps: true)
-        openWindow(id: ScreenTextGrabApp.tableReviewWindowID)
-        historyFeedback = InlineFeedback(
-            message: "Tablo duzenleyici acildi.",
-            tint: .accentCool
-        )
+    private func activeSavedSnippetQuickPickSummary(
+        for suggestion: ActiveSavedSnippetCollectionSuggestion,
+        hiddenCount: Int
+    ) -> String {
+        let base: String
+        switch suggestion.matchKind {
+        case .application:
+            base = "\(suggestion.source.displayName) için \(suggestion.collection.name) koleksiyonundaki en uygun snippet'ler listelendi."
+        case .windowTitle(let windowTitle):
+            base = "\"\(windowTitle)\" penceresine uyan snippet'ler \(suggestion.collection.name) koleksiyonundan getirildi."
+        }
+
+        guard hiddenCount > 0 else {
+            return base
+        }
+
+        return "\(base) +\(hiddenCount) ek eşleşme daha var."
     }
 
-    private func removeHistoryEntry(_ entry: ClipboardHistoryEntry) {
-        appState.removeHistoryEntry(entry)
-        historyFeedback = InlineFeedback(
-            message: "Seçilen kayıt geçmişten kaldırıldı.",
-            tint: .accentNeutral
-        )
+    private func savedSnippetQuickPickButton(_ snippet: SavedSnippet) -> some View {
+        Button(action: { copyQuickPickSnippet(snippet) }) {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(snippet.name)
+                        .font(.system(size: isCompactPanel ? 11 : 11.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+
+                    Text(snippet.previewText)
+                        .font(.system(size: isCompactPanel ? 9.5 : 10.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.white.opacity(0.68))
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                HStack(spacing: 6) {
+                    quickPickBadge(snippet.captureMode.shortTitle, tint: Color.accentWarm)
+                    quickPickBadge(snippet.outputPreset.title, tint: Color.accentMint)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(0.07))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(snippet.name) snippet'ini kopyala")
     }
 
-    private func clearHistory() {
-        appState.clearHistory()
-        historyFeedback = InlineFeedback(
-            message: "Tüm geçmiş temizlendi.",
-            tint: .accentNeutral
-        )
-    }
-
-    private func exportHistory() {
-        let entries = filteredHistoryEntries
-        guard !entries.isEmpty else {
-            historyFeedback = InlineFeedback(
-                message: "Dışa aktarılacak geçmiş bulunmuyor.",
-                tint: .accentWarm
+    private func copyQuickPickSnippet(_ snippet: SavedSnippet) {
+        guard let result = appState.coordinator?.copySavedSnippet(snippet) else {
+            smartActionFeedback = InlineFeedback(
+                message: "Snippet servisi şu anda hazır değil.",
+                tint: .accentRose
             )
             return
         }
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd-HHmm"
-        let exportFormat = appState.historyExportFormat
-
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [historyExportContentType(for: exportFormat)]
-        panel.canCreateDirectories = true
-        panel.nameFieldStringValue = "ScreenTextGrab-Gecmis-\(formatter.string(from: Date())).\(exportFormat.fileExtension)"
-
-        guard panel.runModal() == .OK, let url = panel.url else {
-            return
-        }
-
-        do {
-            let exportText = ClipboardHistoryStore.export(entries, format: exportFormat)
-            try exportText.write(to: url, atomically: true, encoding: .utf8)
-            historyFeedback = InlineFeedback(
-                message: "\(entries.count) kayıt \(exportFormat.title) olarak dışa aktarıldı: \(url.lastPathComponent)",
+        switch result {
+        case .success:
+            smartActionFeedback = InlineFeedback(
+                message: "\(snippet.name) panoya kopyalandı.",
                 tint: .accentCool
             )
-        } catch {
-            historyFeedback = InlineFeedback(
-                message: "Geçmiş dışa aktarılamadı: \(error.localizedDescription)",
+        case .failedWrite, .failedReadback:
+            smartActionFeedback = InlineFeedback(
+                message: "Snippet panoya yazılamadı.",
                 tint: .accentRose
             )
         }
     }
 
-    private func historyExportContentType(for format: ClipboardHistoryExportFormat) -> UTType {
-        switch format {
-        case .text:
-            return .plainText
-        case .markdown:
-            return UTType(filenameExtension: "md") ?? .plainText
-        case .json:
-            return .json
-        case .csv:
-            return .commaSeparatedText
-        }
-    }
-
-    private func refreshPermissionDiagnostics() {
-        Task { @MainActor in
-            appState.coordinator?.refreshPermission()
-            permissionDiagnostics = await appState.permissionDiagnosticsProvider?.diagnosticSnapshot()
-            diagnosticsFeedback = InlineFeedback(
-                message: "Tanı verisi güncellendi.",
-                tint: .accentCool
+    private func quickPickBadge(_ text: String, tint: Color) -> some View {
+        Text(text)
+            .font(.system(size: isCompactPanel ? 8.5 : 9, weight: .semibold, design: .rounded))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(tint.opacity(0.14))
             )
-        }
-    }
-
-    private func copyPermissionDiagnostics() {
-        guard let permissionDiagnostics else {
-            diagnosticsFeedback = InlineFeedback(
-                message: "Önce tanı verisini yenile.",
-                tint: .accentWarm
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(tint.opacity(0.24), lineWidth: 1)
             )
-            return
-        }
-
-        if copyTextToPasteboard(permissionDiagnostics.reportText) {
-            diagnosticsFeedback = InlineFeedback(
-                message: "İzin tanısı panoya kopyalandı.",
-                tint: .accentCool
-            )
-        } else {
-            diagnosticsFeedback = InlineFeedback(
-                message: "İzin tanısı panoya kopyalanamadı.",
-                tint: .accentRose
-            )
-        }
     }
 
-    private func exportSupportBundle() {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd-HHmm"
-
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.plainText]
-        panel.canCreateDirectories = true
-        panel.nameFieldStringValue = "ScreenTextGrab-Support-\(formatter.string(from: Date())).txt"
-
-        guard panel.runModal() == .OK, let url = panel.url else {
-            return
-        }
-
-        do {
-            let report = appState.buildSupportBundleReport(permissionSnapshot: permissionDiagnostics)
-            try report.write(to: url, atomically: true, encoding: .utf8)
-            diagnosticsFeedback = InlineFeedback(
-                message: "Support paketi dışa aktarıldı: \(url.lastPathComponent)",
-                tint: .accentCool
-            )
-        } catch {
-            diagnosticsFeedback = InlineFeedback(
-                message: "Support paketi dışa aktarılamadı: \(error.localizedDescription)",
-                tint: .accentRose
-            )
-        }
+    private func quitApp() {
+        NSApplication.shared.terminate(nil)
     }
+}
 
-    private func copyTextToPasteboard(_ text: String) -> Bool {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        return pasteboard.setString(text, forType: .string)
-    }
-
-    private func tint(for severity: DiagnosticSeverity) -> Color {
-        switch severity {
-        case .info:
-            return .accentCool
-        case .warning:
-            return .accentWarm
-        case .error:
-            return .accentRose
-        }
-    }
-
-    private func openLoginItemsSettings() {
-        appState.launchAtLoginManager?.openLoginItemsSettings()
-    }
-
-    private func requestPermission() {
-        appState.coordinator?.requestPermission()
-    }
-
-    private func refreshPermission() {
-        appState.coordinator?.refreshPermission()
-    }
-
-    private func openSystemSettings() {
-        appState.coordinator?.openSystemSettings()
-    }
+enum SettingsTab: String, Hashable {
+    case general
+    case ocr
+    case diagnostics
+    case history
 }
 
 struct TableReviewView: View {
@@ -3208,7 +2287,8 @@ struct TableReviewView: View {
             captureMode: .table,
             contentKind: session.entry.contentKind,
             source: session.entry.source,
-            outputPreset: preset
+            outputPreset: preset,
+            targetBundleIdentifier: appState.activeTargetBundleIdentifier
         ) else {
             feedback = InlineFeedback(
                 message: "Kopyalama servisi su anda hazir degil.",
@@ -3291,23 +2371,24 @@ private struct NoticeContent {
     let message: String
     let icon: String
     let tint: Color
+    var actionTitle: String? = nil
+    var action: (() -> Void)? = nil
 }
 
-private struct HotkeyFeedback {
+struct HotkeyFeedback {
     let message: String
     let tint: Color
 }
 
-private struct InlineFeedback {
+struct InlineFeedback {
     let message: String
     let tint: Color
 }
 
-private extension Color {
+extension Color {
     static let surfaceTop = Color(red: 0.05, green: 0.11, blue: 0.15)
     static let surfaceBottom = Color(red: 0.09, green: 0.18, blue: 0.20)
     static let accentWarm = Color(red: 0.83, green: 0.57, blue: 0.36)
-    static let accentWarmMuted = Color(red: 0.63, green: 0.38, blue: 0.27)
     static let accentAmber = Color(red: 0.90, green: 0.63, blue: 0.42)
     static let accentCoral = Color(red: 0.79, green: 0.39, blue: 0.32)
     static let accentCool = Color(red: 0.40, green: 0.72, blue: 0.76)

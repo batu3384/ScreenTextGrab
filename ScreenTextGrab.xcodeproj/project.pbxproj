@@ -11,6 +11,8 @@
 		19631CE8D3FDCF60066B7116 /* SelectionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 691E0B85C0EB91A1D64E46BB /* SelectionOverlay.swift */; };
 		2290E0C8538BBF615847D375 /* LaunchAtLoginServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51EAB51912760565BC654DF4 /* LaunchAtLoginServiceTests.swift */; };
 		2ED7CE46D4CCE3319F366FAF /* OCRResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CEEA251B568C9B80FDDC766 /* OCRResult.swift */; };
+		2FF1CC8C09102F6392DC2C8F /* PDFProcessingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CEEEE52877CD2C31BD1D036 /* PDFProcessingService.swift */; };
+		33FA94A5480F22608A94424A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA00A3409351D42C19881235 /* SettingsView.swift */; };
 		388D8FFB028AC5545E6DCC6E /* ScreenTextGrabApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6B811E93E42BDCF8E6BBDEF /* ScreenTextGrabApp.swift */; };
 		394E732A187B137E0A6EC8FA /* ScreenCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DB24A00EFBEBA723B140DF2 /* ScreenCaptureService.swift */; };
 		43CFAB20FA9D63A0951C4C80 /* WatchTextFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D5BE4199EDB2D68BF621F22 /* WatchTextFilterTests.swift */; };
@@ -19,8 +21,10 @@
 		4FC1394D39DF39D813007D36 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 57637AC54FF6F7DF88F515FC /* Assets.xcassets */; };
 		52742286512432CB963B4535 /* SmartActionBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D321869D6EA978FA499592B /* SmartActionBuilderTests.swift */; };
 		5735BB99C69A848F872D7241 /* ScreenPermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2245A490EC99B2314C210B78 /* ScreenPermissionService.swift */; };
+		59BE0191B8A1A44F2989E5F7 /* AutomationSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5587443DE37934A6C44C0D8A /* AutomationSupport.swift */; };
 		5EBFDDC97CC150F8F964A08E /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439AB8319D466E099CE36AB3 /* AppModels.swift */; };
 		6697A066E4BB17C5FFD0DEED /* CaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82B6782199ECDF02ED5CE5C2 /* CaptureCoordinator.swift */; };
+		674EE05BAF945CD57C6813F0 /* AppState+ContextSuggestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AA320529CFEA82E1C22DBF8 /* AppState+ContextSuggestions.swift */; };
 		753AB5317B389FEB28205D3C /* ClipboardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FBC534BDAA8DA6ADC2D228F /* ClipboardManager.swift */; };
 		7D34069C69997FAFD166504C /* ScreenTextGrabUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60ECF18625B72ECFD2D918F0 /* ScreenTextGrabUITests.swift */; };
 		7DAAE0E993EC36811D6D9988 /* BarcodeDetectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D1A296714CAEC33C43EC169 /* BarcodeDetectionTests.swift */; };
@@ -28,6 +32,7 @@
 		8E392A63ADFCF77BC1C12CA3 /* HotkeyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 503FABD42F445D7CC752A9DF /* HotkeyService.swift */; };
 		AAE4A4EB336DFA83898EFDD5 /* OCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA101828FA23B1C6A17F33A /* OCRService.swift */; };
 		AEAE5C425C0291F593754BF9 /* WatchTextFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0851C720BFFA8BED4421718B /* WatchTextFilter.swift */; };
+		BE47F64BDC947CE3A5C94B1C /* AutomationIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D837B65BF51EB3E7DBE4DAF0 /* AutomationIntents.swift */; };
 		C6AC1ECC9420596C8525BD47 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45ED1A4C0E3AFB208B888E85 /* Localization.swift */; };
 		CCFEF8DCADACF678F4DCF1FC /* ScreenEnvironmentSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A71D0480EAFC142281E21C3 /* ScreenEnvironmentSnapshot.swift */; };
 		D1E6329C78D23445AC17E542 /* OCRServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C93221DC54FDE315E087165 /* OCRServiceTests.swift */; };
@@ -69,6 +74,7 @@
 		2C13B3F98484393217058119 /* CapturePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePreferences.swift; sourceTree = "<group>"; };
 		2F480F910E933BE50F586804 /* OCRResultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRResultTests.swift; sourceTree = "<group>"; };
 		36FBCB6ED2013B9BDFF7B34D /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
+		3AA320529CFEA82E1C22DBF8 /* AppState+ContextSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+ContextSuggestions.swift"; sourceTree = "<group>"; };
 		3E54F75C3EE2CBFF07CC7223 /* CaptureOutputFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureOutputFormatterTests.swift; sourceTree = "<group>"; };
 		439AB8319D466E099CE36AB3 /* AppModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModels.swift; sourceTree = "<group>"; };
 		455984721CAF976508C28F5B /* ScreenTextGrab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScreenTextGrab.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -76,12 +82,14 @@
 		4FBC534BDAA8DA6ADC2D228F /* ClipboardManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardManager.swift; sourceTree = "<group>"; };
 		503FABD42F445D7CC752A9DF /* HotkeyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyService.swift; sourceTree = "<group>"; };
 		51EAB51912760565BC654DF4 /* LaunchAtLoginServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginServiceTests.swift; sourceTree = "<group>"; };
+		5587443DE37934A6C44C0D8A /* AutomationSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationSupport.swift; sourceTree = "<group>"; };
 		57637AC54FF6F7DF88F515FC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5D5BE4199EDB2D68BF621F22 /* WatchTextFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchTextFilterTests.swift; sourceTree = "<group>"; };
 		60A7302D5F692E7C7CEC0F50 /* ScreenPermissionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenPermissionServiceTests.swift; sourceTree = "<group>"; };
 		60ECF18625B72ECFD2D918F0 /* ScreenTextGrabUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenTextGrabUITests.swift; sourceTree = "<group>"; };
 		6347794F3E2FA318922C231A /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		691E0B85C0EB91A1D64E46BB /* SelectionOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionOverlay.swift; sourceTree = "<group>"; };
+		7CEEEE52877CD2C31BD1D036 /* PDFProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFProcessingService.swift; sourceTree = "<group>"; };
 		82B6782199ECDF02ED5CE5C2 /* CaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureCoordinator.swift; sourceTree = "<group>"; };
 		83B530733156255B6E0DF548 /* ScreenTextGrab.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ScreenTextGrab.entitlements; sourceTree = "<group>"; };
 		8C93221DC54FDE315E087165 /* OCRServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRServiceTests.swift; sourceTree = "<group>"; };
@@ -92,6 +100,8 @@
 		A81722B125426EBF76936C64 /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
 		A8891012CC830AA36376ECC6 /* ScreenTextGrabTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ScreenTextGrabTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2EFE7EDBD48BF5FCEF8F8EB /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		D837B65BF51EB3E7DBE4DAF0 /* AutomationIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationIntents.swift; sourceTree = "<group>"; };
+		DA00A3409351D42C19881235 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DDA101828FA23B1C6A17F33A /* OCRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRService.swift; sourceTree = "<group>"; };
 		EBEF558C0B53262FBA630D96 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F6B811E93E42BDCF8E6BBDEF /* ScreenTextGrabApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenTextGrabApp.swift; sourceTree = "<group>"; };
@@ -123,6 +133,7 @@
 				A81722B125426EBF76936C64 /* LaunchAtLoginService.swift */,
 				36FBCB6ED2013B9BDFF7B34D /* Logging.swift */,
 				DDA101828FA23B1C6A17F33A /* OCRService.swift */,
+				7CEEEE52877CD2C31BD1D036 /* PDFProcessingService.swift */,
 				9DB24A00EFBEBA723B140DF2 /* ScreenCaptureService.swift */,
 				2245A490EC99B2314C210B78 /* ScreenPermissionService.swift */,
 			);
@@ -151,6 +162,7 @@
 			children = (
 				C2EFE7EDBD48BF5FCEF8F8EB /* MenuBarView.swift */,
 				691E0B85C0EB91A1D64E46BB /* SelectionOverlay.swift */,
+				DA00A3409351D42C19881235 /* SettingsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -198,7 +210,10 @@
 		EC7F00610887BEEA7DD5F2FC /* ScreenTextGrab */ = {
 			isa = PBXGroup;
 			children = (
+				3AA320529CFEA82E1C22DBF8 /* AppState+ContextSuggestions.swift */,
 				57637AC54FF6F7DF88F515FC /* Assets.xcassets */,
+				D837B65BF51EB3E7DBE4DAF0 /* AutomationIntents.swift */,
+				5587443DE37934A6C44C0D8A /* AutomationSupport.swift */,
 				EBEF558C0B53262FBA630D96 /* Info.plist */,
 				45ED1A4C0E3AFB208B888E85 /* Localization.swift */,
 				83B530733156255B6E0DF548 /* ScreenTextGrab.entitlements */,
@@ -355,6 +370,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				5EBFDDC97CC150F8F964A08E /* AppModels.swift in Sources */,
+				674EE05BAF945CD57C6813F0 /* AppState+ContextSuggestions.swift in Sources */,
+				BE47F64BDC947CE3A5C94B1C /* AutomationIntents.swift in Sources */,
+				59BE0191B8A1A44F2989E5F7 /* AutomationSupport.swift in Sources */,
 				6697A066E4BB17C5FFD0DEED /* CaptureCoordinator.swift in Sources */,
 				185FEBB3AF5E75C578BD3658 /* CaptureOutputFormatter.swift in Sources */,
 				E74F01E9696AFA0BD4D2D8F6 /* CapturePreferences.swift in Sources */,
@@ -366,11 +384,13 @@
 				8081E2D35D8006618D93301E /* MenuBarView.swift in Sources */,
 				2ED7CE46D4CCE3319F366FAF /* OCRResult.swift in Sources */,
 				AAE4A4EB336DFA83898EFDD5 /* OCRService.swift in Sources */,
+				2FF1CC8C09102F6392DC2C8F /* PDFProcessingService.swift in Sources */,
 				394E732A187B137E0A6EC8FA /* ScreenCaptureService.swift in Sources */,
 				CCFEF8DCADACF678F4DCF1FC /* ScreenEnvironmentSnapshot.swift in Sources */,
 				5735BB99C69A848F872D7241 /* ScreenPermissionService.swift in Sources */,
 				388D8FFB028AC5545E6DCC6E /* ScreenTextGrabApp.swift in Sources */,
 				19631CE8D3FDCF60066B7116 /* SelectionOverlay.swift in Sources */,
+				33FA94A5480F22608A94424A /* SettingsView.swift in Sources */,
 				AEAE5C425C0291F593754BF9 /* WatchTextFilter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -564,12 +584,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ScreenTextGrab/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.screentextgrab.app;
 				PRODUCT_NAME = ScreenTextGrab;
 				SDKROOT = macosx;
@@ -620,12 +640,12 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ScreenTextGrab/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.screentextgrab.app;
 				PRODUCT_NAME = ScreenTextGrab;
 				SDKROOT = macosx;

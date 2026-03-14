@@ -12,6 +12,10 @@ enum L10n {
 
     static let actionSettings = NSLocalizedString("action.settings", value: "Ayarlar", comment: "")
     static let actionRefresh = NSLocalizedString("action.refresh", value: "Yenile", comment: "")
+    static let actionClipboardImage = NSLocalizedString("action.clipboard_image", value: "Panodaki Görseli Oku", comment: "")
+    static let actionImageFile = NSLocalizedString("action.image_file", value: "Görsel Dosyası Oku", comment: "")
+    static let actionPDFFile = NSLocalizedString("action.pdf_file", value: "PDF Oku", comment: "")
+    static let actionSearchablePDF = NSLocalizedString("action.searchable_pdf", value: "Searchable PDF", comment: "")
     static let actionAllow = NSLocalizedString("action.allow", value: "İzin Ver", comment: "")
     static let actionSystemSettings = NSLocalizedString("action.system_settings", value: "Sistem Ayarları", comment: "")
     static let actionRequestPermission = NSLocalizedString("action.request_permission", value: "İzin İste", comment: "")

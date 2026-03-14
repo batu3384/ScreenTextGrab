@@ -133,6 +133,11 @@ fi
 echo "==> Cleaning stale app copies"
 "${ROOT_DIR}/scripts/cleanup_app_copies.sh"
 
+echo "==> Installing terminal helper"
+if ! bash "${ROOT_DIR}/scripts/install_cli_command.sh"; then
+  echo "WARNING: failed to install the 'stg' command-line helper." >&2
+fi
+
 if [[ "${LAUNCH_AFTER_INSTALL}" == "true" ]]; then
   echo "==> Launching ${INSTALL_PATH}"
   open "${INSTALL_PATH}"

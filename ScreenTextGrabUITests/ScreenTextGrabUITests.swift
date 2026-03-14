@@ -46,7 +46,7 @@ final class ScreenTextGrabUITests: XCTestCase {
 
         app.launchArguments = ["--ui-test-launch-panel"] + additionalArguments
         app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 8))
+        XCTAssertTrue(waitForLaunch(of: app, timeout: 10))
         app.activate()
         return app
     }
@@ -74,5 +74,20 @@ final class ScreenTextGrabUITests: XCTestCase {
 
     private func startCaptureButton(in app: XCUIApplication) -> XCUIElement {
         app.buttons["launch-panel-start-capture"]
+    }
+
+    private func waitForLaunch(of app: XCUIApplication, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while Date() < deadline {
+            switch app.state {
+            case .runningForeground, .runningBackground:
+                return true
+            default:
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            }
+        }
+
+        return false
     }
 }

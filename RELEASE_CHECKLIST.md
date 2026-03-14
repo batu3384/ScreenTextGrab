@@ -1,7 +1,8 @@
 # ScreenTextGrab Release Checklist
 
 ## Packaging
-- Generate the Xcode project before release builds:
+- Use the checked-in Xcode project for release builds. Regenerate it only if
+  `project.yml` changed and `xcodegen` is available:
 
 ```bash
 xcodegen generate --spec project.yml
@@ -15,7 +16,8 @@ xcodegen generate --spec project.yml
 
   If the release Mac already has a matching Apple Developer signing identity,
   the script auto-detects the team ID. `SCREEN_TEXT_GRAB_TEAM_ID` is only
-  needed when auto-detection is not possible.
+  needed when auto-detection is not possible. If `xcodegen` is not installed,
+  the script falls back to the checked-in `ScreenTextGrab.xcodeproj`.
 
 - To build, notarize, verify, and publish the GitHub release in one local command:
 
@@ -74,13 +76,13 @@ SCREEN_TEXT_GRAB_XCODE_NOTARY_TIMEOUT_SECONDS=3600 \
 - Verify the notarized release package:
 
 ```bash
-./scripts/verify_release.sh
+APP_PATH=dist/.app-bundles.noindex/ScreenTextGrab.app ./scripts/verify_release.sh
 ```
 
 - For a local signed smoke build that is not Developer ID / notarized, run:
 
 ```bash
-VERIFY_MODE=local ./scripts/verify_release.sh
+APP_PATH=dist/.app-bundles.noindex/ScreenTextGrab.app VERIFY_MODE=local ./scripts/verify_release.sh
 ```
 
 - To rerun the launch-panel UI automation locally, use the same ad-hoc signing flags as CI:

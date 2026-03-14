@@ -15,7 +15,7 @@ require_command() {
 require_command codesign
 require_command spctl
 require_command xcrun
-require_command defaults
+require_command /usr/libexec/PlistBuddy
 
 if [[ ! -d "${APP_PATH}" ]]; then
   echo "App not found: ${APP_PATH}" >&2
@@ -24,10 +24,15 @@ fi
 
 APP_DIR="$(cd "$(dirname "${APP_PATH}")" && pwd -P)"
 APP_PATH="${APP_DIR}/$(basename "${APP_PATH}")"
+INFO_PLIST="${APP_PATH}/Contents/Info.plist"
+
+read_plist_value() {
+  /usr/libexec/PlistBuddy -c "Print :$2" "$1"
+}
 
 echo "==> Version metadata"
-defaults read "${APP_PATH}/Contents/Info" CFBundleShortVersionString
-defaults read "${APP_PATH}/Contents/Info" CFBundleVersion
+read_plist_value "${INFO_PLIST}" CFBundleShortVersionString
+read_plist_value "${INFO_PLIST}" CFBundleVersion
 
 echo "==> Code signature"
 codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
@@ -60,8 +65,8 @@ else
 fi
 
 echo "==> Permission scope"
-if defaults read "${APP_PATH}/Contents/Info" NSAppleEventsUsageDescription >/dev/null 2>&1; then
+if /usr/libexec/PlistBuddy -c "Print :NSAppleEventsUsageDescription" "${INFO_PLIST}" >/dev/null 2>&1; then
   echo "Unexpected Apple Events permission present in release bundle" >&2
   exit 1
 fi
-defaults read "${APP_PATH}/Contents/Info" NSScreenCaptureUsageDescription
+read_plist_value "${INFO_PLIST}" NSScreenCaptureUsageDescription

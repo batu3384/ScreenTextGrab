@@ -87,7 +87,7 @@ If you are shipping the public `.app`, notarize it before release:
 SCREEN_TEXT_GRAB_NOTARY_PROFILE="your-notary-profile" \
 ./scripts/notarize_release.sh
 
-./scripts/verify_release.sh
+APP_PATH=dist/.app-bundles.noindex/ScreenTextGrab.app ./scripts/verify_release.sh
 ```
 
 Create the GitHub release from terminal:

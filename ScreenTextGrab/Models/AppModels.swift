@@ -316,6 +316,9 @@ enum CaptureStrategy: String, Equatable, Sendable {
     case screenshotKitDisplayFilter     // SCScreenshotManager per-display filter — macOS 14+
     case systemScreencaptureCLI         // /usr/sbin/screencapture CLI subprocess
     case displayCropTopLeft             // CGDisplayCreateImage + crop — legacy fallback
+    case clipboardImage                 // NSPasteboard image OCR
+    case importedImageFile              // User-selected image file OCR
+    case importedPDFPage                // User-selected PDF page OCR
 }
 
 struct CaptureCandidate: @unchecked Sendable {
@@ -668,9 +671,55 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
         }
     }
 
+    enum ConfidenceIndicator: String, Codable, Sendable {
+        case low
+        case medium
+        case high
+
+        var title: String {
+            switch self {
+            case .low:
+                return "Düşük Güven"
+            case .medium:
+                return "Kontrol Et"
+            case .high:
+                return "Yüksek Güven"
+            }
+        }
+
+        var shortTitle: String {
+            switch self {
+            case .low:
+                return "Düşük"
+            case .medium:
+                return "Orta"
+            case .high:
+                return "Yüksek"
+            }
+        }
+
+        var detail: String {
+            switch self {
+            case .low:
+                return "Son OCR çıktısı zayıf güvenle üretildi. Yapıştırmadan önce gözden geçirmek iyi olur."
+            case .medium:
+                return "Son OCR çıktısı kullanılabilir görünüyor ama kısa bir göz kontrolü faydalı olabilir."
+            case .high:
+                return "Son OCR çıktısı yüksek güvenle üretildi."
+            }
+        }
+    }
+
     struct SourceContext: Equatable, Sendable, Codable {
         let appName: String?
         let bundleIdentifier: String?
+        let windowTitle: String?
+
+        init(appName: String?, bundleIdentifier: String?, windowTitle: String? = nil) {
+            self.appName = Self.normalizedValue(appName)
+            self.bundleIdentifier = Self.normalizedValue(bundleIdentifier)
+            self.windowTitle = Self.normalizedValue(windowTitle)
+        }
 
         var displayName: String {
             if let appName, !appName.isEmpty {
@@ -683,6 +732,39 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
 
             return "Bilinmeyen Kaynak"
         }
+
+        var displayContextName: String {
+            guard let windowTitle else {
+                return displayName
+            }
+
+            return "\(displayName) • \(windowTitle)"
+        }
+
+        func matchesWindowTitle(_ candidate: String?) -> Bool {
+            guard let normalizedSelf = Self.normalizedComparisonValue(windowTitle),
+                  let normalizedCandidate = Self.normalizedComparisonValue(candidate) else {
+                return false
+            }
+
+            return normalizedSelf == normalizedCandidate ||
+                normalizedSelf.contains(normalizedCandidate) ||
+                normalizedCandidate.contains(normalizedSelf)
+        }
+
+        private static func normalizedValue(_ value: String?) -> String? {
+            guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !trimmed.isEmpty else {
+                return nil
+            }
+
+            return trimmed
+        }
+
+        private static func normalizedComparisonValue(_ value: String?) -> String? {
+            normalizedValue(value)?
+                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        }
     }
 
     let id: UUID
@@ -692,7 +774,9 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
     let outputPreset: CaptureOutputPreset
     let contentKind: ContentKind
     let rawText: String?
+    let ocrConfidence: Float?
     let source: SourceContext?
+    let isPinned: Bool
 
     init(
         id: UUID = UUID(),
@@ -702,7 +786,9 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
         outputPreset: CaptureOutputPreset = .smart,
         contentKind: ContentKind = .text,
         rawText: String? = nil,
-        source: SourceContext? = nil
+        ocrConfidence: Float? = nil,
+        source: SourceContext? = nil,
+        isPinned: Bool = false
     ) {
         self.id = id
         self.text = text
@@ -711,7 +797,9 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
         self.outputPreset = outputPreset
         self.contentKind = contentKind
         self.rawText = rawText
+        self.ocrConfidence = ocrConfidence
         self.source = source
+        self.isPinned = isPinned
     }
 
     var effectiveRawText: String {
@@ -749,6 +837,14 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    var confidenceIndicator: ConfidenceIndicator? {
+        guard let ocrConfidence else {
+            return nil
+        }
+
+        return Self.confidenceIndicator(for: ocrConfidence, contentKind: contentKind)
+    }
+
     var searchableText: String {
         [
             text,
@@ -756,6 +852,8 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
             captureMode.title,
             outputPreset.title,
             contentKind.title,
+            isPinned ? "Sabit Favori" : "",
+            confidenceIndicator?.title ?? "",
             source?.displayName ?? "",
             source?.bundleIdentifier ?? ""
         ]
@@ -779,7 +877,9 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
         case outputPreset
         case contentKind
         case rawText
+        case ocrConfidence
         case source
+        case isPinned
     }
 
     init(from decoder: Decoder) throws {
@@ -791,7 +891,25 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
         outputPreset = try container.decodeIfPresent(CaptureOutputPreset.self, forKey: .outputPreset) ?? .smart
         contentKind = try container.decodeIfPresent(ContentKind.self, forKey: .contentKind) ?? .text
         rawText = try container.decodeIfPresent(String.self, forKey: .rawText)
+        ocrConfidence = try container.decodeIfPresent(Float.self, forKey: .ocrConfidence)
         source = try container.decodeIfPresent(SourceContext.self, forKey: .source)
+        isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+    }
+
+    static func confidenceIndicator(for confidence: Float, contentKind: ContentKind) -> ConfidenceIndicator? {
+        if contentKind == .barcode {
+            return .high
+        }
+
+        let normalized = min(max(confidence, 0), 1)
+        switch normalized {
+        case ..<0.58:
+            return .low
+        case 0.82...:
+            return .high
+        default:
+            return .medium
+        }
     }
 
     private static func normalizedReviewSource(_ text: String) -> String {
@@ -909,15 +1027,6 @@ struct TableReviewDocument: Equatable, Sendable {
 
         rows.removeLast()
         rows = Self.rectangularized(rows)
-    }
-
-    mutating func removeRow(at index: Int) {
-        guard rows.indices.contains(index) else {
-            return
-        }
-
-        rows.remove(at: index)
-        rows = rows.isEmpty ? [[""]] : Self.rectangularized(rows)
     }
 
     mutating func removeLastColumn() {
@@ -1208,6 +1317,20 @@ enum ClipboardHistoryStore {
         }
     }
 
+    static func orderedForDisplay(_ history: [ClipboardHistoryEntry]) -> [ClipboardHistoryEntry] {
+        history.sorted { lhs, rhs in
+            if lhs.isPinned != rhs.isPinned {
+                return lhs.isPinned && !rhs.isPinned
+            }
+
+            if lhs.date != rhs.date {
+                return lhs.date > rhs.date
+            }
+
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
     static func exportText(_ history: [ClipboardHistoryEntry], generatedAt: Date = Date()) -> String {
         let formatter = ISO8601DateFormatter()
         var lines = [
@@ -1218,7 +1341,7 @@ enum ClipboardHistoryStore {
 
         for (index, entry) in history.enumerated() {
             lines.append("#\(index + 1) - \(formatter.string(from: entry.date))")
-            lines.append("Mod: \(entry.captureMode.title) | Çıktı: \(entry.outputPreset.title) | Tür: \(entry.contentKind.title) | Kaynak: \(entry.source?.displayName ?? "Bilinmiyor")")
+            lines.append("Mod: \(entry.captureMode.title) | Çıktı: \(entry.outputPreset.title) | Tür: \(entry.contentKind.title) | Kaynak: \(entry.source?.displayName ?? "Bilinmiyor") | Sabit: \(entry.isPinned ? "Evet" : "Hayır")")
             lines.append(entry.text)
             if entry.effectiveRawText != entry.text {
                 lines.append("Ham Metin: \(entry.effectiveRawText)")
@@ -1249,6 +1372,7 @@ enum ClipboardHistoryStore {
             lines.append("- Çıktı: \(entry.outputPreset.title)")
             lines.append("- Tür: \(entry.contentKind.title)")
             lines.append("- Kaynak: \(entry.source?.displayName ?? "Bilinmiyor")")
+            lines.append("- Sabit: \(entry.isPinned ? "Evet" : "Hayır")")
             lines.append("")
             lines.append("```text")
             lines.append(entry.text)
@@ -1288,6 +1412,7 @@ enum ClipboardHistoryStore {
                 "mode",
                 "output_preset",
                 "content_kind",
+                "is_pinned",
                 "source_app",
                 "source_bundle_id",
                 "raw_text",
@@ -1301,6 +1426,7 @@ enum ClipboardHistoryStore {
                 csvEscaped(entry.captureMode.title),
                 csvEscaped(entry.outputPreset.title),
                 csvEscaped(entry.contentKind.title),
+                csvEscaped(entry.isPinned ? "true" : "false"),
                 csvEscaped(entry.source?.appName ?? ""),
                 csvEscaped(entry.source?.bundleIdentifier ?? ""),
                 csvEscaped(entry.effectiveRawText),

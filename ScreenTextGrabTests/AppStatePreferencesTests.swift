@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import ScreenTextGrab
 
@@ -34,6 +35,38 @@ final class AppStatePreferencesTests: XCTestCase {
             ],
             defaults: defaults
         )
+        SavedCaptureRegionStore.save(
+            [
+                SavedCaptureRegion(
+                    name: "Safari • Tablo",
+                    screenRect: CGRect(x: 20, y: 30, width: 240, height: 120),
+                    preferredDisplayID: 77,
+                    source: .init(appName: "Safari", bundleIdentifier: "com.apple.Safari"),
+                    sessionConfiguration: CaptureSessionConfiguration(
+                        captureMode: .table,
+                        outputPreset: .office,
+                        ocrLanguageSelection: OCRLanguageSelection(automaticDetection: false, languages: [.english]),
+                        profileName: "Safari"
+                    )
+                )
+            ],
+            defaults: defaults
+        )
+        SavedSnippetStore.save(
+            [
+                SavedSnippet(
+                    name: "Fiyat listesi",
+                    text: "Urun\tFiyat\nKalem\t12",
+                    rawText: "Urun\tFiyat\nKalem\t12",
+                    captureMode: .table,
+                    outputPreset: .office,
+                    contentKind: .text,
+                    ocrConfidence: 0.91,
+                    source: .init(appName: "Safari", bundleIdentifier: "com.apple.Safari")
+                )
+            ],
+            defaults: defaults
+        )
         ClipboardHistoryExportFormatStore.save(.json, defaults: defaults)
         OCRLanguageSelectionStore.save(
             OCRLanguageSelection(automaticDetection: false, languages: [.turkish]),
@@ -49,6 +82,8 @@ final class AppStatePreferencesTests: XCTestCase {
         XCTAssertEqual(appState.watchConfiguration.copyBehavior, .newLinesOnly)
         XCTAssertEqual(appState.watchConfiguration.regexFilter, "Invoice #[0-9]+")
         XCTAssertEqual(appState.appProfiles.first?.bundleIdentifier, "com.apple.dt.Xcode")
+        XCTAssertEqual(appState.savedCaptureRegions.first?.name, "Safari • Tablo")
+        XCTAssertEqual(appState.savedSnippets.first?.name, "Fiyat listesi")
         XCTAssertEqual(appState.historyExportFormat, .json)
         XCTAssertFalse(appState.ocrLanguageSelection.automaticDetection)
         XCTAssertEqual(appState.ocrLanguageSelection.languages, [.turkish])
@@ -64,6 +99,90 @@ final class AppStatePreferencesTests: XCTestCase {
         let restored = AppState(defaults: defaults, persistsUserPreferences: true)
         XCTAssertEqual(restored.copyHistory.map(\.text), ["Yeni kayit"])
         XCTAssertEqual(restored.lastCopiedText, "Yeni kayit")
+    }
+
+    func testPinnedHistoryEntryPersistsAcrossReload() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        appState.recordCopiedText("Sabitlenecek kayit")
+        guard let entry = appState.copyHistory.first else {
+            XCTFail("Expected history entry")
+            return
+        }
+
+        appState.togglePinnedHistoryEntry(entry)
+
+        let restored = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertEqual(restored.copyHistory.first?.isPinned, true)
+        XCTAssertEqual(restored.pinnedHistoryCount, 1)
+    }
+
+    func testRecordCopiedTextPreservesPinnedStateForDuplicateEntry() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        appState.recordCopiedText("Ayni metin", captureMode: .table, outputPreset: .office)
+        guard let firstEntry = appState.copyHistory.first else {
+            XCTFail("Expected initial entry")
+            return
+        }
+
+        appState.togglePinnedHistoryEntry(firstEntry)
+        appState.recordCopiedText("Ayni metin", captureMode: .table, outputPreset: .office)
+
+        XCTAssertEqual(appState.copyHistory.count, 1)
+        XCTAssertEqual(appState.copyHistory.first?.isPinned, true)
+    }
+
+    func testRecordCopiedTextPersistsOCRConfidence() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        appState.recordCopiedText("Dusuk guvenli kayit", ocrConfidence: 0.42)
+
+        let restored = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertEqual(restored.copyHistory.first?.ocrConfidence ?? 0, 0.42, accuracy: 0.0001)
+        XCTAssertEqual(restored.copyHistory.first?.confidenceIndicator, .low)
+    }
+
+    func testClipboardHistoryEntryComputesConfidenceIndicator() {
+        let lowEntry = ClipboardHistoryEntry(
+            text: "Zor okunan metin",
+            date: Date(),
+            ocrConfidence: 0.41
+        )
+        let mediumEntry = ClipboardHistoryEntry(
+            text: "Kontrol edilebilir metin",
+            date: Date(),
+            ocrConfidence: 0.70
+        )
+        let highEntry = ClipboardHistoryEntry(
+            text: "Net metin",
+            date: Date(),
+            ocrConfidence: 0.91
+        )
+
+        XCTAssertEqual(lowEntry.confidenceIndicator, .low)
+        XCTAssertEqual(mediumEntry.confidenceIndicator, .medium)
+        XCTAssertEqual(highEntry.confidenceIndicator, .high)
+    }
+
+    func testClipboardHistoryStoreOrdersPinnedEntriesFirstForDisplay() {
+        let now = Date()
+        let history = [
+            ClipboardHistoryEntry(text: "Yeni", date: now),
+            ClipboardHistoryEntry(text: "Eski Sabit", date: now.addingTimeInterval(-3600), isPinned: true),
+            ClipboardHistoryEntry(text: "Yeni Sabit", date: now.addingTimeInterval(-60), isPinned: true)
+        ]
+
+        XCTAssertEqual(
+            ClipboardHistoryStore.orderedForDisplay(history).map(\.text),
+            ["Yeni Sabit", "Eski Sabit", "Yeni"]
+        )
     }
 
     func testSetOCRLanguageRejectsEmptySelection() {
@@ -198,6 +317,927 @@ final class AppStatePreferencesTests: XCTestCase {
         XCTAssertNil(restored.appProfile(for: "com.microsoft.Excel"))
     }
 
+    func testActiveAppProfileSuggestionUsesTrackedProfileWhenCurrentSettingsDiffer() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        appState.setCaptureMode(.code)
+        appState.setCaptureOutputPreset(.markdown)
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        let suggestion = appState.activeAppProfileSuggestion
+
+        XCTAssertEqual(suggestion?.source.appName, "Microsoft Excel")
+        XCTAssertEqual(suggestion?.profile.captureMode, .table)
+        XCTAssertEqual(suggestion?.profile.outputPreset, .office)
+    }
+
+    func testActiveAppProfileSuggestionHidesWhenCurrentSettingsAlreadyMatchProfile() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        appState.setCaptureMode(.table)
+        appState.setCaptureOutputPreset(.office)
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        XCTAssertNil(appState.activeAppProfileSuggestion)
+    }
+
+    func testActiveAppProfilePanelAutoSyncAppliesTrackedProfileWhenEnabled() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.appProfiles = [
+            AppCaptureProfile(
+                bundleIdentifier: "com.microsoft.Excel",
+                appName: "Microsoft Excel",
+                captureMode: .table,
+                outputPreset: .office,
+                ocrLanguageSelection: .defaultValue
+            )
+        ]
+        appState.setCaptureMode(.code)
+        appState.setCaptureOutputPreset(.markdown)
+        appState.setAppProfilePanelAutoSyncEnabled(true)
+
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        XCTAssertEqual(appState.captureMode, .table)
+        XCTAssertEqual(appState.captureOutputPreset, .office)
+        XCTAssertNil(appState.activeAppProfileSuggestion)
+    }
+
+    func testActiveAppProfilePanelAutoSyncDoesNotApplyProfileWhenDisabled() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.appProfiles = [
+            AppCaptureProfile(
+                bundleIdentifier: "com.microsoft.Excel",
+                appName: "Microsoft Excel",
+                captureMode: .table,
+                outputPreset: .office,
+                ocrLanguageSelection: .defaultValue
+            )
+        ]
+        appState.setCaptureMode(.code)
+        appState.setCaptureOutputPreset(.markdown)
+
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        XCTAssertEqual(appState.captureMode, .code)
+        XCTAssertEqual(appState.captureOutputPreset, .markdown)
+        XCTAssertEqual(appState.activeAppProfileSuggestion?.profile.outputPreset, .office)
+    }
+
+    func testActiveSavedCaptureRegionSuggestionUsesMatchingActiveAppRegions() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedCaptureRegions = [
+            SavedCaptureRegion(
+                name: "Safari • Tablo",
+                screenRect: CGRect(x: 20, y: 30, width: 240, height: 120),
+                preferredDisplayID: 77,
+                source: .init(appName: "Safari", bundleIdentifier: "com.apple.Safari"),
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .table,
+                    outputPreset: .office,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Safari"
+                ),
+                updatedAt: Date(timeIntervalSince1970: 20)
+            ),
+            SavedCaptureRegion(
+                name: "Safari • Kod",
+                screenRect: CGRect(x: 40, y: 50, width: 220, height: 160),
+                preferredDisplayID: 77,
+                source: .init(appName: "Safari", bundleIdentifier: "com.apple.Safari"),
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .code,
+                    outputPreset: .markdown,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Safari"
+                ),
+                updatedAt: Date(timeIntervalSince1970: 10)
+            ),
+            SavedCaptureRegion(
+                name: "Xcode • Kod",
+                screenRect: CGRect(x: 90, y: 70, width: 280, height: 180),
+                preferredDisplayID: 91,
+                source: .init(appName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode"),
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .code,
+                    outputPreset: .markdown,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Xcode"
+                ),
+                updatedAt: Date(timeIntervalSince1970: 30)
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Safari", bundleIdentifier: "com.apple.Safari")
+        )
+
+        let suggestion = appState.activeSavedCaptureRegionSuggestion
+
+        XCTAssertEqual(suggestion?.source.appName, "Safari")
+        XCTAssertEqual(suggestion?.primaryRegion.name, "Safari • Tablo")
+        XCTAssertEqual(suggestion?.regionCount, 2)
+        XCTAssertEqual(suggestion?.matchKind, .application)
+    }
+
+    func testActiveSavedCaptureRegionSuggestionHidesWhenNoMatchingRegionExists() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedCaptureRegions = [
+            SavedCaptureRegion(
+                name: "Xcode • Kod",
+                screenRect: CGRect(x: 90, y: 70, width: 280, height: 180),
+                preferredDisplayID: 91,
+                source: .init(appName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode"),
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .code,
+                    outputPreset: .markdown,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Xcode"
+                )
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Safari", bundleIdentifier: "com.apple.Safari")
+        )
+
+        XCTAssertNil(appState.activeSavedCaptureRegionSuggestion)
+    }
+
+    func testActiveSavedCaptureRegionSuggestionPrefersMatchingWindowTitle() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedCaptureRegions = [
+            SavedCaptureRegion(
+                name: "Safari • Dokumantasyon",
+                screenRect: CGRect(x: 20, y: 30, width: 240, height: 120),
+                preferredDisplayID: 77,
+                source: .init(
+                    appName: "Safari",
+                    bundleIdentifier: "com.apple.Safari",
+                    windowTitle: "OpenAI Docs"
+                ),
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .standard,
+                    outputPreset: .cleaned,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Safari"
+                ),
+                updatedAt: Date(timeIntervalSince1970: 10)
+            ),
+            SavedCaptureRegion(
+                name: "Safari • Kanban",
+                screenRect: CGRect(x: 40, y: 50, width: 220, height: 160),
+                preferredDisplayID: 77,
+                source: .init(
+                    appName: "Safari",
+                    bundleIdentifier: "com.apple.Safari",
+                    windowTitle: "Proje Panosu"
+                ),
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .table,
+                    outputPreset: .office,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Safari"
+                ),
+                updatedAt: Date(timeIntervalSince1970: 20)
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(
+                appName: "Safari",
+                bundleIdentifier: "com.apple.Safari",
+                windowTitle: "Proje Panosu"
+            )
+        )
+
+        let suggestion = appState.activeSavedCaptureRegionSuggestion
+
+        XCTAssertEqual(suggestion?.primaryRegion.name, "Safari • Kanban")
+        XCTAssertEqual(suggestion?.regionCount, 1)
+        XCTAssertEqual(suggestion?.totalAppMatchingRegions, 2)
+        XCTAssertEqual(suggestion?.matchKind, .windowTitle("Proje Panosu"))
+    }
+
+    func testActiveSavedCaptureRegionSuggestionFallsBackToAppMatchWhenWindowTitleDoesNotMatch() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedCaptureRegions = [
+            SavedCaptureRegion(
+                name: "Safari • Dokumantasyon",
+                screenRect: CGRect(x: 20, y: 30, width: 240, height: 120),
+                preferredDisplayID: 77,
+                source: .init(
+                    appName: "Safari",
+                    bundleIdentifier: "com.apple.Safari",
+                    windowTitle: "OpenAI Docs"
+                ),
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .standard,
+                    outputPreset: .cleaned,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Safari"
+                ),
+                updatedAt: Date(timeIntervalSince1970: 20)
+            ),
+            SavedCaptureRegion(
+                name: "Safari • Kanban",
+                screenRect: CGRect(x: 40, y: 50, width: 220, height: 160),
+                preferredDisplayID: 77,
+                source: .init(
+                    appName: "Safari",
+                    bundleIdentifier: "com.apple.Safari",
+                    windowTitle: "Proje Panosu"
+                ),
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .table,
+                    outputPreset: .office,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Safari"
+                ),
+                updatedAt: Date(timeIntervalSince1970: 10)
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(
+                appName: "Safari",
+                bundleIdentifier: "com.apple.Safari",
+                windowTitle: "Baska Sekme"
+            )
+        )
+
+        let suggestion = appState.activeSavedCaptureRegionSuggestion
+
+        XCTAssertEqual(suggestion?.primaryRegion.name, "Safari • Dokumantasyon")
+        XCTAssertEqual(suggestion?.regionCount, 2)
+        XCTAssertEqual(suggestion?.totalAppMatchingRegions, 2)
+        XCTAssertEqual(suggestion?.matchKind, .application)
+    }
+
+    func testPrimaryQuickStartRegionUsesActiveSuggestionWhenEnabled() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedCaptureRegions = [
+            SavedCaptureRegion(
+                name: "Safari • Tablo",
+                screenRect: CGRect(x: 20, y: 30, width: 240, height: 120),
+                preferredDisplayID: 77,
+                source: .init(appName: "Safari", bundleIdentifier: "com.apple.Safari"),
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .table,
+                    outputPreset: .office,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Safari"
+                ),
+                updatedAt: Date(timeIntervalSince1970: 20)
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Safari", bundleIdentifier: "com.apple.Safari")
+        )
+
+        XCTAssertEqual(appState.primaryQuickStartRegion?.name, "Safari • Tablo")
+    }
+
+    func testPrimaryQuickStartRegionIsNilWhenPreferenceDisabled() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedCaptureRegions = [
+            SavedCaptureRegion(
+                name: "Safari • Tablo",
+                screenRect: CGRect(x: 20, y: 30, width: 240, height: 120),
+                preferredDisplayID: 77,
+                source: .init(appName: "Safari", bundleIdentifier: "com.apple.Safari"),
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .table,
+                    outputPreset: .office,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Safari"
+                ),
+                updatedAt: Date(timeIntervalSince1970: 20)
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Safari", bundleIdentifier: "com.apple.Safari")
+        )
+        appState.setSavedCaptureRegionQuickStartEnabled(false)
+
+        XCTAssertNil(appState.primaryQuickStartRegion)
+    }
+
+    func testSavedCaptureRegionQuickStartPreferencePersists() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertTrue(appState.savedCaptureRegionQuickStartEnabled)
+
+        appState.setSavedCaptureRegionQuickStartEnabled(false)
+
+        let restored = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertFalse(restored.savedCaptureRegionQuickStartEnabled)
+    }
+
+    func testActiveSavedSnippetCollectionSuggestionUsesMatchingActiveAppSnippets() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Excel Toplam",
+                text: "Toplam 42",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor", "Excel"],
+                updatedAt: Date(timeIntervalSince1970: 30)
+            ),
+            SavedSnippet(
+                name: "Excel Gelir",
+                text: "Gelir Toplam",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 20)
+            ),
+            SavedSnippet(
+                name: "Word Toplam",
+                text: "Toplam",
+                captureMode: .standard,
+                outputPreset: .cleaned,
+                source: .init(appName: "Microsoft Word", bundleIdentifier: "com.microsoft.Word"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 40)
+            )
+        ]
+        appState.savedSnippetCollections = [
+            SavedSnippetCollection(
+                name: "Excel Raporlari",
+                selectedTag: "Rapor",
+                searchQuery: "toplam",
+                updatedAt: Date(timeIntervalSince1970: 10)
+            ),
+            SavedSnippetCollection(
+                name: "Belgeler",
+                selectedTag: "Belge",
+                searchQuery: "",
+                updatedAt: Date(timeIntervalSince1970: 50)
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        let suggestion = appState.activeSavedSnippetCollectionSuggestion
+
+        XCTAssertEqual(suggestion?.collection.name, "Excel Raporlari")
+        XCTAssertEqual(suggestion?.source.appName, "Microsoft Excel")
+        XCTAssertEqual(suggestion?.snippetCount, 2)
+        XCTAssertEqual(suggestion?.totalAppMatchingSnippets, 2)
+        XCTAssertEqual(suggestion?.matchKind, .application)
+    }
+
+    func testActiveSavedSnippetCollectionSuggestionPrefersMatchingWindowTitle() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Safari Docs",
+                text: "API reference",
+                captureMode: .standard,
+                outputPreset: .cleaned,
+                source: .init(
+                    appName: "Safari",
+                    bundleIdentifier: "com.apple.Safari",
+                    windowTitle: "OpenAI Docs"
+                ),
+                tags: ["Docs"],
+                updatedAt: Date(timeIntervalSince1970: 10)
+            ),
+            SavedSnippet(
+                name: "Safari Pano",
+                text: "Sprint backlog",
+                captureMode: .standard,
+                outputPreset: .cleaned,
+                source: .init(
+                    appName: "Safari",
+                    bundleIdentifier: "com.apple.Safari",
+                    windowTitle: "Proje Panosu"
+                ),
+                tags: ["Docs"],
+                updatedAt: Date(timeIntervalSince1970: 20)
+            )
+        ]
+        appState.savedSnippetCollections = [
+            SavedSnippetCollection(
+                name: "Safari Notlari",
+                selectedTag: "Docs",
+                searchQuery: "",
+                updatedAt: Date(timeIntervalSince1970: 30)
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(
+                appName: "Safari",
+                bundleIdentifier: "com.apple.Safari",
+                windowTitle: "Proje Panosu"
+            )
+        )
+
+        let suggestion = appState.activeSavedSnippetCollectionSuggestion
+
+        XCTAssertEqual(suggestion?.collection.name, "Safari Notlari")
+        XCTAssertEqual(suggestion?.snippetCount, 1)
+        XCTAssertEqual(suggestion?.totalAppMatchingSnippets, 2)
+        XCTAssertEqual(suggestion?.matchKind, .windowTitle("Proje Panosu"))
+    }
+
+    func testActiveSavedSnippetCollectionSuggestionHidesWhenNoMatchingSnippetExists() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Word Belge",
+                text: "Sozlesme",
+                captureMode: .standard,
+                outputPreset: .cleaned,
+                source: .init(appName: "Microsoft Word", bundleIdentifier: "com.microsoft.Word"),
+                tags: ["Belge"]
+            )
+        ]
+        appState.savedSnippetCollections = [
+            SavedSnippetCollection(
+                name: "Belgeler",
+                selectedTag: "Belge",
+                searchQuery: ""
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        XCTAssertNil(appState.activeSavedSnippetCollectionSuggestion)
+    }
+
+    func testActiveSavedSnippetSuggestionReturnsSingleMatchingSnippet() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Excel Toplam",
+                text: "Toplam 42",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"]
+            )
+        ]
+        appState.savedSnippetCollections = [
+            SavedSnippetCollection(
+                name: "Excel Raporlari",
+                selectedTag: "Rapor",
+                searchQuery: "toplam"
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        let suggestion = appState.activeSavedSnippetSuggestion
+
+        XCTAssertEqual(suggestion?.collection.name, "Excel Raporlari")
+        XCTAssertEqual(suggestion?.snippet.name, "Excel Toplam")
+        XCTAssertEqual(suggestion?.matchKind, .application)
+    }
+
+    func testActiveSavedSnippetSuggestionPrefersWindowMatchedSnippet() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Safari Docs",
+                text: "API reference",
+                captureMode: .standard,
+                outputPreset: .cleaned,
+                source: .init(
+                    appName: "Safari",
+                    bundleIdentifier: "com.apple.Safari",
+                    windowTitle: "OpenAI Docs"
+                ),
+                tags: ["Docs"]
+            ),
+            SavedSnippet(
+                name: "Safari Pano",
+                text: "Sprint backlog",
+                captureMode: .standard,
+                outputPreset: .cleaned,
+                source: .init(
+                    appName: "Safari",
+                    bundleIdentifier: "com.apple.Safari",
+                    windowTitle: "Proje Panosu"
+                ),
+                tags: ["Docs"],
+                updatedAt: Date(timeIntervalSince1970: 20)
+            )
+        ]
+        appState.savedSnippetCollections = [
+            SavedSnippetCollection(
+                name: "Safari Notlari",
+                selectedTag: "Docs",
+                searchQuery: "",
+                updatedAt: Date(timeIntervalSince1970: 30)
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(
+                appName: "Safari",
+                bundleIdentifier: "com.apple.Safari",
+                windowTitle: "Proje Panosu"
+            )
+        )
+
+        let suggestion = appState.activeSavedSnippetSuggestion
+
+        XCTAssertEqual(suggestion?.snippet.name, "Safari Pano")
+        XCTAssertEqual(suggestion?.matchKind, .windowTitle("Proje Panosu"))
+    }
+
+    func testActiveSavedSnippetSuggestionReturnsNilWhenMultipleMatchesRemain() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Excel Toplam",
+                text: "Toplam 42",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"]
+            ),
+            SavedSnippet(
+                name: "Excel Ozet",
+                text: "Ozet 12",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 30)
+            )
+        ]
+        appState.savedSnippetCollections = [
+            SavedSnippetCollection(
+                name: "Excel Raporlari",
+                selectedTag: "Rapor",
+                searchQuery: ""
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        XCTAssertNil(appState.activeSavedSnippetSuggestion)
+    }
+
+    func testActiveSavedSnippetSuggestionPrefersPreviouslyUsedSnippetWhenMultipleMatchesRemain() {
+        let appState = AppState(persistsUserPreferences: false)
+        let usedAt = Date(timeIntervalSince1970: 120)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Excel Toplam",
+                text: "Toplam 42",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 40),
+                lastUsedAt: usedAt
+            ),
+            SavedSnippet(
+                name: "Excel Ozet",
+                text: "Ozet 12",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 90)
+            )
+        ]
+        appState.savedSnippetCollections = [
+            SavedSnippetCollection(
+                name: "Excel Raporlari",
+                selectedTag: "Rapor",
+                searchQuery: ""
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        let suggestion = appState.activeSavedSnippetSuggestion
+
+        XCTAssertEqual(suggestion?.snippet.name, "Excel Toplam")
+        XCTAssertEqual(suggestion?.selectionKind, .learnedPreference)
+        XCTAssertTrue(appState.activeSavedSnippetQuickPicks.isEmpty)
+    }
+
+    func testActiveSavedSnippetQuickPicksReturnsTopMatchesWhenMultipleRemain() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Excel Toplam",
+                text: "Toplam 42",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 40)
+            ),
+            SavedSnippet(
+                name: "Excel Ozet",
+                text: "Ozet 12",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 30)
+            ),
+            SavedSnippet(
+                name: "Excel Kalemler",
+                text: "Kalem 5",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 20)
+            ),
+            SavedSnippet(
+                name: "Excel Diger",
+                text: "Diger 2",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 10)
+            )
+        ]
+        appState.savedSnippetCollections = [
+            SavedSnippetCollection(
+                name: "Excel Raporlari",
+                selectedTag: "Rapor",
+                searchQuery: ""
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        XCTAssertEqual(
+            appState.activeSavedSnippetQuickPicks.map(\.name),
+            ["Excel Toplam", "Excel Ozet", "Excel Kalemler"]
+        )
+    }
+
+    func testActiveSavedSnippetQuickPicksPrioritizeRecentlyUsedSnippet() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Excel Toplam",
+                text: "Toplam 42",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 40),
+                lastUsedAt: Date(timeIntervalSince1970: 120)
+            ),
+            SavedSnippet(
+                name: "Excel Ozet",
+                text: "Ozet 12",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 80),
+                lastUsedAt: Date(timeIntervalSince1970: 120)
+            ),
+            SavedSnippet(
+                name: "Excel Kalemler",
+                text: "Kalem 5",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"],
+                updatedAt: Date(timeIntervalSince1970: 60)
+            )
+        ]
+        appState.savedSnippetCollections = [
+            SavedSnippetCollection(
+                name: "Excel Raporlari",
+                selectedTag: "Rapor",
+                searchQuery: ""
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        XCTAssertNil(appState.activeSavedSnippetSuggestion)
+        XCTAssertEqual(
+            appState.activeSavedSnippetQuickPicks.map(\.name),
+            ["Excel Ozet", "Excel Toplam", "Excel Kalemler"]
+        )
+    }
+
+    func testActiveSavedSnippetQuickPicksHidesWhenSingleSnippetSuggestionExists() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Excel Toplam",
+                text: "Toplam 42",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"]
+            )
+        ]
+        appState.savedSnippetCollections = [
+            SavedSnippetCollection(
+                name: "Excel Raporlari",
+                selectedTag: "Rapor",
+                searchQuery: ""
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        XCTAssertTrue(appState.activeSavedSnippetQuickPicks.isEmpty)
+    }
+
+    func testPreferredActiveSavedSnippetCollectionSelectionReturnsSuggestionWhenAutoSyncEnabled() {
+        let appState = AppState(persistsUserPreferences: false)
+        let collection = SavedSnippetCollection(
+            name: "Excel Raporlari",
+            selectedTag: "Rapor",
+            searchQuery: "toplam"
+        )
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Excel Toplam",
+                text: "Toplam 42",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"]
+            )
+        ]
+        appState.savedSnippetCollections = [collection]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        XCTAssertEqual(
+            appState.preferredActiveSavedSnippetCollectionSelection(currentSelectionID: nil)?.name,
+            "Excel Raporlari"
+        )
+    }
+
+    func testPreferredActiveSavedSnippetCollectionSelectionSkipsWhenAlreadySelected() {
+        let appState = AppState(persistsUserPreferences: false)
+        let collection = SavedSnippetCollection(
+            name: "Excel Raporlari",
+            selectedTag: "Rapor",
+            searchQuery: "toplam"
+        )
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Excel Toplam",
+                text: "Toplam 42",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"]
+            )
+        ]
+        appState.savedSnippetCollections = [collection]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        XCTAssertNil(
+            appState.preferredActiveSavedSnippetCollectionSelection(currentSelectionID: collection.id)
+        )
+    }
+
+    func testPreferredActiveSavedSnippetCollectionSelectionReturnsNilWhenAutoSyncDisabled() {
+        let appState = AppState(persistsUserPreferences: false)
+        let collection = SavedSnippetCollection(
+            name: "Excel Raporlari",
+            selectedTag: "Rapor",
+            searchQuery: "toplam"
+        )
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Excel Toplam",
+                text: "Toplam 42",
+                captureMode: .table,
+                outputPreset: .office,
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                tags: ["Rapor"]
+            )
+        ]
+        appState.savedSnippetCollections = [collection]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+        appState.setSavedSnippetCollectionAutoSyncEnabled(false)
+
+        XCTAssertNil(
+            appState.preferredActiveSavedSnippetCollectionSelection(currentSelectionID: nil)
+        )
+    }
+
+    func testSavedSnippetCollectionAutoSyncPreferencePersists() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertTrue(appState.savedSnippetCollectionAutoSyncEnabled)
+
+        appState.setSavedSnippetCollectionAutoSyncEnabled(false)
+
+        let restored = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertFalse(restored.savedSnippetCollectionAutoSyncEnabled)
+    }
+
+    func testApplyCaptureProfileSynchronizesCurrentSelections() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        let profile = AppCaptureProfile(
+            bundleIdentifier: "com.apple.dt.Xcode",
+            appName: "Xcode",
+            captureMode: .code,
+            outputPreset: .plainText,
+            ocrLanguageSelection: OCRLanguageSelection(
+                automaticDetection: false,
+                languages: [.english]
+            )
+        )
+
+        appState.applyCaptureProfile(profile)
+
+        XCTAssertEqual(appState.captureMode, .code)
+        XCTAssertEqual(appState.captureOutputPreset, .plainText)
+        XCTAssertEqual(
+            appState.ocrLanguageSelection,
+            OCRLanguageSelection(automaticDetection: false, languages: [.english])
+        )
+    }
+
+    func testAppProfilePanelAutoSyncPreferencePersists() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertFalse(appState.appProfilePanelAutoSyncEnabled)
+
+        appState.setAppProfilePanelAutoSyncEnabled(true)
+
+        let restored = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertTrue(restored.appProfilePanelAutoSyncEnabled)
+    }
+
+    func testPreferredRepasteOutputPresetUsesActiveAppProfile() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.appProfiles = [
+            AppCaptureProfile(
+                bundleIdentifier: "com.microsoft.Word",
+                appName: "Microsoft Word",
+                captureMode: .standard,
+                outputPreset: .office,
+                ocrLanguageSelection: .defaultValue
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Word", bundleIdentifier: "com.microsoft.Word")
+        )
+
+        XCTAssertEqual(appState.preferredRepasteOutputPreset(defaultingTo: .markdown), .office)
+        XCTAssertEqual(appState.activeTargetBundleIdentifier, "com.microsoft.Word")
+    }
+
+    func testPreferredRepasteOutputPresetFallsBackWithoutActiveProfile() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.updateActiveSourceApp(
+            .init(appName: "Preview", bundleIdentifier: "com.apple.Preview")
+        )
+
+        XCTAssertEqual(appState.preferredRepasteOutputPreset(defaultingTo: .markdown), .markdown)
+        XCTAssertEqual(appState.activeTargetBundleIdentifier, "com.apple.Preview")
+    }
+
     func testSetHistoryExportFormatPersistsSelection() {
         let defaults = makeDefaults()
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
@@ -230,7 +1270,7 @@ final class AppStatePreferencesTests: XCTestCase {
 
     func testClipboardHistoryExportTextIncludesEntries() {
         let entries = [
-            ClipboardHistoryEntry(text: "Birinci satir", date: Date(timeIntervalSince1970: 10)),
+            ClipboardHistoryEntry(text: "Birinci satir", date: Date(timeIntervalSince1970: 10), isPinned: true),
             ClipboardHistoryEntry(text: "Ikinci satir", date: Date(timeIntervalSince1970: 20))
         ]
 
@@ -242,6 +1282,7 @@ final class AppStatePreferencesTests: XCTestCase {
         XCTAssertTrue(output.contains("ScreenTextGrab Geçmişi"))
         XCTAssertTrue(output.contains("Birinci satir"))
         XCTAssertTrue(output.contains("Ikinci satir"))
+        XCTAssertTrue(output.contains("Sabit: Evet"))
     }
 
     func testClipboardHistoryExportJSONIncludesMetadata() {
@@ -253,7 +1294,8 @@ final class AppStatePreferencesTests: XCTestCase {
                 outputPreset: .markdown,
                 contentKind: .text,
                 rawText: "let value = 42",
-                source: .init(appName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode")
+                source: .init(appName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode"),
+                isPinned: true
             )
         ]
 
@@ -263,6 +1305,7 @@ final class AppStatePreferencesTests: XCTestCase {
         XCTAssertTrue(output.contains("\"outputPreset\""))
         XCTAssertTrue(output.contains("\"rawText\""))
         XCTAssertTrue(output.contains("\"source\""))
+        XCTAssertTrue(output.contains("\"isPinned\""))
         XCTAssertTrue(output.contains("com.apple.dt.Xcode"))
     }
 
@@ -283,6 +1326,771 @@ final class AppStatePreferencesTests: XCTestCase {
         XCTAssertTrue(entry.matches(query: "JSON"))
         XCTAssertTrue(entry.matches(query: "example.com"))
         XCTAssertFalse(entry.matches(query: "Terminal"))
+    }
+
+    func testAppStateRemembersLastCaptureSelection() {
+        let appState = AppState(persistsUserPreferences: false)
+        let selection = RecentCaptureSelection(
+            screenRect: CGRect(x: 20, y: 30, width: 240, height: 120),
+            preferredDisplayID: 77,
+            source: .init(appName: "Safari", bundleIdentifier: "com.apple.Safari"),
+            sessionConfiguration: CaptureSessionConfiguration(
+                captureMode: .table,
+                outputPreset: .office,
+                ocrLanguageSelection: OCRLanguageSelection(automaticDetection: false, languages: [.english]),
+                profileName: "Safari"
+            )
+        )
+
+        appState.rememberCaptureSelection(selection)
+
+        XCTAssertEqual(appState.lastCaptureSelection, selection)
+    }
+
+    func testSaveLastCaptureSelectionPersistsSavedRegion() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        let selection = RecentCaptureSelection(
+            screenRect: CGRect(x: 20, y: 30, width: 240, height: 120),
+            preferredDisplayID: 77,
+            source: .init(appName: "Safari", bundleIdentifier: "com.apple.Safari"),
+            sessionConfiguration: CaptureSessionConfiguration(
+                captureMode: .table,
+                outputPreset: .office,
+                ocrLanguageSelection: OCRLanguageSelection(automaticDetection: false, languages: [.english]),
+                profileName: "Safari"
+            )
+        )
+
+        appState.rememberCaptureSelection(selection)
+        let saved = appState.saveLastCaptureSelection()
+
+        XCTAssertEqual(saved?.name, "Safari • Tablo")
+        XCTAssertEqual(appState.savedCaptureRegions.first?.screenRect, selection.screenRect)
+
+        let restored = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertEqual(restored.savedCaptureRegions.first?.name, "Safari • Tablo")
+        XCTAssertEqual(restored.savedCaptureRegions.first?.sessionConfiguration.captureMode, .table)
+    }
+
+    func testRefreshSavedCaptureRegionPreservesNameAndUpdatesSelection() {
+        let appState = AppState(persistsUserPreferences: false)
+        let initialSelection = RecentCaptureSelection(
+            screenRect: CGRect(x: 20, y: 30, width: 240, height: 120),
+            preferredDisplayID: 77,
+            source: .init(appName: "Safari", bundleIdentifier: "com.apple.Safari"),
+            sessionConfiguration: CaptureSessionConfiguration(
+                captureMode: .table,
+                outputPreset: .office,
+                ocrLanguageSelection: .defaultValue,
+                profileName: "Safari"
+            )
+        )
+
+        appState.rememberCaptureSelection(initialSelection)
+        guard let saved = appState.saveLastCaptureSelection() else {
+            XCTFail("Expected saved region")
+            return
+        }
+
+        let updatedSelection = RecentCaptureSelection(
+            screenRect: CGRect(x: 90, y: 110, width: 300, height: 180),
+            preferredDisplayID: 99,
+            source: .init(appName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode"),
+            sessionConfiguration: CaptureSessionConfiguration(
+                captureMode: .code,
+                outputPreset: .markdown,
+                ocrLanguageSelection: OCRLanguageSelection(automaticDetection: false, languages: [.english]),
+                profileName: "Xcode"
+            )
+        )
+
+        appState.rememberCaptureSelection(updatedSelection)
+        let refreshed = appState.refreshSavedCaptureRegion(saved)
+
+        XCTAssertEqual(refreshed?.name, saved.name)
+        XCTAssertEqual(refreshed?.screenRect, updatedSelection.screenRect)
+        XCTAssertEqual(refreshed?.sessionConfiguration.captureMode, .code)
+        XCTAssertEqual(refreshed?.source?.bundleIdentifier, "com.apple.dt.Xcode")
+    }
+
+    func testSavedCaptureSelectionUsesUniqueGeneratedNames() {
+        let appState = AppState(persistsUserPreferences: false)
+        let selection = RecentCaptureSelection(
+            screenRect: CGRect(x: 20, y: 30, width: 240, height: 120),
+            preferredDisplayID: 77,
+            source: .init(appName: "Safari", bundleIdentifier: "com.apple.Safari"),
+            sessionConfiguration: CaptureSessionConfiguration(
+                captureMode: .table,
+                outputPreset: .office,
+                ocrLanguageSelection: .defaultValue,
+                profileName: "Safari"
+            )
+        )
+
+        appState.rememberCaptureSelection(selection)
+        let first = appState.saveLastCaptureSelection()
+        let second = appState.saveLastCaptureSelection()
+
+        XCTAssertEqual(first?.name, "Safari • Tablo")
+        XCTAssertEqual(second?.name, "Safari • Tablo 2")
+    }
+
+    func testSaveHistoryEntryAsSnippetPersistsMetadata() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        let entry = ClipboardHistoryEntry(
+            text: "if value {\n    print(value)\n}",
+            date: Date(),
+            captureMode: .code,
+            outputPreset: .markdown,
+            contentKind: .text,
+            rawText: "if value {\n    print(value)\n}",
+            ocrConfidence: 0.73,
+            source: .init(appName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode")
+        )
+
+        let snippet = appState.saveHistoryEntryAsSnippet(entry)
+
+        XCTAssertEqual(snippet.captureMode, .code)
+        XCTAssertEqual(snippet.outputPreset, .markdown)
+        XCTAssertEqual(snippet.source?.bundleIdentifier, "com.apple.dt.Xcode")
+
+        let restored = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertEqual(restored.savedSnippets.first?.name, snippet.name)
+        XCTAssertEqual(restored.savedSnippets.first?.outputPreset, .markdown)
+        XCTAssertEqual(restored.savedSnippets.first?.tags, ["Kod", "Xcode", "Markdown"])
+    }
+
+    func testSaveHistoryEntryAsSnippetRefreshesExistingMatch() {
+        let appState = AppState(persistsUserPreferences: false)
+        let entry = ClipboardHistoryEntry(
+            text: "Ayni icerik",
+            date: Date(timeIntervalSince1970: 10),
+            captureMode: .standard,
+            outputPreset: .cleaned,
+            contentKind: .text,
+            rawText: "Ayni icerik"
+        )
+
+        let first = appState.saveHistoryEntryAsSnippet(entry)
+        let second = appState.saveHistoryEntryAsSnippet(entry)
+
+        XCTAssertEqual(appState.savedSnippets.count, 1)
+        XCTAssertEqual(first.id, second.id)
+        XCTAssertEqual(second.name, first.name)
+    }
+
+    func testUpdateSavedSnippetTagsPersistsSelection() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        let entry = ClipboardHistoryEntry(
+            text: "Fiyat listesi",
+            date: Date(),
+            captureMode: .table,
+            outputPreset: .office,
+            contentKind: .text,
+            rawText: "Urun\tFiyat",
+            source: .init(appName: "Excel", bundleIdentifier: "com.microsoft.Excel")
+        )
+
+        let snippet = appState.saveHistoryEntryAsSnippet(entry)
+        appState.updateSavedSnippetTags(["Rapor", "Sik Kullanilan"], for: snippet)
+
+        let restored = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertEqual(restored.savedSnippets.first?.tags, ["Rapor", "Sik Kullanilan"])
+    }
+
+    func testUpdateSavedSnippetTagsNormalizesCustomTags() {
+        let appState = AppState(persistsUserPreferences: false)
+        let entry = ClipboardHistoryEntry(
+            text: "Toplam\t42",
+            date: Date(),
+            captureMode: .table,
+            outputPreset: .office,
+            contentKind: .text,
+            rawText: "Toplam\t42"
+        )
+
+        let snippet = appState.saveHistoryEntryAsSnippet(entry)
+        appState.updateSavedSnippetTags(["  Rapor  ", "rapor", " Finans "], for: snippet)
+
+        XCTAssertEqual(appState.savedSnippets.first?.tags, ["Rapor", "Finans"])
+    }
+
+    func testSaveSnippetCollectionPersistsFilters() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        let collection = appState.saveSnippetCollection(
+            named: "Excel Raporlari",
+            selectedTag: "Rapor",
+            searchQuery: "toplam"
+        )
+
+        XCTAssertEqual(collection?.selectedTag, "Rapor")
+        XCTAssertEqual(collection?.searchQuery, "toplam")
+
+        let restored = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertEqual(restored.savedSnippetCollections.first?.name, "Excel Raporlari")
+        XCTAssertEqual(restored.savedSnippetCollections.first?.selectedTag, "Rapor")
+        XCTAssertEqual(restored.savedSnippetCollections.first?.searchQuery, "toplam")
+    }
+
+    func testSaveSnippetCollectionUpdatesExistingName() {
+        let appState = AppState(persistsUserPreferences: false)
+
+        let first = appState.saveSnippetCollection(
+            named: "Kod Akisi",
+            selectedTag: "Kod",
+            searchQuery: ""
+        )
+        let second = appState.saveSnippetCollection(
+            named: "kod akisi",
+            selectedTag: nil,
+            searchQuery: "swift"
+        )
+
+        XCTAssertEqual(appState.savedSnippetCollections.count, 1)
+        XCTAssertEqual(first?.id, second?.id)
+        XCTAssertEqual(appState.savedSnippetCollections.first?.selectedTag, nil)
+        XCTAssertEqual(appState.savedSnippetCollections.first?.searchQuery, "swift")
+    }
+
+    func testSaveSnippetCollectionRejectsEmptyFilters() {
+        let appState = AppState(persistsUserPreferences: false)
+
+        let collection = appState.saveSnippetCollection(
+            named: "Bos",
+            selectedTag: nil,
+            searchQuery: "   "
+        )
+
+        XCTAssertNil(collection)
+        XCTAssertTrue(appState.savedSnippetCollections.isEmpty)
+    }
+
+    func testPresentSettingsForSavedSnippetCollectionQueuesRequest() {
+        let appState = AppState(persistsUserPreferences: false)
+        _ = appState.saveSnippetCollection(
+            named: "Excel Raporlari",
+            selectedTag: "Rapor",
+            searchQuery: "toplam"
+        )
+
+        XCTAssertTrue(appState.presentSettingsForSavedSnippetCollection(named: "Excel Raporlari"))
+        XCTAssertNotNil(appState.settingsPresentationToken)
+        XCTAssertEqual(appState.consumePendingSnippetCollectionSelection()?.name, "Excel Raporlari")
+        XCTAssertNil(appState.consumePendingSnippetCollectionSelection())
+    }
+
+    func testAvailableSnippetTagsDeduplicatesAndSortsTags() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Kod",
+                text: "print('x')",
+                captureMode: .code,
+                outputPreset: .markdown,
+                tags: ["Kod", "Xcode"]
+            ),
+            SavedSnippet(
+                name: "Rapor",
+                text: "Toplam",
+                captureMode: .standard,
+                outputPreset: .office,
+                tags: ["Rapor", "kod"]
+            )
+        ]
+
+        XCTAssertEqual(appState.availableSnippetTags, ["Kod", "Rapor", "Xcode"])
+    }
+
+    func testAppStateMigratesSavedSnippetsWithoutTags() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let legacyJSON = """
+        [{
+          "id":"E6D0BA2B-3A06-46BB-9E50-2B489B44A7E4",
+          "name":"Kod parcasi",
+          "text":"if value { print(value) }",
+          "rawText":"if value { print(value) }",
+          "captureMode":"code",
+          "outputPreset":"markdown",
+          "contentKind":"text",
+          "ocrConfidence":0.73,
+          "source":{"appName":"Xcode","bundleIdentifier":"com.apple.dt.Xcode"},
+          "updatedAt":100
+        }]
+        """.data(using: .utf8)!
+        defaults.set(legacyJSON, forKey: SavedSnippetStore.key)
+
+        let restored = AppState(defaults: defaults, persistsUserPreferences: true)
+
+        XCTAssertEqual(restored.savedSnippets.first?.tags, ["Kod", "Xcode", "Markdown"])
+    }
+
+    func testSaveHistoryEntryAsSnippetRefreshPreservesExistingCustomTags() {
+        let appState = AppState(persistsUserPreferences: false)
+        let entry = ClipboardHistoryEntry(
+            text: "for value in values { print(value) }",
+            date: Date(),
+            captureMode: .code,
+            outputPreset: .markdown,
+            contentKind: .text,
+            rawText: "for value in values { print(value) }",
+            source: .init(appName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode")
+        )
+
+        let snippet = appState.saveHistoryEntryAsSnippet(entry)
+        appState.updateSavedSnippetTags(["Rapor", "Kod"], for: snippet)
+
+        let refreshed = appState.saveHistoryEntryAsSnippet(entry)
+
+        XCTAssertEqual(refreshed.tags, ["Rapor", "Kod", "Xcode", "Markdown"])
+    }
+
+    func testSaveLastCopiedEntryAsSnippetUsesMostRecentHistoryEntry() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.recordCopiedText("Ilk kayit", captureMode: .standard, outputPreset: .plainText)
+        appState.recordCopiedText("Ikinci kayit", captureMode: .table, outputPreset: .office, rawText: "Ikinci\tkayit")
+
+        let snippet = appState.saveLastCopiedEntryAsSnippet()
+
+        XCTAssertEqual(snippet?.text, "Ikinci kayit")
+        XCTAssertEqual(snippet?.outputPreset, .office)
+        XCTAssertEqual(appState.savedSnippets.first?.text, "Ikinci kayit")
+    }
+
+    func testAutomationCommandParsesCaptureArguments() {
+        let command = AutomationCommand(
+            arguments: [
+                "/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab",
+                "--capture",
+                "--mode", "table",
+                "--output", "office",
+                "--languages", "tr,en",
+                "--ocr-auto", "off"
+            ]
+        )
+
+        XCTAssertEqual(
+            command,
+            .capture(
+                AutomationCaptureOverrides(
+                    captureMode: .table,
+                    outputPreset: .office,
+                    languagePreferences: [.turkish, .english],
+                    automaticDetection: false
+                )
+            )
+        )
+    }
+
+    func testAutomationCommandRejectsAmbiguousArguments() {
+        let command = AutomationCommand(
+            arguments: [
+                "/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab",
+                "--capture",
+                "--repeat-last"
+            ]
+        )
+
+        XCTAssertNil(command)
+    }
+
+    func testAutomationCommandParsesRepeatLastURL() {
+        let url = URL(string: "stg://repeat-last?mode=code&output=markdown&ocr-auto=true")!
+
+        XCTAssertEqual(
+            AutomationCommand(url: url),
+            .repeatLast(
+                AutomationCaptureOverrides(
+                    captureMode: .code,
+                    outputPreset: .markdown,
+                    automaticDetection: true
+                )
+            )
+        )
+    }
+
+    func testAutomationCommandParsesSavedRegionArguments() {
+        let command = AutomationCommand(
+            arguments: [
+                "/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab",
+                "--saved-region",
+                "--name", "Safari • Tablo",
+                "--mode", "table",
+                "--output", "office"
+            ]
+        )
+
+        XCTAssertEqual(
+            command,
+            .savedRegion(
+                "Safari • Tablo",
+                AutomationCaptureOverrides(
+                    captureMode: .table,
+                    outputPreset: .office
+                )
+            )
+        )
+    }
+
+    func testAutomationCommandParsesSavedRegionURL() {
+        let url = URL(string: "stg://saved-region?name=Safari%20%E2%80%A2%20Tablo&mode=table&output=office")!
+
+        XCTAssertEqual(
+            AutomationCommand(url: url),
+            .savedRegion(
+                "Safari • Tablo",
+                AutomationCaptureOverrides(
+                    captureMode: .table,
+                    outputPreset: .office
+                )
+            )
+        )
+    }
+
+    func testAutomationCommandParsesSnippetArguments() {
+        let command = AutomationCommand(
+            arguments: [
+                "/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab",
+                "--snippet",
+                "--name", "Fiyat listesi"
+            ]
+        )
+
+        XCTAssertEqual(command, .snippet("Fiyat listesi"))
+    }
+
+    func testAutomationCommandParsesActiveSnippetArguments() {
+        let command = AutomationCommand(
+            arguments: [
+                "/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab",
+                "--active-snippet"
+            ]
+        )
+
+        XCTAssertEqual(command, .activeSnippet)
+    }
+
+    func testAutomationCommandParsesSnippetURL() {
+        let url = URL(string: "stg://snippet?name=Fiyat%20listesi")!
+
+        XCTAssertEqual(AutomationCommand(url: url), .snippet("Fiyat listesi"))
+    }
+
+    func testAutomationCommandParsesActiveSnippetURL() {
+        let url = URL(string: "stg://active-snippet")!
+
+        XCTAssertEqual(AutomationCommand(url: url), .activeSnippet)
+    }
+
+    func testAutomationCommandParsesSnippetCollectionArguments() {
+        let command = AutomationCommand(
+            arguments: [
+                "/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab",
+                "--snippet-collection",
+                "--name", "Excel Raporlari"
+            ]
+        )
+
+        XCTAssertEqual(command, .snippetCollection("Excel Raporlari"))
+    }
+
+    func testAutomationCommandParsesSnippetCollectionURL() {
+        let url = URL(string: "stg://snippet-collection?name=Excel%20Raporlari")!
+
+        XCTAssertEqual(AutomationCommand(url: url), .snippetCollection("Excel Raporlari"))
+    }
+
+    func testAutomationCommandParsesIncomingImageFileURL() {
+        XCTAssertEqual(
+            AutomationCommand(incomingURL: URL(fileURLWithPath: "/tmp/example.png")),
+            .imageFile(
+                URL(fileURLWithPath: "/tmp/example.png"),
+                AutomationCaptureOverrides()
+            )
+        )
+    }
+
+    func testAutomationCommandParsesIncomingPDFFileURL() {
+        XCTAssertEqual(
+            AutomationCommand(incomingURL: URL(fileURLWithPath: "/tmp/example.pdf")),
+            .pdfFile(
+                URL(fileURLWithPath: "/tmp/example.pdf"),
+                AutomationCaptureOverrides()
+            )
+        )
+    }
+
+    func testAutomationCommandRejectsUnsupportedIncomingFileURL() {
+        XCTAssertNil(
+            AutomationCommand(incomingURL: URL(fileURLWithPath: "/tmp/example.txt"))
+        )
+    }
+
+    func testAutomationCommandParsesClipboardImageArgument() {
+        let command = AutomationCommand(
+            arguments: [
+                "/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab",
+                "--clipboard-image",
+                "--mode", "standard",
+                "--output", "cleaned"
+            ]
+        )
+
+        XCTAssertEqual(
+            command,
+            .clipboardImage(
+                AutomationCaptureOverrides(
+                    captureMode: .standard,
+                    outputPreset: .cleaned
+                )
+            )
+        )
+    }
+
+    func testAutomationCommandParsesImageFileArgument() {
+        let command = AutomationCommand(
+            arguments: [
+                "/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab",
+                "--image-file",
+                "--path", "/tmp/example.png",
+                "--mode", "table",
+                "--output", "office"
+            ]
+        )
+
+        XCTAssertEqual(
+            command,
+            .imageFile(
+                URL(fileURLWithPath: "/tmp/example.png"),
+                AutomationCaptureOverrides(
+                    captureMode: .table,
+                    outputPreset: .office
+                )
+            )
+        )
+    }
+
+    func testAutomationCommandParsesPDFFileArgument() {
+        let command = AutomationCommand(
+            arguments: [
+                "/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab",
+                "--pdf-file",
+                "--path", "/tmp/example.pdf",
+                "--mode", "standard",
+                "--output", "cleaned"
+            ]
+        )
+
+        XCTAssertEqual(
+            command,
+            .pdfFile(
+                URL(fileURLWithPath: "/tmp/example.pdf"),
+                AutomationCaptureOverrides(
+                    captureMode: .standard,
+                    outputPreset: .cleaned
+                )
+            )
+        )
+    }
+
+    func testAutomationCommandParsesSearchablePDFArgument() {
+        let command = AutomationCommand(
+            arguments: [
+                "/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab",
+                "--pdf-searchable",
+                "--path", "/tmp/example.pdf",
+                "--destination", "/tmp/example-searchable.pdf",
+                "--mode", "table"
+            ]
+        )
+
+        XCTAssertEqual(
+            command,
+            .searchablePDF(
+                URL(fileURLWithPath: "/tmp/example.pdf"),
+                URL(fileURLWithPath: "/tmp/example-searchable.pdf"),
+                AutomationCaptureOverrides(
+                    captureMode: .table
+                )
+            )
+        )
+    }
+
+    func testAutomationURLBuilderRoundTripsToCommand() {
+        let url = AutomationURLBuilder.capture(
+            overrides: AutomationCaptureOverrides(
+                captureMode: .subtitle,
+                outputPreset: .cleaned,
+                languagePreferences: [.english],
+                automaticDetection: false
+            )
+        )
+
+        XCTAssertEqual(
+            AutomationCommand(url: url!),
+            .capture(
+                AutomationCaptureOverrides(
+                    captureMode: .subtitle,
+                    outputPreset: .cleaned,
+                    languagePreferences: [.english],
+                    automaticDetection: false
+                )
+            )
+        )
+    }
+
+    func testClipboardImageURLBuilderRoundTripsToCommand() {
+        let url = AutomationURLBuilder.clipboardImage(
+            overrides: AutomationCaptureOverrides(
+                captureMode: .code,
+                outputPreset: .markdown
+            )
+        )
+
+        XCTAssertEqual(
+            AutomationCommand(url: url!),
+            .clipboardImage(
+                AutomationCaptureOverrides(
+                    captureMode: .code,
+                    outputPreset: .markdown
+                )
+            )
+        )
+    }
+
+    func testSnippetURLBuilderRoundTripsToCommand() {
+        let url = AutomationURLBuilder.snippet(name: "Fiyat listesi")
+
+        XCTAssertEqual(AutomationCommand(url: url!), .snippet("Fiyat listesi"))
+    }
+
+    func testActiveSnippetURLBuilderRoundTripsToCommand() {
+        let url = AutomationURLBuilder.activeSnippet()
+
+        XCTAssertEqual(AutomationCommand(url: url!), .activeSnippet)
+    }
+
+    func testSnippetCollectionURLBuilderRoundTripsToCommand() {
+        let url = AutomationURLBuilder.snippetCollection(name: "Excel Raporlari")
+
+        XCTAssertEqual(AutomationCommand(url: url!), .snippetCollection("Excel Raporlari"))
+    }
+
+    func testImageFileURLBuilderRoundTripsToCommand() {
+        let url = AutomationURLBuilder.imageFile(
+            path: "/tmp/example.png",
+            overrides: AutomationCaptureOverrides(
+                captureMode: .standard,
+                outputPreset: .cleaned
+            )
+        )
+
+        XCTAssertEqual(
+            AutomationCommand(url: url!),
+            .imageFile(
+                URL(fileURLWithPath: "/tmp/example.png"),
+                AutomationCaptureOverrides(
+                    captureMode: .standard,
+                    outputPreset: .cleaned
+                )
+            )
+        )
+    }
+
+    func testPDFFileURLBuilderRoundTripsToCommand() {
+        let url = AutomationURLBuilder.pdfFile(
+            path: "/tmp/example.pdf",
+            overrides: AutomationCaptureOverrides(
+                captureMode: .code,
+                outputPreset: .markdown
+            )
+        )
+
+        XCTAssertEqual(
+            AutomationCommand(url: url!),
+            .pdfFile(
+                URL(fileURLWithPath: "/tmp/example.pdf"),
+                AutomationCaptureOverrides(
+                    captureMode: .code,
+                    outputPreset: .markdown
+                )
+            )
+        )
+    }
+
+    func testSearchablePDFURLBuilderRoundTripsToCommand() {
+        let url = AutomationURLBuilder.searchablePDF(
+            path: "/tmp/example.pdf",
+            destination: "/tmp/example-searchable.pdf",
+            overrides: AutomationCaptureOverrides(
+                captureMode: .table
+            )
+        )
+
+        XCTAssertEqual(
+            AutomationCommand(url: url!),
+            .searchablePDF(
+                URL(fileURLWithPath: "/tmp/example.pdf"),
+                URL(fileURLWithPath: "/tmp/example-searchable.pdf"),
+                AutomationCaptureOverrides(
+                    captureMode: .table
+                )
+            )
+        )
+    }
+
+    func testImportedDocumentRouterResolvesImageFile() {
+        XCTAssertEqual(
+            ImportedDocumentRouter.resolve(URL(fileURLWithPath: "/tmp/example.png")),
+            .image(URL(fileURLWithPath: "/tmp/example.png"))
+        )
+    }
+
+    func testImportedDocumentRouterResolvesPDFFile() {
+        XCTAssertEqual(
+            ImportedDocumentRouter.resolve(URL(fileURLWithPath: "/tmp/example.pdf")),
+            .pdf(URL(fileURLWithPath: "/tmp/example.pdf"))
+        )
+    }
+
+    func testFinderImportServiceProviderReadsFileURLsFromPasteboard() {
+        let pasteboard = NSPasteboard.withUniqueName()
+        pasteboard.clearContents()
+        pasteboard.writeObjects([
+            NSURL(fileURLWithPath: "/tmp/example.png"),
+            NSURL(fileURLWithPath: "/tmp/example.pdf")
+        ])
+
+        XCTAssertEqual(
+            FinderImportServiceProvider.readFileURLs(from: pasteboard),
+            [
+                URL(fileURLWithPath: "/tmp/example.png"),
+                URL(fileURLWithPath: "/tmp/example.pdf")
+            ]
+        )
+    }
+
+    func testFinderImportServiceProviderReturnsEmptyForUnsupportedPasteboardContent() {
+        let pasteboard = NSPasteboard.withUniqueName()
+        pasteboard.clearContents()
+        pasteboard.setString("desteklenmeyen", forType: NSPasteboard.PasteboardType.string)
+
+        XCTAssertTrue(
+            FinderImportServiceProvider.readFileURLs(from: pasteboard).isEmpty
+        )
     }
 
     func testLaunchPanelPolicyShowsWindowForForegroundLaunch() {

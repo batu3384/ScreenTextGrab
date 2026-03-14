@@ -1,5 +1,7 @@
+import ApplicationServices
 import AVFoundation
 import SwiftUI
+import UniformTypeIdentifiers
 
 @main
 struct ScreenTextGrabApp: App {
@@ -49,8 +51,18 @@ final class AppState: ObservableObject {
     @Published var captureOutputPreset: CaptureOutputPreset
     @Published var watchConfiguration: WatchConfiguration
     @Published var appProfiles: [AppCaptureProfile]
+    @Published var appProfilePanelAutoSyncEnabled: Bool
+    @Published var savedCaptureRegions: [SavedCaptureRegion]
+    @Published var savedCaptureRegionQuickStartEnabled: Bool
+    @Published var savedSnippets: [SavedSnippet]
+    @Published var savedSnippetCollections: [SavedSnippetCollection]
+    @Published var savedSnippetCollectionAutoSyncEnabled: Bool
     @Published var historyExportFormat: ClipboardHistoryExportFormat
+    @Published var settingsPresentationToken: UUID?
+    @Published var pendingSnippetCollectionSelectionName: String?
     @Published var activeTableReview: TableReviewSession?
+    @Published var activeSourceApp: ClipboardHistoryEntry.SourceContext?
+    private(set) var lastCaptureSelection: RecentCaptureSelection?
 
     weak var coordinator: CaptureCoordinating?
     weak var hotkeyManager: HotkeyManaging?
@@ -97,20 +109,113 @@ final class AppState: ObservableObject {
         self.appProfiles = persistsUserPreferences
             ? AppCaptureProfileStore.load(defaults: defaults)
             : []
+        self.appProfilePanelAutoSyncEnabled = persistsUserPreferences
+            ? AppProfilePanelAutoSyncStore.load(defaults: defaults)
+            : false
+        self.savedCaptureRegions = persistsUserPreferences
+            ? SavedCaptureRegionStore.load(defaults: defaults)
+            : []
+        self.savedCaptureRegionQuickStartEnabled = persistsUserPreferences
+            ? SavedCaptureRegionQuickStartStore.load(defaults: defaults)
+            : true
+        self.savedSnippets = persistsUserPreferences
+            ? AppState.migratedSavedSnippets(SavedSnippetStore.load(defaults: defaults))
+            : []
+        self.savedSnippetCollections = persistsUserPreferences
+            ? SavedSnippetCollectionStore.load(defaults: defaults)
+            : []
+        self.savedSnippetCollectionAutoSyncEnabled = persistsUserPreferences
+            ? SavedSnippetCollectionAutoSyncStore.load(defaults: defaults)
+            : true
         self.historyExportFormat = persistsUserPreferences
             ? ClipboardHistoryExportFormatStore.load(defaults: defaults)
             : .markdown
+        self.settingsPresentationToken = nil
+        self.pendingSnippetCollectionSelectionName = nil
         self.activeTableReview = nil
+        self.activeSourceApp = nil
+        self.lastCaptureSelection = nil
     }
 
     var lastCopiedEntry: ClipboardHistoryEntry? {
         copyHistory.first
     }
 
+    var pinnedHistoryCount: Int {
+        copyHistory.filter { $0.isPinned }.count
+    }
+
     var readyStatusMessage: String {
         isHotkeyAvailable
             ? "✅ Hazır — \(hotkeyDisplayLabel) ile yakala"
             : "✅ Hazır — menüden yakala"
+    }
+
+    var availableSnippetTags: [String] {
+        var seen = Set<String>()
+        let tags = savedSnippets
+            .flatMap(\.tags)
+            .filter { tag in
+                let key = tag.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+                if seen.contains(key) {
+                    return false
+                }
+
+                seen.insert(key)
+                return true
+            }
+
+        return tags.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    @discardableResult
+    func saveSnippetCollection(named name: String, selectedTag: String?, searchQuery: String) -> SavedSnippetCollection? {
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedTag = selectedTag?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let effectiveTag = (normalizedTag?.isEmpty == false) ? normalizedTag : nil
+        let normalizedQuery = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !normalizedName.isEmpty,
+              effectiveTag != nil || !normalizedQuery.isEmpty else {
+            return nil
+        }
+
+        let updatedAt = Date()
+
+        if let index = savedSnippetCollections.firstIndex(where: {
+            $0.name.compare(normalizedName, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }) {
+            let existing = savedSnippetCollections[index]
+            savedSnippetCollections[index] = SavedSnippetCollection(
+                id: existing.id,
+                name: normalizedName,
+                selectedTag: effectiveTag,
+                searchQuery: normalizedQuery,
+                updatedAt: updatedAt
+            )
+            sortSavedSnippetCollections()
+            persistSavedSnippetCollectionsIfNeeded()
+            return savedSnippetCollections.first(where: { $0.id == existing.id }) ?? savedSnippetCollections[index]
+        }
+
+        let collection = SavedSnippetCollection(
+            name: normalizedName,
+            selectedTag: effectiveTag,
+            searchQuery: normalizedQuery,
+            updatedAt: updatedAt
+        )
+        savedSnippetCollections.insert(collection, at: 0)
+        if savedSnippetCollections.count > SavedSnippetCollectionStore.maximumEntries {
+            savedSnippetCollections.removeLast(savedSnippetCollections.count - SavedSnippetCollectionStore.maximumEntries)
+        }
+        sortSavedSnippetCollections()
+        persistSavedSnippetCollectionsIfNeeded()
+        return savedSnippetCollections.first(where: { $0.id == collection.id }) ?? collection
+    }
+
+    func removeSavedSnippetCollection(_ collection: SavedSnippetCollection) {
+        savedSnippetCollections.removeAll { $0.id == collection.id }
+        persistSavedSnippetCollectionsIfNeeded()
     }
 
     func appendDiagnostic(category: String, message: String, domain: String?, code: Int?, severity: DiagnosticSeverity = .error) {
@@ -147,15 +252,27 @@ final class AppState: ObservableObject {
         outputPreset: CaptureOutputPreset = .smart,
         contentKind: ClipboardHistoryEntry.ContentKind = .text,
         rawText: String? = nil,
+        ocrConfidence: Float? = nil,
         source: ClipboardHistoryEntry.SourceContext? = nil
     ) {
         lastCopiedText = text
+        let inheritedPinnedState = copyHistory.contains {
+            $0.text == text &&
+            $0.captureMode == captureMode &&
+            $0.outputPreset == outputPreset &&
+            $0.contentKind == contentKind &&
+            $0.rawText == rawText &&
+            $0.ocrConfidence == ocrConfidence &&
+            $0.source == source &&
+            $0.isPinned
+        }
         copyHistory.removeAll {
             $0.text == text &&
             $0.captureMode == captureMode &&
             $0.outputPreset == outputPreset &&
             $0.contentKind == contentKind &&
             $0.rawText == rawText &&
+            $0.ocrConfidence == ocrConfidence &&
             $0.source == source
         }
         copyHistory.insert(
@@ -166,7 +283,9 @@ final class AppState: ObservableObject {
                 outputPreset: outputPreset,
                 contentKind: contentKind,
                 rawText: rawText,
-                source: source
+                ocrConfidence: ocrConfidence,
+                source: source,
+                isPinned: inheritedPinnedState
             ),
             at: 0
         )
@@ -228,6 +347,7 @@ final class AppState: ObservableObject {
         appProfiles.append(profile)
         appProfiles.sort { $0.appName.localizedCaseInsensitiveCompare($1.appName) == .orderedAscending }
         persistAppProfilesIfNeeded()
+        _ = syncActiveAppProfileIfNeeded()
     }
 
     func removeAppProfile(_ profile: AppCaptureProfile) {
@@ -243,6 +363,14 @@ final class AppState: ObservableObject {
         return appProfiles.first { $0.bundleIdentifier == bundleIdentifier }
     }
 
+    var activeTargetBundleIdentifier: String? {
+        activeSourceApp?.bundleIdentifier
+    }
+
+    func preferredRepasteOutputPreset(defaultingTo preset: CaptureOutputPreset) -> CaptureOutputPreset {
+        appProfile(for: activeTargetBundleIdentifier)?.outputPreset ?? preset
+    }
+
     func setHistoryExportFormat(_ format: ClipboardHistoryExportFormat) {
         historyExportFormat = format
         persistHistoryExportFormatIfNeeded()
@@ -256,9 +384,35 @@ final class AppState: ObservableObject {
         speechState = state
     }
 
+    func updateActiveSourceApp(_ source: ClipboardHistoryEntry.SourceContext?) {
+        activeSourceApp = source
+        _ = syncActiveAppProfileIfNeeded(for: source)
+    }
+
     func removeHistoryEntry(_ entry: ClipboardHistoryEntry) {
         copyHistory.removeAll { $0.id == entry.id }
         lastCopiedText = copyHistory.first?.text ?? ""
+        persistHistoryIfNeeded()
+    }
+
+    func togglePinnedHistoryEntry(_ entry: ClipboardHistoryEntry) {
+        guard let index = copyHistory.firstIndex(where: { $0.id == entry.id }) else {
+            return
+        }
+
+        let existing = copyHistory[index]
+        copyHistory[index] = ClipboardHistoryEntry(
+            id: existing.id,
+            text: existing.text,
+            date: existing.date,
+            captureMode: existing.captureMode,
+            outputPreset: existing.outputPreset,
+            contentKind: existing.contentKind,
+            rawText: existing.rawText,
+            ocrConfidence: existing.ocrConfidence,
+            source: existing.source,
+            isPinned: !existing.isPinned
+        )
         persistHistoryIfNeeded()
     }
 
@@ -278,6 +432,264 @@ final class AppState: ObservableObject {
             entry: entry,
             sourceText: entry.preferredTableSourceText
         )
+    }
+
+    func rememberCaptureSelection(_ selection: RecentCaptureSelection) {
+        lastCaptureSelection = selection
+    }
+
+    @discardableResult
+    func saveLastCaptureSelection() -> SavedCaptureRegion? {
+        guard let selection = lastCaptureSelection else {
+            return nil
+        }
+
+        let region = SavedCaptureRegion(
+            name: nextSavedCaptureRegionName(for: selection),
+            screenRect: selection.screenRect,
+            preferredDisplayID: selection.preferredDisplayID,
+            source: selection.source,
+            sessionConfiguration: selection.sessionConfiguration
+        )
+
+        savedCaptureRegions.insert(region, at: 0)
+
+        if savedCaptureRegions.count > SavedCaptureRegionStore.maximumEntries {
+            savedCaptureRegions.removeLast(savedCaptureRegions.count - SavedCaptureRegionStore.maximumEntries)
+        }
+
+        persistSavedCaptureRegionsIfNeeded()
+        return region
+    }
+
+    @discardableResult
+    func refreshSavedCaptureRegion(_ region: SavedCaptureRegion) -> SavedCaptureRegion? {
+        guard let selection = lastCaptureSelection,
+              let index = savedCaptureRegions.firstIndex(where: { $0.id == region.id }) else {
+            return nil
+        }
+
+        savedCaptureRegions[index] = SavedCaptureRegion(
+            id: region.id,
+            name: region.name,
+            screenRect: selection.screenRect,
+            preferredDisplayID: selection.preferredDisplayID,
+            source: selection.source,
+            sessionConfiguration: selection.sessionConfiguration,
+            updatedAt: Date()
+        )
+
+        persistSavedCaptureRegionsIfNeeded()
+        return savedCaptureRegions[index]
+    }
+
+    func removeSavedCaptureRegion(_ region: SavedCaptureRegion) {
+        savedCaptureRegions.removeAll { $0.id == region.id }
+        persistSavedCaptureRegionsIfNeeded()
+    }
+
+    func setSavedCaptureRegionQuickStartEnabled(_ isEnabled: Bool) {
+        savedCaptureRegionQuickStartEnabled = isEnabled
+        persistSavedCaptureRegionQuickStartIfNeeded()
+    }
+
+    func setAppProfilePanelAutoSyncEnabled(_ isEnabled: Bool) {
+        appProfilePanelAutoSyncEnabled = isEnabled
+        persistAppProfilePanelAutoSyncIfNeeded()
+
+        guard isEnabled else {
+            return
+        }
+
+        _ = syncActiveAppProfileIfNeeded()
+    }
+
+    func setSavedSnippetCollectionAutoSyncEnabled(_ isEnabled: Bool) {
+        savedSnippetCollectionAutoSyncEnabled = isEnabled
+        persistSavedSnippetCollectionAutoSyncIfNeeded()
+    }
+
+    @discardableResult
+    func saveLastCopiedEntryAsSnippet() -> SavedSnippet? {
+        guard let entry = lastCopiedEntry else {
+            return nil
+        }
+
+        return saveHistoryEntryAsSnippet(entry)
+    }
+
+    @discardableResult
+    func saveHistoryEntryAsSnippet(_ entry: ClipboardHistoryEntry) -> SavedSnippet {
+        let updatedAt = Date()
+        let defaultTags = Self.defaultSnippetTags(
+            captureMode: entry.captureMode,
+            outputPreset: entry.outputPreset,
+            contentKind: entry.contentKind,
+            source: entry.source
+        )
+
+        if let index = savedSnippets.firstIndex(where: {
+            $0.text == entry.text &&
+            $0.rawText == entry.rawText &&
+            $0.captureMode == entry.captureMode &&
+            $0.outputPreset == entry.outputPreset &&
+            $0.contentKind == entry.contentKind &&
+            $0.source == entry.source
+        }) {
+            let existing = savedSnippets[index]
+            savedSnippets[index] = SavedSnippet(
+                id: existing.id,
+                name: existing.name,
+                text: entry.text,
+                rawText: entry.rawText,
+                captureMode: entry.captureMode,
+                outputPreset: entry.outputPreset,
+                contentKind: entry.contentKind,
+                ocrConfidence: entry.ocrConfidence,
+                source: entry.source,
+                tags: mergeSnippetTags(existing.tags, with: defaultTags),
+                updatedAt: updatedAt,
+                lastUsedAt: existing.lastUsedAt
+            )
+            sortSavedSnippets()
+            persistSavedSnippetsIfNeeded()
+            return savedSnippets.first(where: { $0.id == existing.id }) ?? savedSnippets[index]
+        }
+
+        let snippet = SavedSnippet(
+            entry: entry,
+            name: nextSavedSnippetName(for: entry),
+            tags: defaultTags,
+            updatedAt: updatedAt
+        )
+
+        savedSnippets.insert(snippet, at: 0)
+
+        if savedSnippets.count > SavedSnippetStore.maximumEntries {
+            savedSnippets.removeLast(savedSnippets.count - SavedSnippetStore.maximumEntries)
+        }
+
+        sortSavedSnippets()
+        persistSavedSnippetsIfNeeded()
+        return savedSnippets.first(where: { $0.id == snippet.id }) ?? snippet
+    }
+
+    func removeSavedSnippet(_ snippet: SavedSnippet) {
+        savedSnippets.removeAll { $0.id == snippet.id }
+        persistSavedSnippetsIfNeeded()
+    }
+
+    func updateSavedSnippetTags(_ tags: [String], for snippet: SavedSnippet) {
+        guard let index = savedSnippets.firstIndex(where: { $0.id == snippet.id }) else {
+            return
+        }
+
+        let existing = savedSnippets[index]
+        savedSnippets[index] = SavedSnippet(
+            id: existing.id,
+            name: existing.name,
+            text: existing.text,
+            rawText: existing.rawText,
+            captureMode: existing.captureMode,
+            outputPreset: existing.outputPreset,
+            contentKind: existing.contentKind,
+            ocrConfidence: existing.ocrConfidence,
+            source: existing.source,
+            tags: tags,
+            updatedAt: existing.updatedAt,
+            lastUsedAt: existing.lastUsedAt
+        )
+        sortSavedSnippets()
+        persistSavedSnippetsIfNeeded()
+    }
+
+    @discardableResult
+    func noteSavedSnippetUsed(_ snippet: SavedSnippet, usedAt: Date = Date()) -> SavedSnippet? {
+        guard let index = savedSnippets.firstIndex(where: { $0.id == snippet.id }) else {
+            return nil
+        }
+
+        let existing = savedSnippets[index]
+        let updated = SavedSnippet(
+            id: existing.id,
+            name: existing.name,
+            text: existing.text,
+            rawText: existing.rawText,
+            captureMode: existing.captureMode,
+            outputPreset: existing.outputPreset,
+            contentKind: existing.contentKind,
+            ocrConfidence: existing.ocrConfidence,
+            source: existing.source,
+            tags: existing.tags,
+            updatedAt: existing.updatedAt,
+            lastUsedAt: usedAt
+        )
+        savedSnippets[index] = updated
+        persistSavedSnippetsIfNeeded()
+        return updated
+    }
+
+    func suggestedTags(for snippet: SavedSnippet) -> [String] {
+        let defaults = Self.defaultSnippetTags(
+            captureMode: snippet.captureMode,
+            outputPreset: snippet.outputPreset,
+            contentKind: snippet.contentKind,
+            source: snippet.source
+        )
+        return mergeSnippetTags(snippet.tags, with: defaults)
+    }
+
+    func savedSnippet(named name: String) -> SavedSnippet? {
+        let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            return nil
+        }
+
+        return savedSnippets.first {
+            $0.name.compare(normalized, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }
+    }
+
+    func savedSnippetCollection(named name: String) -> SavedSnippetCollection? {
+        let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            return nil
+        }
+
+        return savedSnippetCollections.first {
+            $0.name.compare(normalized, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }
+    }
+
+    @discardableResult
+    func presentSettingsForSavedSnippetCollection(named name: String) -> Bool {
+        guard let collection = savedSnippetCollection(named: name) else {
+            return false
+        }
+
+        pendingSnippetCollectionSelectionName = collection.name
+        settingsPresentationToken = UUID()
+        return true
+    }
+
+    func consumePendingSnippetCollectionSelection() -> SavedSnippetCollection? {
+        guard let pendingSnippetCollectionSelectionName else {
+            return nil
+        }
+
+        self.pendingSnippetCollectionSelectionName = nil
+        return savedSnippetCollection(named: pendingSnippetCollectionSelectionName)
+    }
+
+    func savedCaptureRegion(named name: String) -> SavedCaptureRegion? {
+        let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            return nil
+        }
+
+        return savedCaptureRegions.first {
+            $0.name.compare(normalized, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }
     }
 
     func clearTableReview() {
@@ -311,7 +723,9 @@ final class AppState: ObservableObject {
             "Sesli Okuma: \(speechState.title)",
             "OCR: \(ocrLanguageSelection.summary)",
             "Geçmiş Sayısı: \(copyHistory.count)",
-            "Uygulama Profilleri: \(appProfiles.count)"
+            "Uygulama Profilleri: \(appProfiles.count)",
+            "Kayıtlı Bölgeler: \(savedCaptureRegions.count)",
+            "Kayıtlı Snippet'lar: \(savedSnippets.count)"
         ]
 
         if let permissionSnapshot {
@@ -349,6 +763,15 @@ final class AppState: ObservableObject {
         persistOCRLanguagesIfNeeded()
     }
 
+    func applyCaptureProfile(_ profile: AppCaptureProfile) {
+        captureMode = profile.captureMode
+        captureOutputPreset = profile.outputPreset
+        ocrLanguageSelection = profile.ocrLanguageSelection
+        persistCaptureModeIfNeeded()
+        persistCaptureOutputPresetIfNeeded()
+        persistOCRLanguagesIfNeeded()
+    }
+
     private func persistHistoryIfNeeded() {
         guard persistsUserPreferences else { return }
         ClipboardHistoryStore.save(copyHistory, defaults: defaults)
@@ -374,9 +797,59 @@ final class AppState: ObservableObject {
         WatchConfigurationStore.save(watchConfiguration, defaults: defaults)
     }
 
+    private func persistAppProfilePanelAutoSyncIfNeeded() {
+        guard persistsUserPreferences else { return }
+        AppProfilePanelAutoSyncStore.save(appProfilePanelAutoSyncEnabled, defaults: defaults)
+    }
+
     private func persistAppProfilesIfNeeded() {
         guard persistsUserPreferences else { return }
         AppCaptureProfileStore.save(appProfiles, defaults: defaults)
+    }
+
+    private func persistSavedCaptureRegionsIfNeeded() {
+        guard persistsUserPreferences else { return }
+        SavedCaptureRegionStore.save(savedCaptureRegions, defaults: defaults)
+    }
+
+    private func persistSavedCaptureRegionQuickStartIfNeeded() {
+        guard persistsUserPreferences else { return }
+        SavedCaptureRegionQuickStartStore.save(savedCaptureRegionQuickStartEnabled, defaults: defaults)
+    }
+
+    private func persistSavedSnippetCollectionAutoSyncIfNeeded() {
+        guard persistsUserPreferences else { return }
+        SavedSnippetCollectionAutoSyncStore.save(savedSnippetCollectionAutoSyncEnabled, defaults: defaults)
+    }
+
+    private func persistSavedSnippetsIfNeeded() {
+        guard persistsUserPreferences else { return }
+        SavedSnippetStore.save(savedSnippets, defaults: defaults)
+    }
+
+    private func persistSavedSnippetCollectionsIfNeeded() {
+        guard persistsUserPreferences else { return }
+        SavedSnippetCollectionStore.save(savedSnippetCollections, defaults: defaults)
+    }
+
+    private func sortSavedSnippets() {
+        savedSnippets.sort { lhs, rhs in
+            if lhs.updatedAt != rhs.updatedAt {
+                return lhs.updatedAt > rhs.updatedAt
+            }
+
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private func sortSavedSnippetCollections() {
+        savedSnippetCollections.sort { lhs, rhs in
+            if lhs.updatedAt != rhs.updatedAt {
+                return lhs.updatedAt > rhs.updatedAt
+            }
+
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
     }
 
     private func persistHistoryExportFormatIfNeeded() {
@@ -384,9 +857,188 @@ final class AppState: ObservableObject {
         ClipboardHistoryExportFormatStore.save(historyExportFormat, defaults: defaults)
     }
 
+    private func nextSavedCaptureRegionName(for selection: RecentCaptureSelection) -> String {
+        let sourceName = selection.source?.appName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let baseName: String
+
+        if let sourceName, !sourceName.isEmpty {
+            baseName = "\(sourceName) • \(selection.sessionConfiguration.captureMode.title)"
+        } else {
+            baseName = "Alan • \(selection.sessionConfiguration.captureMode.title)"
+        }
+
+        guard savedCaptureRegions.contains(where: {
+            $0.name.compare(baseName, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }) else {
+            return baseName
+        }
+
+        var suffix = 2
+        while savedCaptureRegions.contains(where: {
+            $0.name.compare("\(baseName) \(suffix)", options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }) {
+            suffix += 1
+        }
+
+        return "\(baseName) \(suffix)"
+    }
+
+    private func nextSavedSnippetName(for entry: ClipboardHistoryEntry) -> String {
+        let previewBase = entry.previewText
+        let baseName: String
+
+        if !previewBase.isEmpty {
+            baseName = String(previewBase.prefix(34))
+        } else if let sourceName = entry.source?.appName?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !sourceName.isEmpty {
+            baseName = "\(sourceName) • \(entry.captureMode.title)"
+        } else {
+            baseName = "Snippet • \(entry.captureMode.title)"
+        }
+
+        guard savedSnippets.contains(where: {
+            $0.name.compare(baseName, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }) == false else {
+            var suffix = 2
+            while savedSnippets.contains(where: {
+                $0.name.compare("\(baseName) \(suffix)", options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+            }) {
+                suffix += 1
+            }
+
+            return "\(baseName) \(suffix)"
+        }
+
+        return baseName
+    }
+
+    private func mergeSnippetTags(_ existing: [String], with additions: [String]) -> [String] {
+        var merged = existing
+
+        for tag in additions where !merged.contains(where: {
+            $0.compare(tag, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }) {
+            merged.append(tag)
+        }
+
+        return merged
+    }
+
+    private static func defaultSnippetTags(
+        captureMode: CaptureMode,
+        outputPreset: CaptureOutputPreset,
+        contentKind: ClipboardHistoryEntry.ContentKind,
+        source: ClipboardHistoryEntry.SourceContext?
+    ) -> [String] {
+        var tags: [String] = [captureMode.title]
+
+        if let sourceName = source?.displayName, !sourceName.isEmpty {
+            tags.append(sourceName)
+        }
+
+        if contentKind != .text {
+            tags.append(contentKind.title)
+        }
+
+        if outputPreset != .smart {
+            tags.append(outputPreset.title)
+        }
+
+        return tags
+    }
+
+    private static func migratedSavedSnippets(_ snippets: [SavedSnippet]) -> [SavedSnippet] {
+        snippets.map { snippet in
+            guard snippet.tags.isEmpty else {
+                return snippet
+            }
+
+            return SavedSnippet(
+                id: snippet.id,
+                name: snippet.name,
+                text: snippet.text,
+                rawText: snippet.rawText,
+                captureMode: snippet.captureMode,
+                outputPreset: snippet.outputPreset,
+                contentKind: snippet.contentKind,
+                ocrConfidence: snippet.ocrConfidence,
+                source: snippet.source,
+                tags: defaultSnippetTags(
+                    captureMode: snippet.captureMode,
+                    outputPreset: snippet.outputPreset,
+                    contentKind: snippet.contentKind,
+                    source: snippet.source
+                ),
+                updatedAt: snippet.updatedAt,
+                lastUsedAt: snippet.lastUsedAt
+            )
+        }
+    }
+
     private static var shouldPersistUserPreferences: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
     }
+}
+
+struct ActiveAppProfileSuggestion: Equatable, Sendable {
+    let source: ClipboardHistoryEntry.SourceContext
+    let profile: AppCaptureProfile
+}
+
+struct ActiveSavedCaptureRegionSuggestion: Equatable, Sendable {
+    enum MatchKind: Equatable, Sendable {
+        case application
+        case windowTitle(String)
+    }
+
+    let source: ClipboardHistoryEntry.SourceContext
+    let primaryRegion: SavedCaptureRegion
+    let matchingRegions: [SavedCaptureRegion]
+    let totalAppMatchingRegions: Int
+    let matchKind: MatchKind
+
+    var regionCount: Int {
+        matchingRegions.count
+    }
+}
+
+struct ActiveSavedSnippetCollectionSuggestion: Equatable, Sendable {
+    enum MatchKind: Equatable, Sendable {
+        case application
+        case windowTitle(String)
+    }
+
+    let source: ClipboardHistoryEntry.SourceContext
+    let collection: SavedSnippetCollection
+    let matchingSnippets: [SavedSnippet]
+    let totalAppMatchingSnippets: Int
+    let matchKind: MatchKind
+
+    var snippetCount: Int {
+        matchingSnippets.count
+    }
+
+    var prefersWindowMatch: Bool {
+        if case .windowTitle = matchKind {
+            return true
+        }
+
+        return false
+    }
+}
+
+struct ActiveSavedSnippetSuggestion: Equatable, Sendable {
+    enum SelectionKind: Equatable, Sendable {
+        case onlyMatch
+        case learnedPreference
+    }
+
+    let source: ClipboardHistoryEntry.SourceContext
+    let collection: SavedSnippetCollection
+    let snippet: SavedSnippet
+    let totalAppMatchingSnippets: Int
+    let matchKind: ActiveSavedSnippetCollectionSuggestion.MatchKind
+    let selectionKind: SelectionKind
 }
 
 enum LaunchPanelPresentationPolicy {
@@ -707,6 +1359,70 @@ enum InstalledAppRelocator {
     }
 }
 
+enum SourceContextResolver {
+    static func currentFrontmostExternalSourceContext() -> ClipboardHistoryEntry.SourceContext? {
+        externalSourceContext(for: NSWorkspace.shared.frontmostApplication)
+    }
+
+    static func externalSourceContext(
+        for application: NSRunningApplication?
+    ) -> ClipboardHistoryEntry.SourceContext? {
+        let ownBundleIdentifier = Bundle.main.bundleIdentifier
+        let bundleIdentifier = application?.bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if bundleIdentifier == ownBundleIdentifier {
+            return nil
+        }
+
+        let appName = application?.localizedName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (appName?.isEmpty == false) || (bundleIdentifier?.isEmpty == false) else {
+            return nil
+        }
+
+        return ClipboardHistoryEntry.SourceContext(
+            appName: appName,
+            bundleIdentifier: bundleIdentifier,
+            windowTitle: focusedWindowTitle(for: application)
+        )
+    }
+
+    private static func focusedWindowTitle(for application: NSRunningApplication?) -> String? {
+        guard AXIsProcessTrusted(),
+              let application else {
+            return nil
+        }
+
+        let appElement = AXUIElementCreateApplication(application.processIdentifier)
+        if let title = windowTitle(attribute: kAXFocusedWindowAttribute as CFString, for: appElement) {
+            return title
+        }
+
+        return windowTitle(attribute: kAXMainWindowAttribute as CFString, for: appElement)
+    }
+
+    private static func windowTitle(attribute: CFString, for appElement: AXUIElement) -> String? {
+        var rawWindow: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(appElement, attribute, &rawWindow) == .success,
+              let rawWindow else {
+            return nil
+        }
+
+        guard CFGetTypeID(rawWindow) == AXUIElementGetTypeID() else {
+            return nil
+        }
+
+        let windowElement = unsafeBitCast(rawWindow, to: AXUIElement.self)
+        var rawTitle: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(windowElement, kAXTitleAttribute as CFString, &rawTitle) == .success,
+              let title = rawTitle as? String else {
+            return nil
+        }
+
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let appState = AppState()
 
@@ -719,8 +1435,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var previewWindowController: NSWindowController?
     private var previewLaunchAtLoginManager: PreviewLaunchAtLoginManager?
     private var previewPermissionProvider: PreviewPermissionProvider?
+    private var finderImportServiceProvider: FinderImportServiceProvider?
     private var didBecomeActiveObserver: NSObjectProtocol?
+    private var workspaceActivationObserver: NSObjectProtocol?
     private var isHandlingLaunchPanelClosure = false
+    private var pendingAutomationCommands: [AutomationCommand] = []
     private var uiTestLaunchMode: UITestLaunchMode? {
         UITestLaunchMode(arguments: ProcessInfo.processInfo.arguments)
     }
@@ -775,6 +1494,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if handleLaunchAtLoginCommandIfNeeded(using: launchAtLoginService) {
             return
+        }
+
+        if let automationCommand = AutomationCommand(arguments: ProcessInfo.processInfo.arguments) {
+            pendingAutomationCommands.append(automationCommand)
         }
 
         NSApp.setActivationPolicy(.accessory)
@@ -835,6 +1558,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             STGLog.capture.error("Hotkey registration failed: \(error.localizedDescription, privacy: .public)")
         }
 
+        beginActiveAppTracking()
+
         didBecomeActiveObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didBecomeActiveNotification,
             object: nil,
@@ -854,6 +1579,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        if #available(macOS 14.0, *) {
+            ScreenTextGrabShortcutsProvider.updateAppShortcutParameters()
+        }
+
+        configureFinderImportServices()
+        flushPendingAutomationCommands()
+
         beginStartupExperience(using: coordinator, permissionService: permissionService)
     }
 
@@ -863,6 +1595,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyService?.unregisterHotkey()
         if let didBecomeActiveObserver {
             NotificationCenter.default.removeObserver(didBecomeActiveObserver)
+        }
+        if let workspaceActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(workspaceActivationObserver)
         }
     }
 
@@ -1022,6 +1757,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appState.hotkeyDisplayLabel = configuration.hotkeyDisplayLabel
     }
 
+    private func beginActiveAppTracking() {
+        updateActiveSourceApp(SourceContextResolver.currentFrontmostExternalSourceContext())
+
+        workspaceActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            self?.updateActiveSourceApp(SourceContextResolver.externalSourceContext(for: application))
+        }
+    }
+
+    private func updateActiveSourceApp(_ source: ClipboardHistoryEntry.SourceContext?) {
+        guard let source else {
+            return
+        }
+
+        appState.updateActiveSourceApp(source)
+    }
+
     @MainActor
     private func configurePreviewState() {
         let previewLaunchManager = PreviewLaunchAtLoginManager(state: .enabled)
@@ -1037,8 +1793,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 lastProbeAt: Date(),
                 bundleIdentifier: bundle.bundleIdentifier ?? "dev.screentextgrab.app",
                 appPath: bundle.bundleURL.path,
-                marketingVersion: (bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.0.1",
-                buildVersion: (bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String) ?? "1"
+                marketingVersion: (bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.0.2",
+                buildVersion: (bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String) ?? "3"
             )
         )
 
@@ -1089,7 +1845,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 outputPreset: .office,
                 contentKind: .text,
                 rawText: "Urun\tPlan\tAdet\tToplam\nScreenTextGrab Pro\tYillik\t12\t14.400 TL\nOCR Office Pack\tTakim\t3\t5.700 TL\nDestek\tPremium\t1\t1.250 TL\nGenel Toplam\t\t\t21.350 TL",
-                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel")
+                source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
+                isPinned: true
             ),
             ClipboardHistoryEntry(
                 text: "OCR tamamlandi. Son pano cikisi Word uyumlu bicimde hazirlandi.",
@@ -1225,6 +1982,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    func application(_ application: NSApplication, open urls: [URL]) {
+        Task { @MainActor [weak self] in
+            self?.handleIncomingURLs(urls)
+        }
+    }
+
     private func writeLaunchAtLoginCommandOutput(_ message: String) {
         guard let data = "\(message)\n".data(using: .utf8) else { return }
         FileHandle.standardOutput.write(data)
@@ -1239,6 +2002,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+    }
+
+    private func configureFinderImportServices() {
+        guard !isRunningUnderTests else {
+            return
+        }
+
+        let provider = FinderImportServiceProvider { [weak self] urls in
+            self?.handleIncomingURLs(urls)
+        }
+        finderImportServiceProvider = provider
+        NSApp.servicesProvider = provider
+
+        let portName = ((Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines))
+            .flatMap { $0.isEmpty ? nil : $0 } ?? "ScreenTextGrab"
+        NSRegisterServicesProvider(provider, portName)
+        NSUpdateDynamicServices()
+    }
+
+    @MainActor
+    private func handleIncomingURLs(_ urls: [URL]) {
+        let commands = urls.compactMap(AutomationCommand.init(incomingURL:))
+        guard !commands.isEmpty else {
+            if !urls.isEmpty {
+                appState.statusMessage = "⚠️ Yalnızca görsel veya PDF dosyaları desteklenir."
+            }
+            return
+        }
+
+        pendingAutomationCommands.append(contentsOf: commands)
+        flushPendingAutomationCommands()
     }
 
     private func beginStartupExperience(
@@ -1265,6 +2060,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.showLaunchPanel(force: false)
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func flushPendingAutomationCommands() {
+        guard let coordinator = captureCoordinator, !pendingAutomationCommands.isEmpty else {
+            return
+        }
+
+        let commands = pendingAutomationCommands
+        pendingAutomationCommands.removeAll()
+
+        for command in commands {
+            dispatchAutomationCommand(command, coordinator: coordinator)
+        }
+    }
+
+    @MainActor
+    private func dispatchAutomationCommand(
+        _ command: AutomationCommand,
+        coordinator: CaptureCoordinator
+    ) {
+        switch command {
+        case .capture(let overrides):
+            NSApp.activate(ignoringOtherApps: true)
+            coordinator.startCapture(trigger: .automation, sessionOverrides: overrides.isEmpty ? nil : overrides)
+        case .repeatLast(let overrides):
+            NSApp.activate(ignoringOtherApps: true)
+            coordinator.repeatLastCapture(sessionOverrides: overrides.isEmpty ? nil : overrides)
+        case .savedRegion(let name, let overrides):
+            NSApp.activate(ignoringOtherApps: true)
+            coordinator.captureSavedRegion(named: name, sessionOverrides: overrides.isEmpty ? nil : overrides)
+        case .activeSnippet:
+            guard let suggestion = appState.activeSavedSnippetSuggestion else {
+                appState.statusMessage = "⚠️ Aktif uygulama için kullanılabilir snippet bulunamadı."
+                return
+            }
+            _ = coordinator.copySavedSnippet(suggestion.snippet)
+        case .snippet(let name):
+            _ = coordinator.copySavedSnippet(named: name)
+        case .snippetCollection(let name):
+            NSApp.activate(ignoringOtherApps: true)
+            if !appState.presentSettingsForSavedSnippetCollection(named: name) {
+                appState.statusMessage = "⚠️ Snippet koleksiyonu bulunamadı: \(name)"
+            }
+        case .clipboardImage(let overrides):
+            coordinator.captureClipboardImage(sessionOverrides: overrides.isEmpty ? nil : overrides)
+        case .imageFile(let url, let overrides):
+            coordinator.captureImageFile(at: url, sessionOverrides: overrides.isEmpty ? nil : overrides)
+        case .pdfFile(let url, let overrides):
+            coordinator.capturePDFFile(at: url, sessionOverrides: overrides.isEmpty ? nil : overrides)
+        case .searchablePDF(let url, let destinationURL, let overrides):
+            coordinator.exportSearchablePDF(
+                at: url,
+                destinationURL: destinationURL,
+                sessionOverrides: overrides.isEmpty ? nil : overrides
+            )
         }
     }
 
@@ -1368,6 +2220,77 @@ private enum LaunchAtLoginCommand {
         default:
             return nil
         }
+    }
+}
+
+enum ImportedDocumentRoute: Equatable {
+    case image(URL)
+    case pdf(URL)
+}
+
+final class FinderImportServiceProvider: NSObject {
+    private let onImportURLs: @MainActor ([URL]) -> Void
+
+    init(onImportURLs: @escaping @MainActor ([URL]) -> Void) {
+        self.onImportURLs = onImportURLs
+    }
+
+    @objc func importSelectedFiles(
+        _ pasteboard: NSPasteboard,
+        userData: String?,
+        error: AutoreleasingUnsafeMutablePointer<NSString?>
+    ) {
+        let urls = Self.readFileURLs(from: pasteboard)
+        guard !urls.isEmpty else {
+            error.pointee = "Yalnızca görsel veya PDF dosyaları desteklenir." as NSString
+            return
+        }
+
+        Task { @MainActor in
+            onImportURLs(urls)
+        }
+    }
+
+    static func readFileURLs(from pasteboard: NSPasteboard) -> [URL] {
+        let options: [NSPasteboard.ReadingOptionKey: Any] = [
+            .urlReadingFileURLsOnly: true
+        ]
+
+        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL],
+           !urls.isEmpty {
+            return urls
+                .filter(\.isFileURL)
+                .map { $0.resolvingSymlinksInPath().standardizedFileURL }
+        }
+
+        return pasteboard.pasteboardItems?
+            .compactMap { item -> URL? in
+                guard let rawValue = item.string(forType: .fileURL),
+                      let url = URL(string: rawValue),
+                      url.isFileURL else {
+                    return nil
+                }
+                return url.resolvingSymlinksInPath().standardizedFileURL
+            } ?? []
+    }
+}
+
+enum ImportedDocumentRouter {
+    static func resolve(_ url: URL) -> ImportedDocumentRoute? {
+        let standardizedURL = url.standardizedFileURL
+        guard standardizedURL.isFileURL else {
+            return nil
+        }
+
+        let type = UTType(filenameExtension: standardizedURL.pathExtension.lowercased())
+        if type?.conforms(to: .pdf) == true {
+            return .pdf(standardizedURL)
+        }
+        if type?.conforms(to: .image) == true {
+            return .image(standardizedURL)
+        }
+
+        return nil
     }
 }
 
@@ -1505,6 +2428,7 @@ private struct MenuBarStatusIcon: View {
 
 private struct LaunchPanelView: View {
     @EnvironmentObject var appState: AppState
+    @State private var isImportDropTargeted = false
 
     let onStartCapture: () -> Void
     let onDismiss: () -> Void
@@ -1616,7 +2540,36 @@ private struct LaunchPanelView: View {
                 }
             }
             .padding(20)
+
+            if isImportDropTargeted {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.black.opacity(0.48))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color(red: 0.91, green: 0.73, blue: 0.46), style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
+                    )
+                    .overlay {
+                        VStack(spacing: 10) {
+                            Image(systemName: "doc.badge.plus")
+                                .font(.system(size: 26, weight: .bold))
+                                .foregroundStyle(Color(red: 0.91, green: 0.73, blue: 0.46))
+
+                            Text("Görsel veya PDF bırak")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+
+                            Text("Görsel dosyaları OCR olarak açılır, PDF dosyaları içe alınır.")
+                                .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.white.opacity(0.72))
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: 220)
+                        }
+                        .padding(18)
+                    }
+                    .padding(16)
+            }
         }
+        .onDrop(of: [UTType.fileURL], isTargeted: $isImportDropTargeted, perform: handleImportDrop(providers:))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("launch-panel-root")
     }
@@ -1655,6 +2608,39 @@ private struct LaunchPanelView: View {
             return "İzin isteği açık. macOS penceresinden erişimi onayladıktan sonra devam edebilirsin."
         case .unknown:
             return "İzin durumu doğrulanamadı. Bir kez yakalama başlatınca macOS erişim penceresi gösterebilir."
+        }
+    }
+
+    private func handleImportDrop(providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first(where: {
+            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+        }) else {
+            return false
+        }
+
+        provider.loadDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier) { data, _ in
+            guard let data,
+                  let url = URL(dataRepresentation: data, relativeTo: nil) else {
+                return
+            }
+
+            Task { @MainActor in
+                routeDroppedImport(url)
+            }
+        }
+
+        return true
+    }
+
+    @MainActor
+    private func routeDroppedImport(_ url: URL) {
+        switch ImportedDocumentRouter.resolve(url) {
+        case .image(let imageURL):
+            appState.coordinator?.captureImageFile(at: imageURL, sessionOverrides: nil)
+        case .pdf(let pdfURL):
+            appState.coordinator?.capturePDFFile(at: pdfURL, sessionOverrides: nil)
+        case nil:
+            appState.statusMessage = "⚠️ Yalnızca görsel veya PDF dosyaları desteklenir."
         }
     }
 }

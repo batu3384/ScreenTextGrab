@@ -1,3 +1,6 @@
+import ImageIO
+import PDFKit
+import UniformTypeIdentifiers
 import XCTest
 @testable import ScreenTextGrab
 
@@ -143,6 +146,147 @@ final class CaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(overlay.showCount, 1)
     }
 
+    @MainActor
+    func testSavedRegionCaptureUsesStoredSelectionAndOverrides() async {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.savedCaptureRegions = [
+            SavedCaptureRegion(
+                name: "Safari • Tablo",
+                screenRect: CGRect(x: 40, y: 50, width: 260, height: 140),
+                preferredDisplayID: nil,
+                source: .init(appName: "Safari", bundleIdentifier: "com.apple.Safari"),
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .table,
+                    outputPreset: .office,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Safari"
+                )
+            )
+        ]
+
+        let capture = MockScreenCaptureService()
+        capture.result = .success(Self.makeImage())
+
+        let ocr = MockOCRService()
+        ocr.result = .success(OCRResult(
+            blocks: [OCRTextBlock(text: "Merhaba", confidence: 0.95, boundingBox: .zero)],
+            captureDate: Date(),
+            sourceRect: .zero
+        ))
+
+        let clipboard = MockClipboardService()
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: MockPermissionService(),
+            screenCaptureService: capture,
+            ocrService: ocr,
+            clipboardService: clipboard
+        )
+
+        coordinator.captureSavedRegion(
+            named: "Safari • Tablo",
+            sessionOverrides: AutomationCaptureOverrides(
+                captureMode: .code,
+                outputPreset: .plainText
+            )
+        )
+
+        try? await Task.sleep(nanoseconds: 150_000_000)
+
+        XCTAssertEqual(capture.requestedRects.first, CGRect(x: 40, y: 50, width: 260, height: 140))
+        XCTAssertEqual(ocr.receivedModes.first, .code)
+        XCTAssertEqual(appState.lastCopiedText, "Merhaba")
+        XCTAssertEqual(appState.lastCaptureSelection?.screenRect, CGRect(x: 40, y: 50, width: 260, height: 140))
+    }
+
+    @MainActor
+    func testCopySavedSnippetUsesSavedFormattingMetadata() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.setCaptureMode(.table)
+        appState.setCaptureOutputPreset(.json)
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Kod parcasi",
+                text: "```text\nif (value) {\n    print(value)\n}\n```",
+                rawText: "if (value) {\n    print(value)\n}",
+                captureMode: .code,
+                outputPreset: .markdown,
+                contentKind: .text,
+                ocrConfidence: 0.88,
+                source: .init(appName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode")
+            )
+        ]
+
+        let clipboard = MockClipboardService()
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: MockPermissionService(),
+            screenCaptureService: MockScreenCaptureService(),
+            ocrService: MockOCRService(),
+            clipboardService: clipboard
+        )
+
+        let result = coordinator.copySavedSnippet(named: "Kod parcasi")
+
+        XCTAssertEqual(result, .success)
+        XCTAssertEqual(
+            clipboard.copiedTexts.last,
+            "```text\nif (value) {\n    print(value)\n}\n```"
+        )
+        XCTAssertEqual(appState.lastCopiedText, "```text\nif (value) {\n    print(value)\n}\n```")
+        XCTAssertEqual(appState.copyHistory.first?.captureMode, .code)
+        XCTAssertEqual(appState.copyHistory.first?.outputPreset, .markdown)
+        XCTAssertNotNil(appState.savedSnippets.first?.lastUsedAt)
+    }
+
+    @MainActor
+    func testCopySavedSnippetUsesActiveAppProfileOutputPresetOverride() {
+        let appState = AppState(persistsUserPreferences: false)
+        appState.appProfiles = [
+            AppCaptureProfile(
+                bundleIdentifier: "com.microsoft.Word",
+                appName: "Microsoft Word",
+                captureMode: .standard,
+                outputPreset: .office,
+                ocrLanguageSelection: .defaultValue
+            )
+        ]
+        appState.updateActiveSourceApp(
+            .init(appName: "Microsoft Word", bundleIdentifier: "com.microsoft.Word")
+        )
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: "Kod parcasi",
+                text: "```text\nif (value) {\n    print(value)\n}\n```",
+                rawText: "if (value) {\n    print(value)\n}",
+                captureMode: .code,
+                outputPreset: .markdown,
+                contentKind: .text,
+                ocrConfidence: 0.88,
+                source: .init(appName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode")
+            )
+        ]
+
+        let clipboard = MockClipboardService()
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: MockPermissionService(),
+            screenCaptureService: MockScreenCaptureService(),
+            ocrService: MockOCRService(),
+            clipboardService: clipboard
+        )
+
+        let result = coordinator.copySavedSnippet(named: "Kod parcasi")
+
+        XCTAssertEqual(result, .success)
+        XCTAssertEqual(clipboard.copiedTexts.last, "if (value) {\n    print(value)\n}")
+        XCTAssertEqual(clipboard.copiedPayloads.last?.targetProfile, .wordProcessor)
+        XCTAssertTrue(clipboard.copiedPayloads.last?.html?.contains("<pre") == true)
+        XCTAssertEqual(appState.copyHistory.first?.outputPreset, .office)
+        XCTAssertEqual(appState.copyHistory.first?.source?.bundleIdentifier, "com.apple.dt.Xcode")
+        XCTAssertEqual(appState.statusMessage, "✅ Microsoft Word için Office çıktısı kopyalandı")
+    }
+
     // MARK: - New Tests
 
     @MainActor
@@ -253,6 +397,7 @@ final class CaptureCoordinatorTests: XCTestCase {
         XCTAssertTrue((capture.requestedRects.last?.height ?? 0) > 90, "Retry should be allowed to expand beyond the exact subtitle strip")
         XCTAssertEqual(appState.captureState, .completed)
         XCTAssertEqual(appState.lastCopiedText, "altyazi bulundu")
+        XCTAssertEqual(appState.lastCopiedEntry?.confidenceIndicator, .high)
     }
 
     @MainActor
@@ -508,6 +653,7 @@ final class CaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(capture.captureCallCount, 1)
         XCTAssertEqual(appState.lastCopiedText, "Urun\tFiyat\nElma\t12.99\nArmut\t9.50")
         XCTAssertEqual(appState.captureState, .completed)
+        XCTAssertEqual(appState.lastCopiedEntry?.confidenceIndicator, .high)
     }
 
     @MainActor
@@ -950,6 +1096,162 @@ final class CaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(appState.copyHistory.map(\.text), ["eski", "yeni"])
     }
 
+    @MainActor
+    func testClipboardImageCaptureRecognizesTextWithoutScreenPermission() async {
+        let appState = AppState()
+        let permission = MockPermissionService()
+        permission.refreshState = .denied
+
+        let ocr = MockOCRService()
+        ocr.result = .success(
+            OCRResult(
+                blocks: [OCRTextBlock(text: "Panodan OCR", confidence: 0.96, boundingBox: .zero)],
+                captureDate: Date(),
+                sourceRect: .zero
+            )
+        )
+
+        let clipboard = MockClipboardService()
+        clipboard.clipboardImage = Self.makeImage()
+
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: permission,
+            screenCaptureService: MockScreenCaptureService(),
+            ocrService: ocr,
+            clipboardService: clipboard
+        )
+
+        coordinator.captureClipboardImage(sessionOverrides: nil)
+        try? await Task.sleep(nanoseconds: 80_000_000)
+
+        XCTAssertEqual(permission.resolveCallCount, 0)
+        XCTAssertEqual(appState.captureState, .completed)
+        XCTAssertEqual(appState.lastCopiedText, "Panodan OCR")
+        XCTAssertEqual(clipboard.copiedTexts.last, "Panodan OCR")
+    }
+
+    @MainActor
+    func testClipboardImageCaptureFailsWhenClipboardHasNoImage() {
+        let appState = AppState()
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: MockPermissionService(),
+            screenCaptureService: MockScreenCaptureService(),
+            ocrService: MockOCRService(),
+            clipboardService: MockClipboardService()
+        )
+
+        coordinator.captureClipboardImage(sessionOverrides: nil)
+
+        XCTAssertEqual(appState.captureState, .failed)
+        XCTAssertTrue(appState.statusMessage.contains("Panoda okunabilir bir görsel yok"))
+    }
+
+    @MainActor
+    func testImageFileCaptureRecognizesTextFromSelectedFile() async {
+        let appState = AppState()
+
+        let ocr = MockOCRService()
+        ocr.result = .success(
+            OCRResult(
+                blocks: [OCRTextBlock(text: "Dosyadan OCR", confidence: 0.94, boundingBox: .zero)],
+                captureDate: Date(),
+                sourceRect: .zero
+            )
+        )
+
+        let clipboard = MockClipboardService()
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: MockPermissionService(),
+            screenCaptureService: MockScreenCaptureService(),
+            ocrService: ocr,
+            clipboardService: clipboard
+        )
+
+        let url = Self.makeTempPNGFile()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        coordinator.captureImageFile(at: url, sessionOverrides: nil)
+        try? await Task.sleep(nanoseconds: 80_000_000)
+
+        XCTAssertEqual(appState.captureState, .completed)
+        XCTAssertEqual(appState.lastCopiedText, "Dosyadan OCR")
+        XCTAssertEqual(clipboard.copiedTexts.last, "Dosyadan OCR")
+    }
+
+    @MainActor
+    func testPDFFileCaptureRecognizesTextFromSelectedPDF() async {
+        let appState = AppState()
+
+        let ocr = MockOCRService()
+        ocr.result = .success(
+            OCRResult(
+                blocks: [OCRTextBlock(text: "PDF OCR sonucu", confidence: 0.93, boundingBox: CGRect(x: 0.12, y: 0.44, width: 0.36, height: 0.05))],
+                captureDate: Date(),
+                sourceRect: CGRect(x: 0, y: 0, width: 612, height: 792)
+            )
+        )
+
+        let clipboard = MockClipboardService()
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: MockPermissionService(),
+            screenCaptureService: MockScreenCaptureService(),
+            ocrService: ocr,
+            clipboardService: clipboard
+        )
+
+        let url = Self.makeTempPDFFile()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        coordinator.capturePDFFile(at: url, sessionOverrides: nil)
+        try? await Task.sleep(nanoseconds: 150_000_000)
+
+        XCTAssertEqual(appState.captureState, .completed)
+        XCTAssertEqual(appState.lastCopiedText, "PDF OCR sonucu")
+        XCTAssertEqual(clipboard.copiedTexts.last, "PDF OCR sonucu")
+    }
+
+    @MainActor
+    func testSearchablePDFExportEmbedsRecognizedText() async throws {
+        let appState = AppState()
+
+        let ocr = MockOCRService()
+        ocr.result = .success(
+            OCRResult(
+                blocks: [OCRTextBlock(text: "Aranabilir PDF", confidence: 0.96, boundingBox: CGRect(x: 0.15, y: 0.42, width: 0.28, height: 0.05))],
+                captureDate: Date(),
+                sourceRect: CGRect(x: 0, y: 0, width: 612, height: 792)
+            )
+        )
+
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: MockPermissionService(),
+            screenCaptureService: MockScreenCaptureService(),
+            ocrService: ocr,
+            clipboardService: MockClipboardService()
+        )
+
+        let sourceURL = Self.makeTempPDFFile()
+        let destinationURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("pdf")
+        defer {
+            try? FileManager.default.removeItem(at: sourceURL)
+            try? FileManager.default.removeItem(at: destinationURL)
+        }
+
+        coordinator.exportSearchablePDF(at: sourceURL, destinationURL: destinationURL, sessionOverrides: nil)
+        try? await Task.sleep(nanoseconds: 180_000_000)
+
+        XCTAssertEqual(appState.captureState, .completed)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destinationURL.path))
+        XCTAssertTrue(PDFDocument(url: destinationURL)?.string?.contains("Aranabilir PDF") == true)
+    }
+
     private static func makeImage() -> CGImage {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bytesPerPixel = 4
@@ -973,6 +1275,57 @@ final class CaptureCoordinatorTests: XCTestCase {
             shouldInterpolate: false,
             intent: .defaultIntent
         )!
+    }
+
+    private static func makeTempPNGFile() -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("png")
+
+        guard let destination = CGImageDestinationCreateWithURL(
+            url as CFURL,
+            UTType.png.identifier as CFString,
+            1,
+            nil
+        ) else {
+            XCTFail("Could not create image destination")
+            return url
+        }
+
+        CGImageDestinationAddImage(destination, makeImage(), nil)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        return url
+    }
+
+    private static func makeTempPDFFile() -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("pdf")
+
+        var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+        guard let context = CGContext(url as CFURL, mediaBox: &mediaBox, nil) else {
+            XCTFail("Could not create PDF context")
+            return url
+        }
+
+        context.beginPDFPage(nil)
+        context.setFillColor(NSColor.white.cgColor)
+        context.fill(mediaBox)
+
+        let text = NSAttributedString(
+            string: "Sample PDF",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 24, weight: .semibold),
+                .foregroundColor: NSColor.black
+            ]
+        )
+        let line = CTLineCreateWithAttributedString(text as CFAttributedString)
+        context.textPosition = CGPoint(x: 72, y: 640)
+        CTLineDraw(line, context)
+        context.endPDFPage()
+        context.closePDF()
+
+        return url
     }
 
     private static let emptyEnvironment = ScreenEnvironmentSnapshot(displays: [])
@@ -1081,6 +1434,7 @@ private final class MockOCRService: OCRProviding, @unchecked Sendable {
 
 private final class MockClipboardService: ClipboardProviding {
     var result: ClipboardWriteResult = .success
+    var clipboardImage: CGImage?
     private(set) var notificationDisplayFrame: CGRect?
     private(set) var copiedTexts: [String] = []
     private(set) var copiedPayloads: [ClipboardPayload] = []
@@ -1093,6 +1447,10 @@ private final class MockClipboardService: ClipboardProviding {
 
     func readFromClipboard() -> String? {
         nil
+    }
+
+    func readImageFromClipboard() -> CGImage? {
+        clipboardImage
     }
 
     func showCopyNotification(text: String, on displayFrame: CGRect?) {

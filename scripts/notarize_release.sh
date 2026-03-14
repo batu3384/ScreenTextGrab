@@ -3,7 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${DIST_DIR:-${ROOT_DIR}/dist}"
-APP_PATH="${APP_PATH:-${DIST_DIR}/ScreenTextGrab.app}"
+DIST_APP_DIR="${DIST_APP_DIR:-${DIST_DIR}/.app-bundles.noindex}"
+APP_PATH="${APP_PATH:-${DIST_APP_DIR}/ScreenTextGrab.app}"
 ZIP_PATH="${ZIP_PATH:-${DIST_DIR}/ScreenTextGrab-notarization.zip}"
 ARCHIVE_PATH="${ARCHIVE_PATH:-${ROOT_DIR}/.build/release/ScreenTextGrab.xcarchive}"
 NOTARY_PROFILE="${SCREEN_TEXT_GRAB_NOTARY_PROFILE:-}"

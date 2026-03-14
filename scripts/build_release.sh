@@ -7,10 +7,17 @@ SCHEME="ScreenTextGrab"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-${ROOT_DIR}/.build/release}"
 ARCHIVE_PATH="${ARCHIVE_PATH:-${DERIVED_DATA_PATH}/ScreenTextGrab.xcarchive}"
 DIST_DIR="${DIST_DIR:-${ROOT_DIR}/dist}"
-EXPORT_DIR="${EXPORT_DIR:-${DIST_DIR}/export}"
-APP_PATH="${DIST_DIR}/ScreenTextGrab.app"
+DIST_APP_DIR="${DIST_APP_DIR:-${DIST_DIR}/.app-bundles.noindex}"
+EXPORT_DIR="${EXPORT_DIR:-${DIST_APP_DIR}/export}"
+APP_PATH="${DIST_APP_DIR}/ScreenTextGrab.app"
 ZIP_PATH="${DIST_DIR}/ScreenTextGrab.zip"
 TEAM_ID="${SCREEN_TEXT_GRAB_TEAM_ID:-}"
+
+ensure_noindex_marker() {
+  local directory="$1"
+  mkdir -p "${directory}"
+  touch "${directory}/.metadata_never_index" 2>/dev/null || true
+}
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -19,7 +26,6 @@ require_command() {
   fi
 }
 
-require_command xcodegen
 require_command xcodebuild
 require_command codesign
 require_command security
@@ -62,12 +68,23 @@ fi
 
 echo "==> Using Apple Developer Team ID: ${TEAM_ID}"
 
-echo "==> Generating Xcode project"
-xcodegen generate --spec "${ROOT_DIR}/project.yml"
+if command -v xcodegen >/dev/null 2>&1; then
+  echo "==> Generating Xcode project"
+  xcodegen generate --spec "${ROOT_DIR}/project.yml"
+elif [[ -d "${PROJECT_PATH}" ]]; then
+  echo "==> xcodegen not found; using checked-in Xcode project"
+else
+  echo "Missing required command: xcodegen" >&2
+  echo "No checked-in Xcode project found at ${PROJECT_PATH}." >&2
+  exit 1
+fi
 
 echo "==> Cleaning old release outputs"
 rm -rf "${ARCHIVE_PATH}" "${DIST_DIR}"
 mkdir -p "${DIST_DIR}"
+ensure_noindex_marker "${ROOT_DIR}/.build"
+ensure_noindex_marker "${DIST_DIR}"
+ensure_noindex_marker "${DIST_APP_DIR}"
 
 EXPORT_OPTIONS_PLIST="$(mktemp "${TMPDIR:-/tmp}/ScreenTextGrabExportOptions.XXXXXX.plist")"
 trap 'rm -f "${EXPORT_OPTIONS_PLIST}"' EXIT
@@ -105,6 +122,9 @@ xcodebuild -exportArchive \
 
 echo "==> Copying app bundle"
 ditto "${EXPORT_DIR}/ScreenTextGrab.app" "${APP_PATH}"
+ensure_noindex_marker "${DIST_DIR}"
+ensure_noindex_marker "${DIST_APP_DIR}"
+ensure_noindex_marker "${EXPORT_DIR}"
 
 echo "==> Verifying code signature"
 codesign --verify --deep --strict --verbose=2 "${APP_PATH}"

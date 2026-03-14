@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${DIST_DIR:-${ROOT_DIR}/dist}"
+DIST_APP_DIR="${DIST_APP_DIR:-${DIST_DIR}/.app-bundles.noindex}"
+APP_PATH="${APP_PATH:-${DIST_APP_DIR}/ScreenTextGrab.app}"
 ZIP_PATH="${ZIP_PATH:-${DIST_DIR}/ScreenTextGrab.zip}"
 NOTES_FILE="${NOTES_FILE:-${ROOT_DIR}/RELEASE_NOTES.md}"
 TITLE=""
@@ -117,9 +119,9 @@ fi
 
 if [[ "${SKIP_VERIFY}" != "true" ]]; then
   if [[ "${SKIP_NOTARIZE}" == "true" ]]; then
-    VERIFY_MODE=local APP_PATH="${DIST_DIR}/ScreenTextGrab.app" "${ROOT_DIR}/scripts/verify_release.sh"
+    VERIFY_MODE=local APP_PATH="${APP_PATH}" "${ROOT_DIR}/scripts/verify_release.sh"
   else
-    APP_PATH="${DIST_DIR}/ScreenTextGrab.app" "${ROOT_DIR}/scripts/verify_release.sh"
+    APP_PATH="${APP_PATH}" "${ROOT_DIR}/scripts/verify_release.sh"
   fi
 fi
 

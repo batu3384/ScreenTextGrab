@@ -1,15 +1,29 @@
 import AppKit
+import ImageIO
+import PDFKit
 import Vision
 
 enum CaptureTrigger: String, Sendable {
     case hotkey
     case menu
     case retry
+    case automation
+    case clipboard
 }
 
 @MainActor
 protocol CaptureCoordinating: AnyObject {
     func startCapture(trigger: CaptureTrigger)
+    func startCapture(trigger: CaptureTrigger, sessionOverrides: AutomationCaptureOverrides?)
+    func repeatLastCapture(sessionOverrides: AutomationCaptureOverrides?)
+    func captureSavedRegion(_ region: SavedCaptureRegion, sessionOverrides: AutomationCaptureOverrides?)
+    func captureSavedRegion(named name: String, sessionOverrides: AutomationCaptureOverrides?)
+    func copySavedSnippet(_ snippet: SavedSnippet) -> ClipboardWriteResult
+    func copySavedSnippet(named name: String) -> ClipboardWriteResult
+    func captureClipboardImage(sessionOverrides: AutomationCaptureOverrides?)
+    func captureImageFile(at url: URL, sessionOverrides: AutomationCaptureOverrides?)
+    func capturePDFFile(at url: URL, sessionOverrides: AutomationCaptureOverrides?)
+    func exportSearchablePDF(at url: URL, destinationURL: URL?, sessionOverrides: AutomationCaptureOverrides?)
     func startWatching()
     func stopWatching()
     func cancelCapture()
@@ -23,8 +37,28 @@ protocol CaptureCoordinating: AnyObject {
         captureMode: CaptureMode,
         contentKind: ClipboardHistoryEntry.ContentKind,
         source: ClipboardHistoryEntry.SourceContext?,
-        outputPreset: CaptureOutputPreset
+        outputPreset: CaptureOutputPreset,
+        targetBundleIdentifier: String?
     ) -> ClipboardWriteResult
+}
+
+extension CaptureCoordinating {
+    func copyCapturedText(
+        rawText: String,
+        captureMode: CaptureMode,
+        contentKind: ClipboardHistoryEntry.ContentKind,
+        source: ClipboardHistoryEntry.SourceContext?,
+        outputPreset: CaptureOutputPreset
+    ) -> ClipboardWriteResult {
+        copyCapturedText(
+            rawText: rawText,
+            captureMode: captureMode,
+            contentKind: contentKind,
+            source: source,
+            outputPreset: outputPreset,
+            targetBundleIdentifier: nil
+        )
+    }
 }
 
 @MainActor
@@ -109,8 +143,12 @@ final class CaptureCoordinator: CaptureCoordinating {
     }
 
     func startCapture(trigger: CaptureTrigger) {
+        startCapture(trigger: trigger, sessionOverrides: nil)
+    }
+
+    func startCapture(trigger: CaptureTrigger, sessionOverrides: AutomationCaptureOverrides?) {
         let sourceContext = Self.captureHistorySourceContext()
-        let sessionConfiguration = resolvedSessionConfiguration(for: sourceContext)
+        let sessionConfiguration = resolvedSessionConfiguration(for: sourceContext, overrides: sessionOverrides)
         guard appState.watchState != .active && appState.watchState != .selecting else {
             appState.statusMessage = "👁 İzleme aktifken normal yakalama başlamaz. Önce izlemeyi durdur."
             return
@@ -158,6 +196,392 @@ final class CaptureCoordinator: CaptureCoordinating {
                 lastCaptureStart = nil
                 appState.captureState = .idle
                 appState.statusMessage = "İzin isteği devam ediyor..."
+            }
+        }
+    }
+
+    func repeatLastCapture(sessionOverrides: AutomationCaptureOverrides? = nil) {
+        guard appState.watchState != .active && appState.watchState != .selecting else {
+            appState.statusMessage = "👁 İzleme aktifken son alan yeniden yakalanmaz. Önce izlemeyi durdur."
+            return
+        }
+
+        guard let lastSelection = appState.lastCaptureSelection else {
+            appState.statusMessage = "Önce bir alan yakala, sonra tekrar kullan."
+            return
+        }
+
+        performSelectionCapture(
+            lastSelection,
+            sessionOverrides: sessionOverrides,
+            preparingMessage: "Son alan yeniden hazırlanıyor...",
+            logMessage: "Repeat capture requested"
+        )
+    }
+
+    func captureSavedRegion(_ region: SavedCaptureRegion, sessionOverrides: AutomationCaptureOverrides? = nil) {
+        guard appState.watchState != .active && appState.watchState != .selecting else {
+            appState.statusMessage = "👁 İzleme aktifken kayıtlı bölge yakalanmaz. Önce izlemeyi durdur."
+            return
+        }
+
+        performSelectionCapture(
+            region.recentSelection,
+            sessionOverrides: sessionOverrides,
+            preparingMessage: "\(region.name) hazırlanıyor...",
+            logMessage: "Saved region capture requested name=\(region.name)"
+        )
+    }
+
+    func captureSavedRegion(named name: String, sessionOverrides: AutomationCaptureOverrides? = nil) {
+        guard let region = appState.savedCaptureRegion(named: name) else {
+            appState.statusMessage = "Kayıtlı bölge bulunamadı: \(name)"
+            return
+        }
+
+        captureSavedRegion(region, sessionOverrides: sessionOverrides)
+    }
+
+    func copySavedSnippet(_ snippet: SavedSnippet) -> ClipboardWriteResult {
+        let targetBundleIdentifier = appState.activeTargetBundleIdentifier
+        let targetProfile = appState.appProfile(for: targetBundleIdentifier)
+        let effectiveOutputPreset = appState.preferredRepasteOutputPreset(defaultingTo: snippet.outputPreset)
+        let result = copyCapturedText(
+            rawText: snippet.effectiveRawText,
+            captureMode: snippet.captureMode,
+            contentKind: snippet.contentKind,
+            source: snippet.source,
+            outputPreset: effectiveOutputPreset,
+            targetBundleIdentifier: targetBundleIdentifier
+        )
+
+        if result == .success {
+            _ = appState.noteSavedSnippetUsed(snippet)
+            if let targetProfile,
+               effectiveOutputPreset != snippet.outputPreset {
+                appState.statusMessage = "✅ \(targetProfile.appName) için \(effectiveOutputPreset.title) çıktısı kopyalandı"
+            }
+        }
+
+        return result
+    }
+
+    func copySavedSnippet(named name: String) -> ClipboardWriteResult {
+        guard let snippet = appState.savedSnippet(named: name) else {
+            appState.statusMessage = "Kayıtlı snippet bulunamadı: \(name)"
+            return .failedWrite
+        }
+
+        return copySavedSnippet(snippet)
+    }
+
+    func captureClipboardImage(sessionOverrides: AutomationCaptureOverrides? = nil) {
+        guard appState.watchState != .active && appState.watchState != .selecting else {
+            appState.statusMessage = "👁 İzleme aktifken panodaki görsel okunmaz. Önce izlemeyi durdur."
+            return
+        }
+
+        if appState.captureState.isBusy {
+            if let start = lastCaptureStart,
+               timeProvider().timeIntervalSince(start) > 30 {
+                STGLog.pipeline.error("Clipboard OCR stuck for 30+ seconds — force resetting state")
+                appState.captureState = .idle
+                activeOverlay?.closeOverlay()
+                activeOverlay = nil
+                lastCaptureStart = nil
+            } else {
+                return
+            }
+        }
+
+        guard let image = clipboardService.readImageFromClipboard() else {
+            let error = CapturePipelineError.captureFailed(
+                domain: "Clipboard",
+                code: -2,
+                description: "Panoda okunabilir bir görsel yok."
+            )
+            appState.lastError = error
+            appState.captureState = .failed
+            appState.statusMessage = error.errorDescription ?? "⚠️ Panoda okunabilir bir görsel yok."
+            return
+        }
+
+        let sourceContext = Self.captureHistorySourceContext() ?? appState.activeSourceApp
+        let sessionConfiguration = resolvedSessionConfiguration(for: sourceContext, overrides: sessionOverrides)
+        lastCaptureStart = timeProvider()
+        appState.lastError = nil
+        appState.captureState = .preparing
+        appState.statusMessage = "Panodaki görsel hazırlanıyor..."
+        STGLog.pipeline.info("Clipboard OCR started")
+
+        Task { @MainActor in
+            await performClipboardImagePipeline(
+                image: image,
+                source: sourceContext,
+                sessionConfiguration: sessionConfiguration
+            )
+        }
+    }
+
+    private func performSelectionCapture(
+        _ selection: RecentCaptureSelection,
+        sessionOverrides: AutomationCaptureOverrides?,
+        preparingMessage: String,
+        logMessage: String
+    ) {
+        if appState.captureState.isBusy {
+            if let start = lastCaptureStart,
+               timeProvider().timeIntervalSince(start) > 30 {
+                STGLog.pipeline.error("Selection capture stuck for 30+ seconds — force resetting state")
+                appState.captureState = .idle
+                activeOverlay?.closeOverlay()
+                activeOverlay = nil
+                lastCaptureStart = nil
+            } else {
+                return
+            }
+        }
+
+        let sessionConfiguration = (sessionOverrides ?? AutomationCaptureOverrides()).applying(to: selection.sessionConfiguration)
+
+        lastCaptureStart = timeProvider()
+        appState.lastError = nil
+        appState.captureState = .preparing
+        appState.statusMessage = preparingMessage
+        STGLog.pipeline.info("\(logMessage)")
+
+        Task { @MainActor in
+            let permissionState = await permissionService.resolveState()
+            appState.permissionState = permissionState
+
+            switch permissionState {
+            case .granted:
+                let environment = ScreenEnvironmentSnapshot.capture()
+                let preferredDisplay = environment.bestDisplay(
+                    for: selection.screenRect,
+                    preferredDisplayID: selection.preferredDisplayID
+                )
+                await performCapturePipeline(
+                    screenRect: selection.screenRect,
+                    preferredDisplay: preferredDisplay,
+                    environment: environment,
+                    source: selection.source,
+                    sessionConfiguration: sessionConfiguration
+                )
+            case .requiresRestart:
+                lastCaptureStart = nil
+                appState.captureState = .failed
+                appState.statusMessage = "🔐 İzin verildi. Lütfen uygulamayı yeniden başlatın."
+            case .denied:
+                lastCaptureStart = nil
+                appState.captureState = .failed
+                appState.statusMessage = "🔐 Ekran kaydı izni gerekli. İzin verdiyseniz 'Yenile' ile tekrar kontrol edin."
+            case .unknown:
+                lastCaptureStart = nil
+                appState.captureState = .failed
+                appState.statusMessage = "🔐 İzin durumu doğrulanamadı. Sistem Ayarları veya 'Yenile' ile tekrar deneyin."
+            case .requestInProgress:
+                lastCaptureStart = nil
+                appState.captureState = .idle
+                appState.statusMessage = "İzin isteği devam ediyor..."
+            }
+        }
+    }
+
+    func captureImageFile(at url: URL, sessionOverrides: AutomationCaptureOverrides? = nil) {
+        guard appState.watchState != .active && appState.watchState != .selecting else {
+            appState.statusMessage = "👁 İzleme aktifken dosya OCR başlamaz. Önce izlemeyi durdur."
+            return
+        }
+
+        if appState.captureState.isBusy {
+            if let start = lastCaptureStart,
+               timeProvider().timeIntervalSince(start) > 30 {
+                STGLog.pipeline.error("Image file OCR stuck for 30+ seconds — force resetting state")
+                appState.captureState = .idle
+                activeOverlay?.closeOverlay()
+                activeOverlay = nil
+                lastCaptureStart = nil
+            } else {
+                return
+            }
+        }
+
+        let standardizedURL = url.standardizedFileURL
+        guard standardizedURL.isFileURL else {
+            let error = CapturePipelineError.captureFailed(
+                domain: "FileImport",
+                code: -10,
+                description: "Yalnızca yerel görsel dosyaları destekleniyor."
+            )
+            appState.lastError = error
+            appState.captureState = .failed
+            appState.statusMessage = error.errorDescription ?? "⚠️ Desteklenmeyen dosya yolu."
+            return
+        }
+
+        let sessionConfiguration = (sessionOverrides ?? AutomationCaptureOverrides()).applying(
+            to: CaptureSessionConfiguration(
+                captureMode: appState.captureMode,
+                outputPreset: appState.captureOutputPreset,
+                ocrLanguageSelection: appState.ocrLanguageSelection,
+                profileName: nil
+            )
+        )
+
+        lastCaptureStart = timeProvider()
+        appState.lastError = nil
+        appState.captureState = .preparing
+        appState.statusMessage = "Görsel dosyası hazırlanıyor..."
+        STGLog.pipeline.info("Image file OCR started path=\(standardizedURL.path, privacy: .public)")
+
+        Task { @MainActor in
+            do {
+                let image = try Self.loadImageFile(at: standardizedURL)
+                await performImageFilePipeline(
+                    image: image,
+                    fileURL: standardizedURL,
+                    sessionConfiguration: sessionConfiguration
+                )
+            } catch {
+                let pipelineError = Self.mapToPipelineError(error)
+                lastCaptureStart = nil
+                handleFailure(pipelineError)
+            }
+        }
+    }
+
+    func capturePDFFile(at url: URL, sessionOverrides: AutomationCaptureOverrides? = nil) {
+        guard appState.watchState != .active && appState.watchState != .selecting else {
+            appState.statusMessage = "👁 İzleme aktifken PDF OCR başlamaz. Önce izlemeyi durdur."
+            return
+        }
+
+        if appState.captureState.isBusy {
+            if let start = lastCaptureStart,
+               timeProvider().timeIntervalSince(start) > 30 {
+                STGLog.pipeline.error("PDF OCR stuck for 30+ seconds — force resetting state")
+                appState.captureState = .idle
+                activeOverlay?.closeOverlay()
+                activeOverlay = nil
+                lastCaptureStart = nil
+            } else {
+                return
+            }
+        }
+
+        let standardizedURL = url.standardizedFileURL
+        guard standardizedURL.isFileURL else {
+            let error = CapturePipelineError.captureFailed(
+                domain: "PDFImport",
+                code: -20,
+                description: "Yalnızca yerel PDF dosyaları destekleniyor."
+            )
+            appState.lastError = error
+            appState.captureState = .failed
+            appState.statusMessage = error.errorDescription ?? "⚠️ Desteklenmeyen PDF yolu."
+            return
+        }
+
+        let sessionConfiguration = (sessionOverrides ?? AutomationCaptureOverrides()).applying(
+            to: CaptureSessionConfiguration(
+                captureMode: appState.captureMode,
+                outputPreset: appState.captureOutputPreset,
+                ocrLanguageSelection: appState.ocrLanguageSelection,
+                profileName: nil
+            )
+        )
+
+        lastCaptureStart = timeProvider()
+        appState.lastError = nil
+        appState.captureState = .preparing
+        appState.statusMessage = "PDF hazırlanıyor..."
+        STGLog.pipeline.info("PDF OCR started path=\(standardizedURL.path, privacy: .public)")
+
+        Task { @MainActor in
+            do {
+                let pages = try PDFProcessingService.renderPages(from: standardizedURL)
+                await performPDFFilePipeline(
+                    pages: pages,
+                    fileURL: standardizedURL,
+                    sessionConfiguration: sessionConfiguration
+                )
+            } catch {
+                let pipelineError = Self.mapToPipelineError(error)
+                lastCaptureStart = nil
+                handleFailure(pipelineError)
+            }
+        }
+    }
+
+    func exportSearchablePDF(
+        at url: URL,
+        destinationURL: URL?,
+        sessionOverrides: AutomationCaptureOverrides? = nil
+    ) {
+        guard appState.watchState != .active && appState.watchState != .selecting else {
+            appState.statusMessage = "👁 İzleme aktifken searchable PDF üretilemez. Önce izlemeyi durdur."
+            return
+        }
+
+        if appState.captureState.isBusy {
+            if let start = lastCaptureStart,
+               timeProvider().timeIntervalSince(start) > 30 {
+                STGLog.pipeline.error("Searchable PDF export stuck for 30+ seconds — force resetting state")
+                appState.captureState = .idle
+                activeOverlay?.closeOverlay()
+                activeOverlay = nil
+                lastCaptureStart = nil
+            } else {
+                return
+            }
+        }
+
+        let standardizedURL = url.standardizedFileURL
+        guard standardizedURL.isFileURL else {
+            let error = CapturePipelineError.captureFailed(
+                domain: "PDFExport",
+                code: -21,
+                description: "Yalnızca yerel PDF dosyaları destekleniyor."
+            )
+            appState.lastError = error
+            appState.captureState = .failed
+            appState.statusMessage = error.errorDescription ?? "⚠️ Desteklenmeyen PDF yolu."
+            return
+        }
+
+        let resolvedDestination = (destinationURL ?? PDFProcessingService.suggestedSearchableOutputURL(for: standardizedURL))
+            .standardizedFileURL
+        let sessionConfiguration = (sessionOverrides ?? AutomationCaptureOverrides()).applying(
+            to: CaptureSessionConfiguration(
+                captureMode: appState.captureMode,
+                outputPreset: appState.captureOutputPreset,
+                ocrLanguageSelection: appState.ocrLanguageSelection,
+                profileName: nil
+            )
+        )
+
+        lastCaptureStart = timeProvider()
+        appState.lastError = nil
+        appState.captureState = .preparing
+        appState.statusMessage = "Searchable PDF hazırlanıyor..."
+        STGLog.pipeline.info(
+            "Searchable PDF export started source=\(standardizedURL.path, privacy: .public) destination=\(resolvedDestination.path, privacy: .public)"
+        )
+
+        Task { @MainActor in
+            do {
+                let pages = try PDFProcessingService.renderPages(from: standardizedURL)
+                await performSearchablePDFExportPipeline(
+                    pages: pages,
+                    fileURL: standardizedURL,
+                    destinationURL: resolvedDestination,
+                    sessionConfiguration: sessionConfiguration
+                )
+            } catch {
+                let pipelineError = Self.mapToPipelineError(error)
+                lastCaptureStart = nil
+                handleFailure(pipelineError)
             }
         }
     }
@@ -273,14 +697,16 @@ final class CaptureCoordinator: CaptureCoordinating {
         captureMode: CaptureMode,
         contentKind: ClipboardHistoryEntry.ContentKind,
         source: ClipboardHistoryEntry.SourceContext?,
-        outputPreset: CaptureOutputPreset
+        outputPreset: CaptureOutputPreset,
+        targetBundleIdentifier: String? = nil
     ) -> ClipboardWriteResult {
         let payload = CaptureOutputFormatter.clipboardPayload(
             rawText: rawText,
             captureMode: captureMode,
             contentKind: contentKind,
             preset: outputPreset,
-            source: source
+            source: source,
+            targetBundleIdentifier: targetBundleIdentifier
         )
         let formattedText = payload.string
 
@@ -320,6 +746,14 @@ final class CaptureCoordinator: CaptureCoordinating {
         let captureMode = resolvedConfiguration.captureMode
         let outputPreset = resolvedConfiguration.outputPreset
         let ocrLanguageSelection = resolvedConfiguration.ocrLanguageSelection
+        appState.rememberCaptureSelection(
+            RecentCaptureSelection(
+                screenRect: screenRect.standardized,
+                preferredDisplayID: preferredDisplay?.displayID,
+                source: source,
+                sessionConfiguration: resolvedConfiguration
+            )
+        )
         let baseRequest = CaptureRequest(
             selectionRect: primaryCaptureRect,
             preferredDisplay: preferredDisplay,
@@ -409,62 +843,20 @@ final class CaptureCoordinator: CaptureCoordinating {
             }
 
             guard let best = bestSelection else {
-                lastCaptureStart = nil
-                appState.captureState = .completedEmpty
-                appState.statusMessage = captureMode.emptyResultMessage
-                appState.appendDiagnostic(
-                    category: "ocr",
-                    message: "No text found after \(attemptSummaries.count) capture attempt(s). \(String(attemptSummaries.joined(separator: " || ").prefix(450)))",
-                    domain: "CaptureCoordinator",
-                    code: nil
+                handleEmptyResult(
+                    captureMode: captureMode,
+                    attemptSummary: "No text found after \(attemptSummaries.count) capture attempt(s). \(String(attemptSummaries.joined(separator: " || ").prefix(450)))"
                 )
                 return
             }
-
-            STGLog.capture.info(
-                "Capture selected strategy=\(best.candidate.strategy.rawValue, privacy: .public) attempt=\(best.attemptLabel, privacy: .public) score=\(best.score) chars=\(best.text.count)"
-            )
-            appState.appendDiagnostic(
-                category: "capture",
-                message: "Selected \(best.candidate.strategy.rawValue) [\(best.attemptLabel)]: \(best.candidate.debugInfo)",
-                domain: "CaptureCoordinator",
-                code: nil
-            )
-
-            appState.captureState = .copying
-            appState.statusMessage = "Panoya kopyalanıyor..."
-            STGLog.pipeline.info("State → copying")
-
-            let rawText = best.text
-            let contentKind = historyContentKind(for: best)
-            let outputPayload = CaptureOutputFormatter.clipboardPayload(
-                rawText: rawText,
+            try finalizeSelection(
+                best,
                 captureMode: captureMode,
-                contentKind: contentKind,
-                preset: outputPreset,
-                source: source
+                outputPreset: outputPreset,
+                source: source,
+                notificationDisplayFrame: preferredDisplay?.frame,
+                markPermissionGranted: true
             )
-            let outputText = outputPayload.string
-            let clipboardResult = clipboardService.copyToClipboard(outputPayload)
-
-            switch clipboardResult {
-            case .success:
-                appState.recordCopiedText(
-                    outputText,
-                    captureMode: captureMode,
-                    outputPreset: outputPreset,
-                    contentKind: contentKind,
-                    rawText: rawText,
-                    source: source
-                )
-                clipboardService.showCopyNotification(text: outputText, on: preferredDisplay?.frame)
-                appState.permissionState = .granted
-                appState.captureState = .completed
-                appState.statusMessage = Self.successStatusMessage(for: best)
-                lastCaptureStart = nil
-            case .failedWrite, .failedReadback:
-                throw CapturePipelineError.clipboardFailed(result: clipboardResult)
-            }
         } catch {
             let pipelineError = Self.mapToPipelineError(error)
             lastCaptureStart = nil
@@ -566,6 +958,330 @@ final class CaptureCoordinator: CaptureCoordinating {
             try await task.value
         } onCancel: {
             task.cancel()
+        }
+    }
+
+    private func performClipboardImagePipeline(
+        image: CGImage,
+        source: ClipboardHistoryEntry.SourceContext?,
+        sessionConfiguration: CaptureSessionConfiguration
+    ) async {
+        let sourceRect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        let candidate = CaptureCandidate(
+            strategy: .clipboardImage,
+            image: image,
+            debugInfo: "clipboard-image"
+        )
+
+        do {
+            appState.captureState = .recognizing
+            appState.statusMessage = "\(sessionConfiguration.captureMode.recognitionProgressTitle)... (panodaki görsel)"
+            STGLog.pipeline.info("Clipboard OCR recognizing")
+
+            let evaluation = await Self.evaluateCandidatesAsync(
+                ocrService: ocrService,
+                candidates: [candidate],
+                captureRect: sourceRect,
+                sourceRect: sourceRect,
+                captureMode: sessionConfiguration.captureMode,
+                languageSelection: sessionConfiguration.ocrLanguageSelection,
+                attemptLabel: "clipboard"
+            )
+
+            if !evaluation.hadSuccessfulOCRPass, let lastOCRError = evaluation.lastOCRError {
+                throw lastOCRError
+            }
+
+            guard let best = evaluation.best else {
+                handleEmptyResult(
+                    captureMode: sessionConfiguration.captureMode,
+                    attemptSummary: "No text found in clipboard image. \(evaluation.summary)"
+                )
+                return
+            }
+
+            try finalizeSelection(
+                best,
+                captureMode: sessionConfiguration.captureMode,
+                outputPreset: sessionConfiguration.outputPreset,
+                source: source,
+                notificationDisplayFrame: nil,
+                markPermissionGranted: false
+            )
+        } catch {
+            let pipelineError = Self.mapToPipelineError(error)
+            lastCaptureStart = nil
+            handleFailure(pipelineError)
+        }
+    }
+
+    private func performImageFilePipeline(
+        image: CGImage,
+        fileURL: URL,
+        sessionConfiguration: CaptureSessionConfiguration
+    ) async {
+        let sourceRect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        let candidate = CaptureCandidate(
+            strategy: .importedImageFile,
+            image: image,
+            debugInfo: fileURL.lastPathComponent
+        )
+
+        do {
+            appState.captureState = .recognizing
+            appState.statusMessage = "\(sessionConfiguration.captureMode.recognitionProgressTitle)... (dosya)"
+            STGLog.pipeline.info("Image file OCR recognizing path=\(fileURL.path, privacy: .public)")
+
+            let evaluation = await Self.evaluateCandidatesAsync(
+                ocrService: ocrService,
+                candidates: [candidate],
+                captureRect: sourceRect,
+                sourceRect: sourceRect,
+                captureMode: sessionConfiguration.captureMode,
+                languageSelection: sessionConfiguration.ocrLanguageSelection,
+                attemptLabel: "file"
+            )
+
+            if !evaluation.hadSuccessfulOCRPass, let lastOCRError = evaluation.lastOCRError {
+                throw lastOCRError
+            }
+
+            guard let best = evaluation.best else {
+                handleEmptyResult(
+                    captureMode: sessionConfiguration.captureMode,
+                    attemptSummary: "No text found in image file \(fileURL.lastPathComponent). \(evaluation.summary)"
+                )
+                return
+            }
+
+            try finalizeSelection(
+                best,
+                captureMode: sessionConfiguration.captureMode,
+                outputPreset: sessionConfiguration.outputPreset,
+                source: nil,
+                notificationDisplayFrame: nil,
+                markPermissionGranted: false
+            )
+        } catch {
+            let pipelineError = Self.mapToPipelineError(error)
+            lastCaptureStart = nil
+            handleFailure(pipelineError)
+        }
+    }
+
+    private func performPDFFilePipeline(
+        pages: [ImportedPDFPage],
+        fileURL: URL,
+        sessionConfiguration: CaptureSessionConfiguration
+    ) async {
+        let recognition = await recognizeImportedPDFPages(
+            pages,
+            fileURL: fileURL,
+            sessionConfiguration: sessionConfiguration
+        )
+
+        guard !recognition.text.isEmpty else {
+            handleEmptyResult(
+                captureMode: sessionConfiguration.captureMode,
+                attemptSummary: "No text found in PDF \(fileURL.lastPathComponent)."
+            )
+            return
+        }
+
+        let result = copyCapturedText(
+            rawText: recognition.text,
+            captureMode: sessionConfiguration.captureMode,
+            contentKind: .text,
+            source: nil,
+            outputPreset: sessionConfiguration.outputPreset
+        )
+
+        switch result {
+        case .success:
+            lastCaptureStart = nil
+            appState.captureState = .completed
+            appState.statusMessage = "✅ PDF metni kopyalandı"
+        case .failedWrite, .failedReadback:
+            lastCaptureStart = nil
+            appState.captureState = .failed
+            let error = CapturePipelineError.clipboardFailed(result: result)
+            appState.lastError = error
+            appState.appendDiagnostic(
+                category: "clipboard",
+                message: error.errorDescription ?? "Pano doğrulaması başarısız.",
+                domain: "Clipboard",
+                code: nil
+            )
+        }
+    }
+
+    private func performSearchablePDFExportPipeline(
+        pages: [ImportedPDFPage],
+        fileURL: URL,
+        destinationURL: URL,
+        sessionConfiguration: CaptureSessionConfiguration
+    ) async {
+        do {
+            let recognition = await recognizeImportedPDFPages(
+                pages,
+                fileURL: fileURL,
+                sessionConfiguration: sessionConfiguration
+            )
+
+            guard !recognition.text.isEmpty else {
+                handleEmptyResult(
+                    captureMode: sessionConfiguration.captureMode,
+                    attemptSummary: "No searchable text found in PDF \(fileURL.lastPathComponent)."
+                )
+                return
+            }
+
+            try PDFProcessingService.exportSearchablePDF(
+                from: fileURL,
+                recognizedPages: recognition.pages,
+                to: destinationURL
+            )
+
+            lastCaptureStart = nil
+            appState.captureState = .completed
+            appState.statusMessage = "✅ Searchable PDF oluşturuldu: \(destinationURL.lastPathComponent)"
+            appState.appendDiagnostic(
+                category: "pdf",
+                message: "Searchable PDF exported to \(destinationURL.path)",
+                domain: "PDFExport",
+                code: nil,
+                severity: .info
+            )
+            NSWorkspace.shared.activateFileViewerSelecting([destinationURL])
+        } catch {
+            let pipelineError = Self.mapToPipelineError(error)
+            lastCaptureStart = nil
+            handleFailure(pipelineError)
+        }
+    }
+
+    private func recognizeImportedPDFPages(
+        _ pages: [ImportedPDFPage],
+        fileURL: URL,
+        sessionConfiguration: CaptureSessionConfiguration
+    ) async -> (text: String, pages: [ImportedPDFRecognitionPage]) {
+        var recognizedTexts: [String] = []
+        var recognizedPages: [ImportedPDFRecognitionPage] = []
+
+        for (pageOffset, page) in pages.enumerated() {
+            let sourceRect = CGRect(origin: .zero, size: page.pageBounds.size)
+            let candidate = CaptureCandidate(
+                strategy: .importedPDFPage,
+                image: page.image,
+                debugInfo: "\(fileURL.lastPathComponent)#page-\(pageOffset + 1)"
+            )
+
+            appState.captureState = .recognizing
+            appState.statusMessage = "\(sessionConfiguration.captureMode.recognitionProgressTitle)... (PDF \(pageOffset + 1)/\(pages.count))"
+
+            let evaluation = await Self.evaluateCandidatesAsync(
+                ocrService: ocrService,
+                candidates: [candidate],
+                captureRect: sourceRect,
+                sourceRect: sourceRect,
+                captureMode: sessionConfiguration.captureMode,
+                languageSelection: sessionConfiguration.ocrLanguageSelection,
+                attemptLabel: "pdf-page-\(pageOffset + 1)"
+            )
+
+            if let best = evaluation.best {
+                let normalizedText = best.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !normalizedText.isEmpty {
+                    recognizedTexts.append(normalizedText)
+                }
+
+                recognizedPages.append(
+                    ImportedPDFRecognitionPage(
+                        pageIndex: page.pageIndex,
+                        pageBounds: page.pageBounds,
+                        result: best.ocrResult
+                    )
+                )
+            } else if let lastOCRError = evaluation.lastOCRError {
+                appState.appendDiagnostic(
+                    category: "ocr",
+                    message: "PDF sayfa \(pageOffset + 1) OCR hatası: \(lastOCRError.localizedDescription)",
+                    domain: "PDFImport",
+                    code: nil,
+                    severity: .warning
+                )
+            }
+        }
+
+        return (recognizedTexts.joined(separator: "\n\n"), recognizedPages)
+    }
+
+    private func handleEmptyResult(captureMode: CaptureMode, attemptSummary: String) {
+        lastCaptureStart = nil
+        appState.captureState = .completedEmpty
+        appState.statusMessage = captureMode.emptyResultMessage
+        appState.appendDiagnostic(
+            category: "ocr",
+            message: attemptSummary,
+            domain: "CaptureCoordinator",
+            code: nil
+        )
+    }
+
+    private func finalizeSelection(
+        _ best: OCRSelection,
+        captureMode: CaptureMode,
+        outputPreset: CaptureOutputPreset,
+        source: ClipboardHistoryEntry.SourceContext?,
+        notificationDisplayFrame: CGRect?,
+        markPermissionGranted: Bool
+    ) throws {
+        STGLog.capture.info(
+            "Capture selected strategy=\(best.candidate.strategy.rawValue, privacy: .public) attempt=\(best.attemptLabel, privacy: .public) score=\(best.score) chars=\(best.text.count)"
+        )
+        appState.appendDiagnostic(
+            category: "capture",
+            message: "Selected \(best.candidate.strategy.rawValue) [\(best.attemptLabel)]: \(best.candidate.debugInfo)",
+            domain: "CaptureCoordinator",
+            code: nil
+        )
+
+        appState.captureState = .copying
+        appState.statusMessage = "Panoya kopyalanıyor..."
+        STGLog.pipeline.info("State → copying")
+
+        let rawText = best.text
+        let contentKind = historyContentKind(for: best)
+        let outputPayload = CaptureOutputFormatter.clipboardPayload(
+            rawText: rawText,
+            captureMode: captureMode,
+            contentKind: contentKind,
+            preset: outputPreset,
+            source: source
+        )
+        let outputText = outputPayload.string
+        let clipboardResult = clipboardService.copyToClipboard(outputPayload)
+
+        switch clipboardResult {
+        case .success:
+            appState.recordCopiedText(
+                outputText,
+                captureMode: captureMode,
+                outputPreset: outputPreset,
+                contentKind: contentKind,
+                rawText: rawText,
+                ocrConfidence: best.ocrResult.averageConfidence,
+                source: source
+            )
+            clipboardService.showCopyNotification(text: outputText, on: notificationDisplayFrame)
+            if markPermissionGranted {
+                appState.permissionState = .granted
+            }
+            appState.captureState = .completed
+            appState.statusMessage = Self.successStatusMessage(for: best)
+            lastCaptureStart = nil
+        case .failedWrite, .failedReadback:
+            throw CapturePipelineError.clipboardFailed(result: clipboardResult)
         }
     }
 
@@ -964,22 +1680,33 @@ final class CaptureCoordinator: CaptureCoordinating {
         return false
     }
 
-    private func resolvedSessionConfiguration(for source: ClipboardHistoryEntry.SourceContext?) -> CaptureSessionConfiguration {
+    private func resolvedSessionConfiguration(
+        for source: ClipboardHistoryEntry.SourceContext?,
+        overrides: AutomationCaptureOverrides? = nil
+    ) -> CaptureSessionConfiguration {
+        let baseConfiguration: CaptureSessionConfiguration
+
         if let profile = appState.appProfile(for: source?.bundleIdentifier) {
-            return CaptureSessionConfiguration(
+            baseConfiguration = CaptureSessionConfiguration(
                 captureMode: profile.captureMode,
                 outputPreset: profile.outputPreset,
                 ocrLanguageSelection: profile.ocrLanguageSelection,
                 profileName: profile.appName
             )
+        } else {
+            baseConfiguration = CaptureSessionConfiguration(
+                captureMode: appState.captureMode,
+                outputPreset: appState.captureOutputPreset,
+                ocrLanguageSelection: appState.ocrLanguageSelection,
+                profileName: nil
+            )
         }
 
-        return CaptureSessionConfiguration(
-            captureMode: appState.captureMode,
-            outputPreset: appState.captureOutputPreset,
-            ocrLanguageSelection: appState.ocrLanguageSelection,
-            profileName: nil
-        )
+        guard let overrides else {
+            return baseConfiguration
+        }
+
+        return overrides.applying(to: baseConfiguration)
     }
 
     nonisolated
@@ -1004,6 +1731,20 @@ final class CaptureCoordinator: CaptureCoordinating {
             code: nsError.code,
             description: nsError.localizedDescription
         )
+    }
+
+    nonisolated
+    private static func loadImageFile(at url: URL) throws -> CGImage {
+        guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
+            throw CapturePipelineError.captureFailed(
+                domain: "FileImport",
+                code: -11,
+                description: "Görsel dosyası açılamadı veya desteklenmiyor."
+            )
+        }
+
+        return image
     }
 
     private func handleFailure(_ error: CapturePipelineError) {
@@ -1160,24 +1901,7 @@ final class CaptureCoordinator: CaptureCoordinating {
 
     nonisolated
     private static func captureHistorySourceContext() -> ClipboardHistoryEntry.SourceContext? {
-        let frontmostApplication = NSWorkspace.shared.frontmostApplication
-        let ownBundleIdentifier = Bundle.main.bundleIdentifier
-
-        if frontmostApplication?.bundleIdentifier == ownBundleIdentifier {
-            return nil
-        }
-
-        let appName = frontmostApplication?.localizedName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let bundleIdentifier = frontmostApplication?.bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard (appName?.isEmpty == false) || (bundleIdentifier?.isEmpty == false) else {
-            return nil
-        }
-
-        return ClipboardHistoryEntry.SourceContext(
-            appName: appName,
-            bundleIdentifier: bundleIdentifier
-        )
+        SourceContextResolver.currentFrontmostExternalSourceContext()
     }
 
     nonisolated

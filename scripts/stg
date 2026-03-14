@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_NAME="ScreenTextGrab"
+APP_PATH="/Applications/${APP_NAME}.app"
+INFO_PLIST="${APP_PATH}/Contents/Info.plist"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  stg
+  stg open
+  stg capture [--mode MODE] [--output OUTPUT] [--languages tr,en] [--ocr-auto true|false]
+  stg repeat-last [--mode MODE] [--output OUTPUT] [--languages tr,en] [--ocr-auto true|false]
+  stg saved-region --name "Region Name" [--mode MODE] [--output OUTPUT] [--languages tr,en] [--ocr-auto true|false]
+  stg active-snippet
+  stg snippet --name "Snippet Name"
+  stg snippet-collection --name "Collection Name"
+  stg clipboard-image [--mode MODE] [--output OUTPUT] [--languages tr,en] [--ocr-auto true|false]
+  stg file-image --path /absolute/path.png [--mode MODE] [--output OUTPUT] [--languages tr,en] [--ocr-auto true|false]
+  stg pdf-file --path /absolute/path.pdf [--mode MODE] [--output OUTPUT] [--languages tr,en] [--ocr-auto true|false]
+  stg pdf-searchable --path /absolute/path.pdf [--destination /absolute/output.pdf] [--mode MODE] [--languages tr,en] [--ocr-auto true|false]
+  stg version
+
+Examples:
+  stg open
+  stg capture --mode table --output office
+  stg repeat-last --mode code --output markdown
+  stg saved-region --name "Safari • Tablo"
+  stg active-snippet
+  stg snippet --name "Fiyat tablosu"
+  stg snippet-collection --name "Excel Raporlari"
+  stg clipboard-image --mode standard --output cleaned
+  stg file-image --path ~/Desktop/table.png --mode table --output office
+  stg pdf-file --path ~/Desktop/sample.pdf --mode standard --output cleaned
+  stg pdf-searchable --path ~/Desktop/sample.pdf --destination ~/Desktop/sample-searchable.pdf
+EOF
+}
+
+fail() {
+  echo "$1" >&2
+  exit 1
+}
+
+ensure_app_installed() {
+  [[ -d "${APP_PATH}" ]] || fail "ScreenTextGrab is not installed at ${APP_PATH}"
+}
+
+append_query_param() {
+  local key="$1"
+  local value="$2"
+  local current="$3"
+  local separator="$4"
+
+  if [[ -z "${value}" ]]; then
+    printf '%s\n%s\n' "${current}" "${separator}"
+    return
+  fi
+
+  printf '%s%s%s=%s\n&\n' "${current}" "${separator}" "${key}" "$(urlencode "${value}")"
+}
+
+urlencode() {
+  python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
+}
+
+open_url() {
+  local url="$1"
+  ensure_app_installed
+  open "${url}"
+}
+
+print_version() {
+  ensure_app_installed
+  if [[ -x /usr/libexec/PlistBuddy && -f "${INFO_PLIST}" ]]; then
+    local marketing_version
+    marketing_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${INFO_PLIST}" 2>/dev/null || true)"
+    local build_version
+    build_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${INFO_PLIST}" 2>/dev/null || true)"
+    if [[ -n "${marketing_version}" && -n "${build_version}" ]]; then
+      printf '%s %s (%s)\n' "${APP_NAME}" "${marketing_version}" "${build_version}"
+      return
+    fi
+  fi
+
+  echo "${APP_NAME}"
+}
+
+build_capture_url() {
+  local action="$1"
+  shift
+
+  local mode=""
+  local output=""
+  local languages=""
+  local ocr_auto=""
+  local path=""
+  local destination=""
+  local name=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --mode)
+        [[ $# -ge 2 ]] || fail "Missing value for --mode"
+        mode="$2"
+        shift 2
+        ;;
+      --output)
+        [[ $# -ge 2 ]] || fail "Missing value for --output"
+        output="$2"
+        shift 2
+        ;;
+      --languages)
+        [[ $# -ge 2 ]] || fail "Missing value for --languages"
+        languages="$2"
+        shift 2
+        ;;
+      --ocr-auto)
+        [[ $# -ge 2 ]] || fail "Missing value for --ocr-auto"
+        ocr_auto="$2"
+        shift 2
+        ;;
+      --path)
+        [[ $# -ge 2 ]] || fail "Missing value for --path"
+        path="$2"
+        shift 2
+        ;;
+      --destination)
+        [[ $# -ge 2 ]] || fail "Missing value for --destination"
+        destination="$2"
+        shift 2
+        ;;
+      --name)
+        [[ $# -ge 2 ]] || fail "Missing value for --name"
+        name="$2"
+        shift 2
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        fail "Unknown argument: $1"
+        ;;
+    esac
+  done
+
+  if [[ ( "${action}" == "image-file" || "${action}" == "pdf-file" || "${action}" == "searchable-pdf" ) && -z "${path}" ]]; then
+    fail "${action} requires --path /absolute/path"
+  fi
+
+  if [[ ( "${action}" == "saved-region" || "${action}" == "snippet" || "${action}" == "snippet-collection" ) && -z "${name}" ]]; then
+    fail "${action} requires --name \"Name\""
+  fi
+
+  local url="stg://${action}"
+  local separator="?"
+  local result
+
+  result="$(append_query_param "path" "${path}" "${url}" "${separator}")"
+  url="$(printf '%s' "${result}" | sed -n '1p')"
+  separator="$(printf '%s' "${result}" | sed -n '2p')"
+
+  result="$(append_query_param "destination" "${destination}" "${url}" "${separator}")"
+  url="$(printf '%s' "${result}" | sed -n '1p')"
+  separator="$(printf '%s' "${result}" | sed -n '2p')"
+
+  result="$(append_query_param "name" "${name}" "${url}" "${separator}")"
+  url="$(printf '%s' "${result}" | sed -n '1p')"
+  separator="$(printf '%s' "${result}" | sed -n '2p')"
+
+  result="$(append_query_param "mode" "${mode}" "${url}" "${separator}")"
+  url="$(printf '%s' "${result}" | sed -n '1p')"
+  separator="$(printf '%s' "${result}" | sed -n '2p')"
+
+  result="$(append_query_param "output" "${output}" "${url}" "${separator}")"
+  url="$(printf '%s' "${result}" | sed -n '1p')"
+  separator="$(printf '%s' "${result}" | sed -n '2p')"
+
+  result="$(append_query_param "languages" "${languages}" "${url}" "${separator}")"
+  url="$(printf '%s' "${result}" | sed -n '1p')"
+  separator="$(printf '%s' "${result}" | sed -n '2p')"
+
+  result="$(append_query_param "ocr-auto" "${ocr_auto}" "${url}" "${separator}")"
+  url="$(printf '%s' "${result}" | sed -n '1p')"
+
+  printf '%s\n' "${url}"
+}
+
+main() {
+  local command="${1:-open}"
+  if [[ $# -gt 0 ]]; then
+    shift
+  fi
+
+  case "${command}" in
+    open|launch)
+      ensure_app_installed
+      open -a "${APP_NAME}"
+      ;;
+    capture)
+      open_url "$(build_capture_url "capture" "$@")"
+      ;;
+    repeat-last)
+      open_url "$(build_capture_url "repeat-last" "$@")"
+      ;;
+    saved-region|region)
+      open_url "$(build_capture_url "saved-region" "$@")"
+      ;;
+    active-snippet|current-snippet)
+      open_url "$(build_capture_url "active-snippet" "$@")"
+      ;;
+    snippet|saved-snippet)
+      open_url "$(build_capture_url "snippet" "$@")"
+      ;;
+    snippet-collection|collection|saved-collection)
+      open_url "$(build_capture_url "snippet-collection" "$@")"
+      ;;
+    clipboard-image|clipboard)
+      open_url "$(build_capture_url "clipboard-image" "$@")"
+      ;;
+    file-image|image-file)
+      open_url "$(build_capture_url "image-file" "$@")"
+      ;;
+    pdf-file|file-pdf|pdf)
+      open_url "$(build_capture_url "pdf-file" "$@")"
+      ;;
+    pdf-searchable|searchable-pdf)
+      open_url "$(build_capture_url "searchable-pdf" "$@")"
+      ;;
+    version)
+      print_version
+      ;;
+    help|-h|--help)
+      usage
+      ;;
+    *)
+      fail "Unknown command: ${command}"
+      ;;
+  esac
+}
+
+main "$@"

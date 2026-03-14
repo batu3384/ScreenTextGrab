@@ -7,6 +7,10 @@
 "settings.tab.history" = "History";
 "action.settings" = "Settings";
 "action.refresh" = "Refresh";
+"action.clipboard_image" = "Read Clipboard Image";
+"action.image_file" = "Read Image File";
+"action.pdf_file" = "Read PDF";
+"action.searchable_pdf" = "Searchable PDF";
 "action.allow" = "Allow Access";
 "action.system_settings" = "System Settings";
 "action.request_permission" = "Request Access";

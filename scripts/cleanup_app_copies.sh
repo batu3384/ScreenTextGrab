@@ -11,12 +11,37 @@ if [[ "${1:-}" == "--reset-tcc" ]]; then
   RESET_TCC=true
 fi
 
+ensure_noindex_marker() {
+  local directory="$1"
+  [[ -d "$directory" ]] || mkdir -p "$directory"
+  touch "${directory}/.metadata_never_index" 2>/dev/null || true
+}
+
+refresh_canonical_search_registration() {
+  if ! command -v mdutil >/dev/null 2>&1 || ! command -v mdimport >/dev/null 2>&1; then
+    return
+  fi
+
+  if mdutil -s / 2>/dev/null | grep -F "Spotlight server is disabled." >/dev/null 2>&1; then
+    echo "WARNING: Spotlight server is disabled on this Mac. ScreenTextGrab can run from /Applications, but Spotlight search will not show it until indexing is re-enabled." >&2
+    return
+  fi
+
+  mdimport -f "$CANONICAL_PATH" >/dev/null 2>&1 || true
+  mdimport "$CANONICAL_PATH" >/dev/null 2>&1 || true
+}
+
 echo "==> Terminating running ScreenTextGrab processes"
 pkill -f "/${APP_NAME}/Contents/MacOS/ScreenTextGrab" 2>/dev/null || true
 sleep 1
 
 echo "==> Discovering app copies"
 REMOVED=0
+
+echo "==> Marking build folders as Spotlight no-index"
+ensure_noindex_marker "$HOME/Library/Developer/Xcode/DerivedData"
+ensure_noindex_marker "${REPO_ROOT}/dist"
+ensure_noindex_marker "${REPO_ROOT}/.build"
 
 remove_app_path() {
   local path="$1"
@@ -97,9 +122,15 @@ echo "==> Rebuilding Launch Services database"
 echo "==> Re-registering canonical app"
 if [[ -d "$CANONICAL_PATH" ]]; then
   /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f -R -trusted "$CANONICAL_PATH" >/dev/null 2>&1 || true
+  refresh_canonical_search_registration
 else
   echo "WARNING: ${CANONICAL_PATH} not found"
 fi
+
+echo "==> Restoring no-index markers"
+ensure_noindex_marker "$HOME/Library/Developer/Xcode/DerivedData"
+ensure_noindex_marker "${REPO_ROOT}/dist"
+ensure_noindex_marker "${REPO_ROOT}/.build"
 
 echo "==> Remaining indexed copies"
 mdfind "kMDItemFSName == '${APP_NAME}'" | sed -n '1,50p'

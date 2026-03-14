@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 
 enum ClipboardTargetProfile: String, Sendable, Equatable {
     case generic
@@ -43,6 +44,7 @@ struct ClipboardPayload: Sendable, Equatable {
 protocol ClipboardProviding {
     func copyToClipboard(_ payload: ClipboardPayload) -> ClipboardWriteResult
     func readFromClipboard() -> String?
+    func readImageFromClipboard() -> CGImage?
     func showCopyNotification(text: String, on displayFrame: CGRect?)
 }
 
@@ -80,6 +82,23 @@ final class ClipboardManager: ClipboardProviding {
     func readFromClipboard() -> String? {
         NSPasteboard.general.string(forType: .string) ??
             NSPasteboard.general.string(forType: .tabularText)
+    }
+
+    func readImageFromClipboard() -> CGImage? {
+        let pasteboard = NSPasteboard.general
+
+        if let images = pasteboard.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage],
+           let image = images.first,
+           let cgImage = Self.cgImage(from: image) {
+            return cgImage
+        }
+
+        guard let data = pasteboard.data(forType: .tiff),
+              let image = NSImage(data: data) else {
+            return nil
+        }
+
+        return Self.cgImage(from: image)
     }
 
     static func pasteboardItem(for payload: ClipboardPayload) -> NSPasteboardItem {
@@ -425,5 +444,18 @@ final class ClipboardManager: ClipboardProviding {
             }
         }
         .joined()
+    }
+
+    private static func cgImage(from image: NSImage) -> CGImage? {
+        if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            return cgImage
+        }
+
+        guard let tiffData = image.tiffRepresentation,
+              let imageSource = CGImageSourceCreateWithData(tiffData as CFData, nil) else {
+            return nil
+        }
+
+        return CGImageSourceCreateImageAtIndex(imageSource, 0, nil)
     }
 }

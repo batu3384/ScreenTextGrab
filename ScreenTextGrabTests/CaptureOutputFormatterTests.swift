@@ -200,6 +200,19 @@ final class CaptureOutputFormatterTests: XCTestCase {
         XCTAssertEqual(item.types, [.rtf, .html, .tabularText])
     }
 
+    func testOfficePayloadUsesExplicitTargetBundleIdentifierOverride() {
+        let payload = CaptureOutputFormatter.clipboardPayload(
+            rawText: "Urun\tFiyat\nElma\t12.99",
+            captureMode: .table,
+            contentKind: .text,
+            preset: .office,
+            source: .init(appName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode"),
+            targetBundleIdentifier: "com.microsoft.Word"
+        )
+
+        XCTAssertEqual(payload.targetProfile, .wordProcessor)
+    }
+
     func testOfficeCodePasteboardItemKeepsPlainTextLineEndings() {
         let payload = CaptureOutputFormatter.clipboardPayload(
             rawText: "if (value) {\n    print(value)\n}",
