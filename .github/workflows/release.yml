@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (for example v1.0.2)"
+        description: "Release tag (for example v1.0.3)"
         required: true
         type: string
       draft:
@@ -121,11 +121,11 @@ jobs:
 
       - name: Verify public release
         if: env.RELEASE_WORKFLOW_READY == 'true' && env.RELEASE_NOTARIZE == 'true'
-        run: APP_PATH=dist/ScreenTextGrab.app ./scripts/verify_release.sh
+        run: APP_PATH=dist/.app-bundles.noindex/ScreenTextGrab.app ./scripts/verify_release.sh
 
       - name: Verify local release
         if: env.RELEASE_WORKFLOW_READY == 'true' && env.RELEASE_NOTARIZE != 'true'
-        run: APP_PATH=dist/ScreenTextGrab.app VERIFY_MODE=local ./scripts/verify_release.sh
+        run: APP_PATH=dist/.app-bundles.noindex/ScreenTextGrab.app VERIFY_MODE=local ./scripts/verify_release.sh
 
       - name: Upload build artifact
         if: env.RELEASE_WORKFLOW_READY == 'true'
@@ -133,7 +133,7 @@ jobs:
         with:
           name: ScreenTextGrab-${{ env.RELEASE_TAG }}
           path: |
-            dist/ScreenTextGrab.app
+            dist/.app-bundles.noindex/ScreenTextGrab.app
             dist/ScreenTextGrab.zip
 
       - name: Publish GitHub release

@@ -1793,8 +1793,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 lastProbeAt: Date(),
                 bundleIdentifier: bundle.bundleIdentifier ?? "dev.screentextgrab.app",
                 appPath: bundle.bundleURL.path,
-                marketingVersion: (bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.0.2",
-                buildVersion: (bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String) ?? "3"
+                marketingVersion: (bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.0.3",
+                buildVersion: (bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String) ?? "4"
             )
         )
 
