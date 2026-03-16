@@ -1,25 +1,33 @@
 import Foundation
 
 enum L10n {
-    private static var languageIdentifier: String {
-        if let override = ProcessInfo.processInfo.environment["SCREENTEXTGRAB_UI_LANGUAGE"]?
+    static func resolvedLanguageIdentifier(
+        defaults: UserDefaults = .standard,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        preferredLanguages: [String] = Locale.preferredLanguages
+    ) -> String {
+        if let override = environment["SCREENTEXTGRAB_UI_LANGUAGE"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased(),
            !override.isEmpty {
             return override
         }
 
-        if let storedIdentifier = InterfaceLanguageStore.load().resolvedIdentifier {
+        if let storedIdentifier = InterfaceLanguageStore.load(defaults: defaults).resolvedIdentifier {
             return storedIdentifier
         }
 
-        if let defaultsLanguages = UserDefaults.standard.array(forKey: "AppleLanguages") as? [String],
+        if let defaultsLanguages = defaults.array(forKey: "AppleLanguages") as? [String],
            let firstLanguage = defaultsLanguages.first?.lowercased(),
            !firstLanguage.isEmpty {
             return firstLanguage
         }
 
-        return Locale.preferredLanguages.first?.lowercased() ?? "en"
+        return preferredLanguages.first?.lowercased() ?? "en"
+    }
+
+    private static var languageIdentifier: String {
+        resolvedLanguageIdentifier()
     }
 
     static var usesEnglish: Bool {

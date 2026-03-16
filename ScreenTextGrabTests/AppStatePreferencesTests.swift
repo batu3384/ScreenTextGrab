@@ -244,32 +244,40 @@ final class AppStatePreferencesTests: XCTestCase {
     }
 
     func testL10nUsesStoredInterfaceLanguagePreference() {
-        let standardDefaults = UserDefaults.standard
-        let previousInterfaceLanguage = standardDefaults.string(forKey: InterfaceLanguageStore.key)
-        let previousAppleLanguages = standardDefaults.array(forKey: "AppleLanguages")
-        defer {
-            if let previousInterfaceLanguage {
-                standardDefaults.set(previousInterfaceLanguage, forKey: InterfaceLanguageStore.key)
-            } else {
-                standardDefaults.removeObject(forKey: InterfaceLanguageStore.key)
-            }
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
 
-            if let previousAppleLanguages {
-                standardDefaults.set(previousAppleLanguages, forKey: "AppleLanguages")
-            } else {
-                standardDefaults.removeObject(forKey: "AppleLanguages")
-            }
-        }
+        defaults.set(["tr"], forKey: "AppleLanguages")
 
-        standardDefaults.set(["tr"], forKey: "AppleLanguages")
-        InterfaceLanguageStore.save(.english, defaults: standardDefaults)
-        XCTAssertEqual(L10n.pair("Merhaba", "Hello"), "Hello")
+        InterfaceLanguageStore.save(.english, defaults: defaults)
+        XCTAssertEqual(
+            L10n.resolvedLanguageIdentifier(
+                defaults: defaults,
+                environment: [:],
+                preferredLanguages: ["tr"]
+            ),
+            "en"
+        )
 
-        InterfaceLanguageStore.save(.turkish, defaults: standardDefaults)
-        XCTAssertEqual(L10n.pair("Merhaba", "Hello"), "Merhaba")
+        InterfaceLanguageStore.save(.turkish, defaults: defaults)
+        XCTAssertEqual(
+            L10n.resolvedLanguageIdentifier(
+                defaults: defaults,
+                environment: [:],
+                preferredLanguages: ["en"]
+            ),
+            "tr"
+        )
 
-        InterfaceLanguageStore.save(.system, defaults: standardDefaults)
-        XCTAssertEqual(L10n.pair("Merhaba", "Hello"), "Merhaba")
+        InterfaceLanguageStore.save(.system, defaults: defaults)
+        XCTAssertEqual(
+            L10n.resolvedLanguageIdentifier(
+                defaults: defaults,
+                environment: [:],
+                preferredLanguages: ["tr"]
+            ),
+            "tr"
+        )
     }
 
     func testWatchConfigurationPersists() {
