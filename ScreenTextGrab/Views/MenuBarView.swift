@@ -450,12 +450,16 @@ struct MenuBarView: View {
 
             Spacer()
 
-            iconActionButton(
-                systemName: "power",
-                tint: .accentRose,
-                accessibilityLabel: L10n.accessibilityQuitApp,
-                action: quitApp
-            )
+            HStack(spacing: 8) {
+                updateActionButton
+
+                iconActionButton(
+                    systemName: "power",
+                    tint: .accentRose,
+                    accessibilityLabel: L10n.accessibilityQuitApp,
+                    action: quitApp
+                )
+            }
         }
     }
 
@@ -815,6 +819,38 @@ struct MenuBarView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
+    }
+
+    private var updateActionButton: some View {
+        Button(action: performUpdateAction) {
+            HStack(spacing: 6) {
+                Image(systemName: appState.updateState.buttonIcon)
+                    .font(.system(size: isCompactPanel ? 9.5 : 10.5, weight: .bold))
+
+                Text(appState.updateState.buttonTitle)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.74)
+            }
+            .font(.system(size: isCompactPanel ? 9.5 : 10.5, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, isCompactPanel ? 9 : 10)
+            .padding(.vertical, isCompactPanel ? 6 : 7)
+            .frame(width: isCompactPanel ? 122 : 138, height: isCompactPanel ? 30 : 32)
+            .background(
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(updateButtonTint.opacity(0.18))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .stroke(updateButtonTint.opacity(0.28), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(appState.updateState.isBusy || appState.updateManager == nil)
+        .opacity(appState.updateManager == nil ? 0.55 : 1)
+        .help(appState.updateState.helpText)
+        .accessibilityLabel(L10n.accessibilityCheckForUpdates)
     }
 
     private func iconActionButton(
@@ -1699,6 +1735,27 @@ struct MenuBarView: View {
 
     private func openLoginItemsSettings() {
         appState.launchAtLoginManager?.openLoginItemsSettings()
+    }
+
+    private var updateButtonTint: Color {
+        switch appState.updateState {
+        case .idle:
+            return .accentMint
+        case .checking:
+            return .accentCool
+        case .downloading:
+            return .accentAmber
+        case .readyToInstall:
+            return .accentCool
+        case .upToDate:
+            return .accentMint
+        case .failed:
+            return .accentRose
+        }
+    }
+
+    private func performUpdateAction() {
+        appState.updateManager?.performPrimaryUpdateAction()
     }
 
     private func requestPermission() {

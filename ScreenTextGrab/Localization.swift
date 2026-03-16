@@ -58,6 +58,12 @@ enum L10n {
     static var actionImageFile: String { pair("Görsel Dosyası Oku", "Read Image File") }
     static var actionPDFFile: String { pair("PDF Oku", "Read PDF") }
     static var actionSearchablePDF: String { "Searchable PDF" }
+    static var actionCheckForUpdates: String { pair("Güncellemeleri Kontrol Et", "Check for Updates") }
+    static var actionCheckingForUpdates: String { pair("Kontrol Ediliyor...", "Checking...") }
+    static var actionDownloadingUpdate: String { pair("İndiriliyor...", "Downloading...") }
+    static var actionRestartToUpdate: String { pair("Yeniden Başlat ve Güncelle", "Restart & Update") }
+    static var actionRetryUpdate: String { pair("Tekrar Dene", "Try Again") }
+    static var actionUpToDate: String { pair("Güncel", "Up to Date") }
     static var actionAllow: String { pair("İzin Ver", "Allow Access") }
     static var actionSystemSettings: String { pair("Sistem Ayarları", "System Settings") }
     static var actionRequestPermission: String { pair("İzin İste", "Request Access") }
@@ -85,6 +91,7 @@ enum L10n {
     static var installAlertBody: String { pair("ScreenTextGrab izinleri ve Spotlight kaydını stabil tutmak için Applications klasöründen çalışmalıdır.", "ScreenTextGrab should run from Applications so permissions and Spotlight registration stay stable.") }
 
     static var accessibilityQuitApp: String { pair("Uygulamadan çık", "Quit app") }
+    static var accessibilityCheckForUpdates: String { pair("Güncellemeleri kontrol et", "Check for updates") }
     static var accessibilityResetHotkey: String { pair("Kısayolu varsayılana döndür", "Reset shortcut to default") }
     static var accessibilityLaunchAtLoginToggle: String { pair("Açılışta başlat", "Launch at login") }
     static var accessibilityCaptureMode: String { pair("Yakalama modu", "Capture mode") }

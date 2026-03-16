@@ -59,6 +59,7 @@ final class AppState: ObservableObject {
     @Published var savedSnippetCollections: [SavedSnippetCollection]
     @Published var savedSnippetCollectionAutoSyncEnabled: Bool
     @Published var historyExportFormat: ClipboardHistoryExportFormat
+    @Published var updateState: AppUpdateState
     @Published var settingsPresentationToken: UUID?
     @Published var pendingSnippetCollectionSelectionName: String?
     @Published var activeTableReview: TableReviewSession?
@@ -69,6 +70,7 @@ final class AppState: ObservableObject {
     weak var hotkeyManager: HotkeyManaging?
     weak var launchAtLoginManager: LaunchAtLoginManaging?
     weak var speechManager: SpeechManaging?
+    weak var updateManager: AppUpdateManaging?
     weak var permissionDiagnosticsProvider: ScreenPermissionProviding?
 
     private let defaults: UserDefaults
@@ -134,6 +136,7 @@ final class AppState: ObservableObject {
         self.historyExportFormat = persistsUserPreferences
             ? ClipboardHistoryExportFormatStore.load(defaults: defaults)
             : .markdown
+        self.updateState = .idle
         self.settingsPresentationToken = nil
         self.pendingSnippetCollectionSelectionName = nil
         self.activeTableReview = nil
@@ -326,6 +329,10 @@ final class AppState: ObservableObject {
         }
 
         statusMessage = readyStatusMessage
+    }
+
+    func updateUpdateState(_ state: AppUpdateState) {
+        updateState = state
     }
 
     func setWatchCopyBehavior(_ behavior: WatchCopyBehavior) {
@@ -1471,6 +1478,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionService: ScreenPermissionService?
     private var captureCoordinator: CaptureCoordinator?
     private var speechService: SpeechService?
+    private var appUpdateService: AppUpdateService?
     private var launchPanelController: NSWindowController?
     private var previewWindowController: NSWindowController?
     private var previewLaunchAtLoginManager: PreviewLaunchAtLoginManager?
@@ -1572,9 +1580,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         self.hotkeyService = hotkeyService
         self.speechService = speechService
+        self.appUpdateService = AppUpdateService(appState: appState)
         appState.hotkeyManager = self
         appState.launchAtLoginManager = self
         appState.speechManager = self
+        appState.updateManager = appUpdateService
         appState.updateLaunchAtLoginState(launchAtLoginService.refreshState())
         appState.updateSpeechState(speechService.state)
         Task { @MainActor [weak self] in
@@ -3112,5 +3122,12 @@ extension AppDelegate: SpeechManaging {
     func stopSpeechPlayback() {
         speechService?.stopSpeaking()
         appState.updateSpeechState(speechState)
+    }
+}
+
+@MainActor
+extension AppDelegate: AppUpdateManaging {
+    func performPrimaryUpdateAction() {
+        appUpdateService?.performPrimaryUpdateAction()
     }
 }
