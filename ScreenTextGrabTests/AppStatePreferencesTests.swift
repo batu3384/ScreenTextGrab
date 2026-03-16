@@ -2394,9 +2394,7 @@ final class AppStatePreferencesTests: XCTestCase {
         )
     }
 
-    private var defaultsSuiteName: String {
-        "ScreenTextGrab.AppStatePreferencesTests"
-    }
+    private let defaultsSuiteName = "ScreenTextGrab.AppStatePreferencesTests.\(UUID().uuidString)"
 
     private func makeDefaults() -> UserDefaults {
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
