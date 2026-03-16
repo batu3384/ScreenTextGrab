@@ -1371,9 +1371,9 @@ final class AppStatePreferencesTests: XCTestCase {
         )
 
         XCTAssertTrue(entry.matches(query: "Safari"))
-        XCTAssertTrue(entry.matches(query: "Tablo"))
-        XCTAssertTrue(entry.matches(query: "Barkod"))
-        XCTAssertTrue(entry.matches(query: "JSON"))
+        XCTAssertTrue(entry.matches(query: CaptureMode.table.title))
+        XCTAssertTrue(entry.matches(query: ClipboardHistoryEntry.ContentKind.barcode.title))
+        XCTAssertTrue(entry.matches(query: CaptureOutputPreset.json.title))
         XCTAssertTrue(entry.matches(query: "example.com"))
         XCTAssertFalse(entry.matches(query: "Terminal"))
     }
@@ -1417,11 +1417,13 @@ final class AppStatePreferencesTests: XCTestCase {
         appState.rememberCaptureSelection(selection)
         let saved = appState.saveLastCaptureSelection()
 
-        XCTAssertEqual(saved?.name, "Safari • Tablo")
+        let expectedName = "Safari • \(CaptureMode.table.shortTitle)"
+
+        XCTAssertEqual(saved?.name, expectedName)
         XCTAssertEqual(appState.savedCaptureRegions.first?.screenRect, selection.screenRect)
 
         let restored = AppState(defaults: defaults, persistsUserPreferences: true)
-        XCTAssertEqual(restored.savedCaptureRegions.first?.name, "Safari • Tablo")
+        XCTAssertEqual(restored.savedCaptureRegions.first?.name, expectedName)
         XCTAssertEqual(restored.savedCaptureRegions.first?.sessionConfiguration.captureMode, .table)
     }
 
@@ -1484,8 +1486,9 @@ final class AppStatePreferencesTests: XCTestCase {
         let first = appState.saveLastCaptureSelection()
         let second = appState.saveLastCaptureSelection()
 
-        XCTAssertEqual(first?.name, "Safari • Tablo")
-        XCTAssertEqual(second?.name, "Safari • Tablo 2")
+        let expectedName = "Safari • \(CaptureMode.table.shortTitle)"
+        XCTAssertEqual(first?.name, expectedName)
+        XCTAssertEqual(second?.name, "\(expectedName) 2")
     }
 
     func testSaveHistoryEntryAsSnippetPersistsMetadata() {
@@ -1513,7 +1516,10 @@ final class AppStatePreferencesTests: XCTestCase {
         let restored = AppState(defaults: defaults, persistsUserPreferences: true)
         XCTAssertEqual(restored.savedSnippets.first?.name, snippet.name)
         XCTAssertEqual(restored.savedSnippets.first?.outputPreset, .markdown)
-        XCTAssertEqual(restored.savedSnippets.first?.tags, ["Kod", "Xcode", "Markdown"])
+        XCTAssertEqual(
+            restored.savedSnippets.first?.tags,
+            [CaptureMode.code.title, "Xcode", CaptureOutputPreset.markdown.title]
+        )
     }
 
     func testSaveHistoryEntryAsSnippetRefreshesExistingMatch() {
@@ -1685,7 +1691,10 @@ final class AppStatePreferencesTests: XCTestCase {
 
         let restored = AppState(defaults: defaults, persistsUserPreferences: true)
 
-        XCTAssertEqual(restored.savedSnippets.first?.tags, ["Kod", "Xcode", "Markdown"])
+        XCTAssertEqual(
+            restored.savedSnippets.first?.tags,
+            [CaptureMode.code.title, "Xcode", CaptureOutputPreset.markdown.title]
+        )
     }
 
     func testSaveHistoryEntryAsSnippetRefreshPreservesExistingCustomTags() {
@@ -1704,8 +1713,17 @@ final class AppStatePreferencesTests: XCTestCase {
         appState.updateSavedSnippetTags(["Rapor", "Kod"], for: snippet)
 
         let refreshed = appState.saveHistoryEntryAsSnippet(entry)
+        var expectedTags: [String] = []
+        for tag in ["Rapor", "Kod", "Xcode", CaptureOutputPreset.markdown.title, CaptureMode.code.title] {
+            if expectedTags.contains(tag) == false {
+                expectedTags.append(tag)
+            }
+        }
 
-        XCTAssertEqual(refreshed.tags, ["Rapor", "Kod", "Xcode", "Markdown"])
+        XCTAssertEqual(
+            refreshed.tags,
+            expectedTags
+        )
     }
 
     func testSaveLastCopiedEntryAsSnippetUsesMostRecentHistoryEntry() {
