@@ -829,7 +829,9 @@ final class CaptureCoordinatorTests: XCTestCase {
             environment: Self.emptyEnvironment
         )
 
-        try? await Task.sleep(nanoseconds: 8_000_000)
+        await waitForWatchStateUpdate {
+            permission.resolveCallCount > 0 || appState.watchState != .active
+        }
 
         XCTAssertGreaterThan(permission.resolveCallCount, 0, "Watch permission errors should revalidate state before stopping")
         XCTAssertEqual(appState.permissionState, .granted)
@@ -866,7 +868,9 @@ final class CaptureCoordinatorTests: XCTestCase {
             environment: Self.emptyEnvironment
         )
 
-        try? await Task.sleep(nanoseconds: 8_000_000)
+        await waitForWatchStateUpdate {
+            permission.resolveCallCount > 0 || appState.watchState == .inactive
+        }
 
         XCTAssertGreaterThan(permission.resolveCallCount, 0)
         XCTAssertEqual(appState.permissionState, .denied)
@@ -1329,6 +1333,22 @@ final class CaptureCoordinatorTests: XCTestCase {
     }
 
     private static let emptyEnvironment = ScreenEnvironmentSnapshot(displays: [])
+
+    @MainActor
+    private func waitForWatchStateUpdate(
+        timeoutNanoseconds: UInt64 = 250_000_000,
+        pollIntervalNanoseconds: UInt64 = 5_000_000,
+        until condition: @escaping () -> Bool
+    ) async {
+        var elapsedNanoseconds: UInt64 = 0
+        while !condition() {
+            if elapsedNanoseconds >= timeoutNanoseconds {
+                break
+            }
+            try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
+            elapsedNanoseconds += pollIntervalNanoseconds
+        }
+    }
 }
 
 @MainActor

@@ -195,9 +195,9 @@ struct SettingsView: View {
                     subtitle: appState.captureOutputPreset.detail
                 ) {
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 136), spacing: 10)],
+                        columns: [GridItem(.adaptive(minimum: 152), spacing: 12)],
                         alignment: .leading,
-                        spacing: 10
+                        spacing: 12
                     ) {
                         ForEach(CaptureOutputPreset.allCases) { preset in
                             outputPresetButton(preset)
@@ -1670,21 +1670,21 @@ struct SettingsView: View {
         let isSelected = appState.captureOutputPreset == preset
 
         return Button(action: { setCaptureOutputPreset(preset) }) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(preset.title)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.88)
 
-                Text(preset.detail)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                    .lineLimit(3)
+                Text(preset.summary)
+                    .font(.system(size: 10.3, weight: .medium, design: .rounded))
+                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundStyle(isSelected ? Color.white : Color.primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(isSelected ? Color.surfaceTop : Color(NSColor.controlBackgroundColor))

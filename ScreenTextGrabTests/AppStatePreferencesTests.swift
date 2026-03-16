@@ -2163,26 +2163,6 @@ final class AppStatePreferencesTests: XCTestCase {
         )
     }
 
-    func testLaunchPanelPolicyShowsWindowForForegroundLaunch() {
-        XCTAssertTrue(
-            LaunchPanelPresentationPolicy.shouldPresentOnStartup(
-                isAppActive: true,
-                frontmostBundleIdentifier: "dev.screentextgrab.app",
-                ownBundleIdentifier: "dev.screentextgrab.app"
-            )
-        )
-    }
-
-    func testLaunchPanelPolicySuppressesWindowForBackgroundLaunch() {
-        XCTAssertFalse(
-            LaunchPanelPresentationPolicy.shouldPresentOnStartup(
-                isAppActive: false,
-                frontmostBundleIdentifier: "com.apple.finder",
-                ownBundleIdentifier: "dev.screentextgrab.app"
-            )
-        )
-    }
-
     func testInstalledAppLocatorRecognizesApplicationsRoots() {
         let roots = [
             URL(fileURLWithPath: "/Applications", isDirectory: true),

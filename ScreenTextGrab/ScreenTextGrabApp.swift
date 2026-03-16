@@ -1070,43 +1070,8 @@ struct ActiveSavedSnippetSuggestion: Equatable, Sendable {
     let selectionKind: SelectionKind
 }
 
-enum LaunchPanelPresentationPolicy {
-    static func shouldPresentOnStartup(
-        isAppActive: Bool,
-        frontmostBundleIdentifier: String?,
-        ownBundleIdentifier: String?
-    ) -> Bool {
-        guard let ownBundleIdentifier else {
-            return isAppActive
-        }
-
-        return isAppActive || frontmostBundleIdentifier == ownBundleIdentifier
-    }
-}
-
-private enum UITestLaunchMode {
-    case launchPanel
-
-    init?(arguments: [String]) {
-        if arguments.contains("--ui-test-launch-panel") {
-            self = .launchPanel
-            return
-        }
-
-        return nil
-    }
-}
-
-private struct UITestConfiguration {
-    var permissionState: ScreenPermissionState = .granted
-    var watchState: WatchState = .inactive
-    var isHotkeyAvailable = true
-    var hotkeyDisplayLabel = HotkeyConfiguration.defaultValue.displayLabel
-}
-
 private enum ScreenshotLaunchMode {
     case menuPanel
-    case launchPanel
     case settingsGeneral
     case settingsOCR
     case settingsDiagnostics
@@ -1116,11 +1081,6 @@ private enum ScreenshotLaunchMode {
     init?(arguments: [String]) {
         if arguments.contains("--screenshot-menu-panel") {
             self = .menuPanel
-            return
-        }
-
-        if arguments.contains("--screenshot-launch-panel") {
-            self = .launchPanel
             return
         }
 
@@ -1479,46 +1439,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var captureCoordinator: CaptureCoordinator?
     private var speechService: SpeechService?
     private var appUpdateService: AppUpdateService?
-    private var launchPanelController: NSWindowController?
     private var previewWindowController: NSWindowController?
     private var previewLaunchAtLoginManager: PreviewLaunchAtLoginManager?
     private var previewPermissionProvider: PreviewPermissionProvider?
     private var finderImportServiceProvider: FinderImportServiceProvider?
     private var didBecomeActiveObserver: NSObjectProtocol?
     private var workspaceActivationObserver: NSObjectProtocol?
-    private var isHandlingLaunchPanelClosure = false
     private var pendingAutomationCommands: [AutomationCommand] = []
-    private var uiTestLaunchMode: UITestLaunchMode? {
-        UITestLaunchMode(arguments: ProcessInfo.processInfo.arguments)
-    }
     private var screenshotLaunchMode: ScreenshotLaunchMode? {
         ScreenshotLaunchMode(arguments: ProcessInfo.processInfo.arguments)
-    }
-    private var uiTestConfiguration: UITestConfiguration? {
-        guard uiTestLaunchMode != nil else {
-            return nil
-        }
-
-        let arguments = ProcessInfo.processInfo.arguments
-        var configuration = UITestConfiguration()
-
-        if arguments.contains("--ui-test-permission-denied") {
-            configuration.permissionState = .denied
-        } else if arguments.contains("--ui-test-permission-requires-restart") {
-            configuration.permissionState = .requiresRestart
-        } else if arguments.contains("--ui-test-permission-request-in-progress") {
-            configuration.permissionState = .requestInProgress
-        }
-
-        if arguments.contains("--ui-test-watch-active") {
-            configuration.watchState = .active
-        }
-
-        if arguments.contains("--ui-test-hotkey-unavailable") {
-            configuration.isHotkeyAvailable = false
-        }
-
-        return configuration
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -1526,14 +1455,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.setActivationPolicy(.regular)
             configurePreviewState()
             showPreview(for: screenshotLaunchMode)
-            return
-        }
-
-        if let uiTestConfiguration {
-            NSApp.setActivationPolicy(.regular)
-            applyUITestConfiguration(uiTestConfiguration)
-            appState.statusMessage = "UI test launch"
-            showLaunchPanel(force: true)
             return
         }
 
@@ -1616,17 +1537,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [weak self, weak coordinator] _ in
             Task { @MainActor in
-                if self?.uiTestLaunchMode == nil {
-                    coordinator?.refreshPermission()
-                }
+                coordinator?.refreshPermission()
                 if let state = self?.launchAtLoginService?.refreshState() {
                     self?.appState.updateLaunchAtLoginState(state)
                 }
             }
-        }
-
-        if handleUITestLaunchModeIfNeeded() {
-            return
         }
 
         if #available(macOS 14.0, *) {
@@ -1782,29 +1697,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var isRunningUnderTests: Bool {
         let env = ProcessInfo.processInfo.environment
         return env["XCTestConfigurationFilePath"] != nil
-    }
-
-    private func handleUITestLaunchModeIfNeeded() -> Bool {
-        guard let uiTestLaunchMode else {
-            return false
-        }
-
-        switch uiTestLaunchMode {
-        case .launchPanel:
-            if let uiTestConfiguration {
-                applyUITestConfiguration(uiTestConfiguration)
-            }
-            NSApp.setActivationPolicy(.regular)
-            showLaunchPanel(force: true)
-            return true
-        }
-    }
-
-    private func applyUITestConfiguration(_ configuration: UITestConfiguration) {
-        appState.permissionState = configuration.permissionState
-        appState.watchState = configuration.watchState
-        appState.isHotkeyAvailable = configuration.isHotkeyAvailable
-        appState.hotkeyDisplayLabel = configuration.hotkeyDisplayLabel
     }
 
     private func beginActiveAppTracking() {
@@ -2093,7 +1985,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch mode {
         case .menuPanel:
             configureMenuPanelPreviewState()
-            let previewSize = NSSize(width: 404, height: 1420)
+            let previewSize = NSSize(width: 404, height: 1110)
             showPreviewWindow(
                 title: "ScreenTextGrab",
                 size: previewSize,
@@ -2109,8 +2001,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     .frame(width: previewSize.width, height: previewSize.height, alignment: .top)
                     .background(Color(red: 0.03, green: 0.07, blue: 0.10))
             }
-        case .launchPanel:
-            showLaunchPanel(force: true)
         case .settingsGeneral:
             showPreviewWindow(
                 title: L10n.pair("Ayarlar", "Settings"),
@@ -2236,8 +2126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        showLaunchPanel(force: true)
-        return true
+        false
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -2304,22 +2193,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self, weak coordinator] in
             guard let self, let coordinator else { return }
 
-            let isForegroundLaunch = LaunchPanelPresentationPolicy.shouldPresentOnStartup(
-                isAppActive: NSApp.isActive,
-                frontmostBundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
-                ownBundleIdentifier: Bundle.main.bundleIdentifier
-            )
-
             Task { @MainActor [weak self, weak coordinator] in
                 guard let self, let coordinator else { return }
 
+                let ownBundleIdentifier = Bundle.main.bundleIdentifier
+                let isForegroundLaunch = NSApp.isActive ||
+                    NSWorkspace.shared.frontmostApplication?.bundleIdentifier == ownBundleIdentifier
                 let state = await permissionService.resolveStartupState(isForegroundLaunch: isForegroundLaunch)
                 coordinator.syncPermissionState(state)
                 self.scheduleInitialPermissionRefreshes(for: coordinator)
-
-                if isForegroundLaunch, state != .granted {
-                    self.showLaunchPanel(force: false)
-                }
             }
         }
     }
@@ -2386,83 +2268,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func showLaunchPanel(force: Bool) {
-        guard !isRunningUnderTests || uiTestLaunchMode == .launchPanel else { return }
-
-        if let window = launchPanelController?.window {
-            if force || window.isVisible == false {
-                NSApp.activate(ignoringOtherApps: true)
-                window.makeKeyAndOrderFront(nil)
-            }
-            return
-        }
-
-        let rootView = LaunchPanelView(
-            onStartCapture: { [weak self] in
-                Task { @MainActor [weak self] in
-                    self?.closeLaunchPanel()
-                    self?.captureCoordinator?.startCapture(trigger: .menu)
-                }
-            },
-            onDismiss: { [weak self] in
-                Task { @MainActor [weak self] in
-                    self?.closeLaunchPanel()
-                }
-            }
-        )
-        .environmentObject(appState)
-
-        let launchPanelSize = NSSize(width: 496, height: 272)
-        let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: launchPanelSize),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        let controller = NSWindowController(window: window)
-
-        window.contentView = NSHostingView(
-            rootView: rootView
-                .frame(width: launchPanelSize.width, height: launchPanelSize.height)
-        )
-        window.setContentSize(launchPanelSize)
-        window.title = "ScreenTextGrab"
-        window.isReleasedWhenClosed = false
-        window.isMovableByWindowBackground = true
-        window.backgroundColor = .windowBackgroundColor
-        window.level = .floating
-        window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
-        window.delegate = self
-        window.center()
-
-        launchPanelController = controller
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        controller.showWindow(nil)
-        window.makeKeyAndOrderFront(nil)
-        window.orderFrontRegardless()
-    }
-
-    private func closeLaunchPanel() {
-        guard let window = launchPanelController?.window else {
-            handleLaunchPanelClosure()
-            return
-        }
-
-        handleLaunchPanelClosure()
-        window.close()
-    }
-
-    private func handleLaunchPanelClosure() {
-        guard !isHandlingLaunchPanelClosure else { return }
-        isHandlingLaunchPanelClosure = true
-        defer { isHandlingLaunchPanelClosure = false }
-
-        launchPanelController = nil
-        if NSApp.activationPolicy() != .accessory {
-            NSApp.setActivationPolicy(.accessory)
-        }
-    }
 }
 
 private enum LaunchAtLoginCommand {
@@ -2676,302 +2481,12 @@ extension SpeechService: AVSpeechSynthesizerDelegate {
     }
 }
 
-extension AppDelegate: NSWindowDelegate {
-    func windowWillClose(_ notification: Notification) {
-        guard let launchWindow = launchPanelController?.window,
-              notification.object as? NSWindow === launchWindow else {
-            return
-        }
-
-        handleLaunchPanelClosure()
-    }
-}
-
 private struct MenuBarStatusIcon: View {
     var body: some View {
         Image(nsImage: StatusBarIconFactory.image)
             .renderingMode(.template)
             .frame(width: 18, height: 18)
         .accessibilityLabel("ScreenTextGrab")
-    }
-}
-
-private struct LaunchPanelView: View {
-    @EnvironmentObject var appState: AppState
-    @State private var isImportDropTargeted = false
-
-    let onStartCapture: () -> Void
-    let onDismiss: () -> Void
-
-    var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.06, green: 0.10, blue: 0.15),
-                    Color(red: 0.12, green: 0.18, blue: 0.24)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 12) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .frame(width: 48, height: 48)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L10n.pair("ScreenTextGrab Hazır", "ScreenTextGrab Ready"))
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .accessibilityIdentifier("launch-panel-title")
-
-                        Text(L10n.pair("Uygulama menü çubuğunda çalışıyor.", "The app is running in your menu bar."))
-                            .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color.white.opacity(0.72))
-                    }
-
-                    Spacer()
-
-                    Menu {
-                        ForEach(InterfaceLanguage.allCases) { language in
-                            Button {
-                                appState.setInterfaceLanguage(language)
-                            } label: {
-                                HStack {
-                                    Text(language.title)
-                                    if language == appState.interfaceLanguage {
-                                        Spacer()
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "globe")
-                            Text(appState.interfaceLanguage.title)
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 9, weight: .bold))
-                        }
-                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.white.opacity(0.12))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                        )
-                    }
-                    .menuStyle(.borderlessButton)
-                    .accessibilityLabel(L10n.accessibilityInterfaceLanguage)
-                    .accessibilityIdentifier("launch-panel-language-menu")
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    hintRow(
-                        icon: "menubar.rectangle",
-                        text: L10n.pair(
-                            "Üst menüdeki ScreenTextGrab simgesinden hızlı ayarlara ve geçmişe ulaş.",
-                            "Open the ScreenTextGrab menu bar icon for quick controls and recent history."
-                        ),
-                        accessibilityIdentifier: "launch-panel-menubar-hint"
-                    )
-                    hintRow(
-                        icon: "keyboard",
-                        text: appState.isHotkeyAvailable
-                            ? L10n.usesEnglish
-                                ? "Use \(appState.hotkeyDisplayLabel) to select a region and capture text directly."
-                                : "\(appState.hotkeyDisplayLabel) ile doğrudan alan seçip metin yakalayabilirsin."
-                            : L10n.pair(
-                                "Menüden kısayol ayarlayıp doğrudan yakalama başlatabilirsin.",
-                                "Set a shortcut from the menu to start capture directly."
-                            ),
-                        accessibilityIdentifier: "launch-panel-hotkey-hint"
-                    )
-                    hintRow(
-                        icon: appState.permissionState == .granted ? "checkmark.shield" : "lock.display",
-                        text: appState.permissionState == .granted
-                            ? L10n.pair("Ekran kaydı izni aktif, kullanıma hazır.", "Screen recording permission is active and ready.")
-                            : L10n.pair("İlk kullanımda ekran kaydı izni istenebilir.", "Screen recording permission may be requested on first use."),
-                        accessibilityIdentifier: "launch-panel-permission-status-hint"
-                    )
-                }
-
-                if let permissionHintText {
-                    Text(permissionHintText)
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.96, green: 0.88, blue: 0.70))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color(red: 0.22, green: 0.16, blue: 0.10).opacity(0.88))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color(red: 0.91, green: 0.73, blue: 0.46).opacity(0.38), lineWidth: 1)
-                        )
-                        .accessibilityIdentifier("launch-panel-permission-hint")
-                        .accessibilityValue(permissionHintText)
-                }
-
-                HStack(spacing: 10) {
-                    Button(action: onStartCapture) {
-                        Label(L10n.pair("Metni Yakala", "Capture Text"), systemImage: "viewfinder")
-                            .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .frame(maxWidth: .infinity)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(Color(red: 0.91, green: 0.73, blue: 0.46))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(appState.permissionState != .granted || appState.watchState.isActive)
-                    .opacity((appState.permissionState == .granted && !appState.watchState.isActive) ? 1 : 0.65)
-                    .accessibilityIdentifier("launch-panel-start-capture")
-
-                    Button(action: onDismiss) {
-                        Text(L10n.pair("Tamam", "Done"))
-                            .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .frame(maxWidth: .infinity)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(Color.white.opacity(0.12))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("launch-panel-dismiss")
-                }
-            }
-            .padding(20)
-
-            if isImportDropTargeted {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.black.opacity(0.48))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(Color(red: 0.91, green: 0.73, blue: 0.46), style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
-                    )
-                    .overlay {
-                        VStack(spacing: 10) {
-                            Image(systemName: "doc.badge.plus")
-                                .font(.system(size: 26, weight: .bold))
-                                .foregroundStyle(Color(red: 0.91, green: 0.73, blue: 0.46))
-
-                            Text(L10n.pair("Görsel veya PDF bırak", "Drop an Image or PDF"))
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-
-                            Text(L10n.pair("Görsel dosyaları OCR olarak açılır, PDF dosyaları içe alınır.", "Image files open in OCR mode and PDF files are imported directly."))
-                                .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color.white.opacity(0.72))
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: 220)
-                        }
-                        .padding(18)
-                    }
-                    .padding(16)
-            }
-        }
-        .onDrop(of: [UTType.fileURL], isTargeted: $isImportDropTargeted, perform: handleImportDrop(providers:))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("launch-panel-root")
-    }
-
-    private func hintRow(icon: String, text: String, accessibilityIdentifier: String? = nil) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 12.5, weight: .bold))
-                .foregroundStyle(Color(red: 0.47, green: 0.80, blue: 0.84))
-                .frame(width: 18)
-
-            if let accessibilityIdentifier {
-                Text(text)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.78))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier(accessibilityIdentifier)
-            } else {
-                Text(text)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.78))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private var permissionHintText: String? {
-        switch appState.permissionState {
-        case .granted:
-            return nil
-        case .denied:
-            return L10n.pair(
-                "Ekran kaydı izni kapalı. Sistem Ayarları > Gizlilik ve Güvenlik > Ekran Kaydı bölümünden ScreenTextGrab iznini aç.",
-                "Screen recording permission is off. Enable ScreenTextGrab in System Settings > Privacy & Security > Screen Recording."
-            )
-        case .requiresRestart:
-            return L10n.pair(
-                "İzin verildi. Değişikliğin tam uygulanması için uygulamayı yeniden başlat.",
-                "Permission was granted. Restart the app to apply the change completely."
-            )
-        case .requestInProgress:
-            return L10n.pair(
-                "İzin isteği açık. macOS penceresinden erişimi onayladıktan sonra devam edebilirsin.",
-                "The permission prompt is open. Continue after approving access in the macOS dialog."
-            )
-        case .unknown:
-            return L10n.pair(
-                "İzin durumu doğrulanamadı. Bir kez yakalama başlatınca macOS erişim penceresi gösterebilir.",
-                "Permission status could not be verified. macOS may show the access dialog when you start capture."
-            )
-        }
-    }
-
-    private func handleImportDrop(providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first(where: {
-            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
-        }) else {
-            return false
-        }
-
-        provider.loadDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier) { data, _ in
-            guard let data,
-                  let url = URL(dataRepresentation: data, relativeTo: nil) else {
-                return
-            }
-
-            Task { @MainActor in
-                routeDroppedImport(url)
-            }
-        }
-
-        return true
-    }
-
-    @MainActor
-    private func routeDroppedImport(_ url: URL) {
-        switch ImportedDocumentRouter.resolve(url) {
-        case .image(let imageURL):
-            appState.coordinator?.captureImageFile(at: imageURL, sessionOverrides: nil)
-        case .pdf(let pdfURL):
-            appState.coordinator?.capturePDFFile(at: pdfURL, sessionOverrides: nil)
-        case nil:
-            appState.statusMessage = "⚠️ Yalnızca görsel veya PDF dosyaları desteklenir."
-        }
     }
 }
 

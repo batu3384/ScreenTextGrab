@@ -3,37 +3,72 @@
 [![CI](https://github.com/batu3384/ScreenTextGrab/actions/workflows/ci.yml/badge.svg)](https://github.com/batu3384/ScreenTextGrab/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/batu3384/ScreenTextGrab)](https://github.com/batu3384/ScreenTextGrab/releases/latest)
 
-ScreenTextGrab is a local-first macOS menu bar OCR app for capturing text from any on-screen region and pasting it back in the format that fits the job.
+ScreenTextGrab is a local-first macOS menu bar OCR app for turning anything visual into usable text without leaving the app you are already working in.
 
-It is built for everyday text capture, subtitles, code snippets, and spreadsheet-like tables. OCR runs locally with Apple's Vision framework, so screenshots and recognized text stay on the device.
+It is built for:
+- on-screen text capture
+- video subtitles
+- code snippets and terminals
+- spreadsheet-like tables
+- copied screenshots, image files, and PDFs
 
-The app UI supports both English and Turkish. You can keep it on `System` or switch it directly inside the app from the launch panel, menu panel, or `Settings > General`. The screenshots below use the English UI so the documentation stays consistent.
+OCR runs locally with Apple's Vision framework, so screenshots and recognized text stay on the device.
+
+The app UI supports both English and Turkish. You can keep it on `System` or switch it inside `Settings > General`. The screenshots below use the English UI for consistency.
 
 Latest notarized release: [GitHub Releases](https://github.com/batu3384/ScreenTextGrab/releases/latest)
 
-## Install
+## At a Glance
 
-### One-command install
+| Area | What it does |
+| --- | --- |
+| Inputs | Screen regions, clipboard images, local images, PDFs, Finder imports |
+| Modes | `Standard`, `Subtitle`, `Code`, `Table` |
+| Outputs | `Smart`, `Plain Text`, `Cleaned`, `Office`, `Markdown`, `JSON` |
+| Reuse | Saved regions, app profiles, snippets, snippet collections |
+| Automation | `stg`, URL scheme, Shortcuts |
+| Privacy | Local OCR with Apple's Vision framework |
+
+## Why ScreenTextGrab
+
+- Capture from any screen region without changing apps
+- Use purpose-built OCR modes for text, subtitles, code, and tables
+- Paste as plain text, cleaned text, Markdown, JSON, or rich Office output
+- Keep table structure for Excel, Numbers, Word, and Pages workflows
+- Reuse saved regions, snippets, and app-specific capture profiles
+- OCR images and PDFs from the clipboard, Finder, or local files
+- Stay inside a compact menu bar workflow instead of a heavy desktop app
+
+## Quick Start
+
+### Install with one command
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/batu3384/ScreenTextGrab/main/scripts/bootstrap_install.sh | bash
 ```
 
-This command:
+This installs:
+- `ScreenTextGrab.app` into `/Applications`
+- the `stg` terminal helper
+- the latest release when one is available
+- cleanup rules so Spotlight points to the canonical app copy
 
-- downloads the latest release when available
-- installs `ScreenTextGrab.app` into `/Applications`
-- installs the `stg` terminal command
-- cleans stale copies so Spotlight finds the correct app
-- launches the app
-
-After installation you can open it from Spotlight with `ScreenTextGrab` or from Terminal with:
+After installation:
 
 ```bash
 stg open
 ```
 
+Or open `ScreenTextGrab` from Spotlight.
+
 On first launch, macOS asks for Screen Recording permission once. After you allow it, reopen the app and continue normally.
+
+Fastest path:
+1. Install with the command above
+2. Grant Screen Recording permission
+3. Open the menu bar panel
+4. Pick a mode
+5. Capture and paste
 
 ### Install from a local clone
 
@@ -41,36 +76,176 @@ On first launch, macOS asks for Screen Recording permission once. After you allo
 ./scripts/install.sh
 ```
 
-## Why it is useful
+## Core Workflows
 
-- Captures text from any screen region without switching apps
-- Supports `Standard`, `Subtitle`, `Code`, and `Table` OCR modes
-- Copies results as `Plain Text`, `Cleaned`, `Markdown`, `JSON`, or rich `Office` output
-- Preserves row and column structure for Excel, Numbers, Word, and Pages workflows
-- Includes a table review editor for fixing OCR-extracted tables before pasting again
-- Supports both English and Turkish UI presentation
-- Supports app-specific capture profiles and optional smart panel sync for frontmost apps
-- Lets you save frequently used screen regions and run them again later
-- Can OCR a copied screenshot or image directly from the clipboard
-- Can OCR a local image file without starting a screen region capture
-- Accepts drag-and-drop image and PDF imports directly into the launch panel or menu panel
-- Accepts image and PDF files from Finder with `Open With > ScreenTextGrab`
-- Exposes a Finder Services action for selected image and PDF files
-- Keeps local clipboard history for recent captures, with pinned favorites and quick reuse
-- Runs as a focused menu bar utility instead of a large desktop workspace
+### 1. Capture text from the screen
 
-## How it works
+1. Open the menu panel.
+2. Pick the capture mode that matches the content.
+3. Click `Capture Text`.
+4. Select the screen region.
+5. Paste the result into the target app.
 
-1. Open ScreenTextGrab from the menu bar or global shortcut.
-2. Choose the capture mode that matches the content.
-3. Select a screen region.
-4. Review the result and paste it in the target app.
+Recommended presets:
+
+| Content | Mode | Output |
+| --- | --- | --- |
+| General text | `Standard` | `Smart` |
+| Subtitles | `Subtitle` | `Cleaned` |
+| Code / terminal | `Code` | `Markdown` |
+| Tables / lists | `Table` | `Office` |
+
+### 2. OCR a copied screenshot or image
+
+If you already copied an image:
+
+1. Copy the image to the clipboard.
+2. Open the `Import` menu in the menu panel.
+3. Choose `Read Clipboard Image`.
+
+You can do the same from Terminal:
+
+```bash
+stg clipboard-image --mode standard --output cleaned
+```
+
+### 3. OCR an image file
+
+Use this when the source already exists as a PNG or JPG on disk.
+
+Options:
+- `Import > Read Image File`
+- drag the image onto the menu panel
+- `Open With > ScreenTextGrab` in Finder
+- Finder Services: `OCR with ScreenTextGrab`
+
+Terminal:
+
+```bash
+stg file-image --path ~/Desktop/table.png --mode table --output office
+```
+
+### 4. OCR a PDF or create a searchable PDF
+
+For scanned or image-based PDFs:
+
+- `Import > Read PDF` copies OCR text from the document
+- `Import > Searchable PDF` creates an exportable searchable PDF
+
+Terminal:
+
+```bash
+stg pdf-file --path ~/Desktop/sample.pdf --mode standard --output cleaned
+stg pdf-searchable --path ~/Desktop/sample.pdf --destination ~/Desktop/sample-searchable.pdf
+```
+
+### 5. Reuse frequent capture workflows
+
+ScreenTextGrab is designed for repeated work, not just one-off OCR.
+
+You can:
+- save a screen region and run it again later
+- create app-specific capture profiles
+- save reusable OCR results as snippets
+- group snippets into named collections
+- let the panel surface the right region or snippet when the related app becomes active
+
+If you spend all day in the same apps, this is where the product starts to feel more like a workflow tool than a one-off OCR utility.
+
+## Feature Set
+
+### Capture modes
+
+| Mode | Best for |
+| --- | --- |
+| `Standard` | documents, UI text, dashboards, general copy |
+| `Subtitle` | video subtitles, overlays, repeated lower-third text |
+| `Code` | code blocks, logs, terminals, developer tools |
+| `Table` | spreadsheets, price lists, multi-column layouts |
+
+### Output formats
+
+| Output | Use case |
+| --- | --- |
+| `Smart` | best default output for the selected mode |
+| `Plain Text` | raw text paste |
+| `Cleaned` | cleaned OCR output from noisy captures |
+| `Office` | rich paste for Excel, Numbers, Word, and Pages |
+| `Markdown` | notes, docs, code blocks |
+| `JSON` | automation and structured post-processing |
+
+### Table workflow
+
+For spreadsheet-style capture:
+
+1. Choose `Table` mode.
+2. Choose `Office` output.
+3. Capture the table.
+4. Fix cells in the built-in table review window if needed.
+5. Paste into Excel, Numbers, Word, or Pages.
+
+### Saved regions
+
+Use saved regions when you repeatedly OCR the same part of the screen.
+
+Typical examples:
+- the same table inside Excel
+- a fixed dashboard tile
+- a repeated subtitle area
+- a recurring terminal panel
+
+Saved regions can also become smarter:
+- the panel can suggest them when the related app becomes active
+- window-title matching improves the suggestion when accessibility access is enabled
+- `Smart Start` can run the best matching region directly from the main button
+
+### App profiles
+
+If different apps need different OCR defaults, create an app profile.
+
+Profiles can store:
+- capture mode
+- output format
+- OCR language selection
+
+Optional `Smart Panel Sync` keeps the visible menu panel settings aligned with the frontmost app profile.
+
+### History, snippets, and collections
+
+The app keeps recent capture history locally and lets you turn useful results into reusable assets.
+
+You can:
+- pin important history items
+- save named snippets
+- tag snippets
+- search by name, text, app, and tag
+- save filters as named snippet collections
+- reopen those collections later from the UI, Terminal, URL scheme, or Shortcuts
+
+When the related app becomes active again, ScreenTextGrab can:
+- suggest the best saved region
+- suggest the best snippet collection
+- offer the single best matching snippet directly in the menu panel
+- learn repeated snippet choices for the same app or window
+
+### Import and Finder integration
+
+ScreenTextGrab supports image and PDF OCR beyond on-screen capture.
+
+Available entry points:
+- clipboard image OCR
+- local image file OCR
+- local PDF OCR
+- searchable PDF export
+- drag and drop onto the menu panel
+- Finder `Open With > ScreenTextGrab`
+- Finder Services: `OCR with ScreenTextGrab`
 
 ## Automation
 
-ScreenTextGrab now exposes lightweight automation entry points for shell tools, Apple Shortcuts, and launcher workflows.
+ScreenTextGrab exposes lightweight automation entry points for shell tools, launchers, and Apple Shortcuts.
 
-### Terminal command
+### `stg` terminal command
 
 ```bash
 stg capture --mode table --output office
@@ -103,156 +278,25 @@ open 'stg://searchable-pdf?path=/absolute/path/to/sample.pdf&destination=/absolu
 
 Supported query parameters:
 
-- `name=Saved Region Name`
 - `name=Saved Region or Snippet Name`
 - `mode=standard|subtitle|code|table`
 - `output=smart|plain-text|cleaned|office|markdown|json`
 - `languages=tr,en`
 - `ocr-auto=true|false`
 
-### Direct app binary
-
-```bash
-/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab --capture --mode table --output office
-/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab --repeat-last --mode code --output markdown
-/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab --saved-region --name "Safari • Revenue Table"
-/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab --active-snippet
-/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab --snippet --name "Price List"
-/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab --snippet-collection --name "Excel Reports"
-/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab --clipboard-image --mode standard --output cleaned
-/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab --image-file --path /absolute/path/to/table.png --mode table --output office
-/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab --pdf-file --path /absolute/path/to/sample.pdf --mode standard --output cleaned
-/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab --pdf-searchable --path /absolute/path/to/sample.pdf --destination /absolute/path/to/sample-searchable.pdf
-```
-
 For scripts and launchers, the URL scheme is the recommended stable entry point because it also works while the app is already running.
 
-## Clipboard, image, and PDF OCR
-
-If you already copied a screenshot or image, you can skip region selection entirely:
-
-1. Copy the image to the clipboard.
-2. Run `stg clipboard-image` or use the `Read Clipboard Image` button in the menu bar.
-3. ScreenTextGrab OCRs the clipboard image with the current mode and output format.
-
-If the image already exists as a file:
-
-1. Run `stg file-image --path /absolute/path/to/image.png`.
-2. Or use the `Read Image File` button in the menu bar.
-3. ScreenTextGrab loads the file, runs local OCR, and copies the result with the active mode and output preset.
-4. You can also drag the image file directly onto the launch panel or the menu panel.
-5. Or choose `Open With > ScreenTextGrab` in Finder.
-6. Or use the Finder Services action `OCR with ScreenTextGrab`.
-
-If the source is a PDF:
-
-1. Run `stg pdf-file --path /absolute/path/to/file.pdf` to copy OCR text from all pages.
-2. Or use the `Read PDF` button in the menu bar.
-3. To create an exportable searchable PDF, run `stg pdf-searchable --path /absolute/path/to/file.pdf`.
-4. Or use the `Searchable PDF` button in the menu bar and choose where to save the output.
-5. You can also drag the PDF file directly onto the launch panel or the menu panel.
-6. Or choose `Open With > ScreenTextGrab` in Finder.
-7. Or use the Finder Services action `OCR with ScreenTextGrab`.
-
-## Saved regions
-
-If you repeatedly OCR the same part of the screen:
-
-1. Capture it once.
-2. Open `Settings > History`.
-3. Use `Save Last Region`.
-4. Run it later from the saved regions list, the `stg saved-region` command, or the URL scheme.
-5. When the related app becomes active again, ScreenTextGrab surfaces the newest matching saved region directly in the menu panel.
-6. If accessibility access is already enabled, the suggestion becomes smarter and prefers regions that match the current window title.
-7. If `Smart Start` is enabled, the main capture button automatically runs the best matching saved region instead of asking you to select an area again.
-
-## App profiles
-
-If different apps need different OCR defaults:
-
-1. Open `Settings > General`.
-2. Save a profile from `Create Profile from Running App`.
-3. ScreenTextGrab will automatically use that profile during capture whenever the app becomes active.
-4. If you also enable `Smart Panel Sync`, the menu panel updates its visible mode, output preset, and OCR languages to match the same app profile.
-
-## Saved snippets
-
-If you want to keep reusable OCR results without searching through the full history:
-
-1. Open `Settings > History`.
-2. Save the latest result with `Save Latest Result` or use `Create Snippet` on any history row.
-3. Re-copy the saved snippet later from the snippet list, the `stg snippet` command, or the URL scheme.
-4. Snippets preserve the original capture mode and output preset, so table, code, and Office formatting stay intact.
-5. Snippets are automatically tagged from the source app, capture mode, and output style so you can filter them like lightweight collections.
-6. You can add your own tags and search by name, text, app, or tag from the same settings panel.
-7. You can save the current snippet filter as a named collection and reopen the same view later with one click.
-8. Saved collections can also be opened from `stg snippet-collection`, the URL scheme, or Shortcuts.
-9. When the related app becomes active again, ScreenTextGrab can surface the best matching snippet collection directly in the menu panel.
-10. If exactly one snippet is the clear match for the active app or window, ScreenTextGrab offers it directly from the menu so you can copy it in one click.
-11. If multiple snippets are still relevant, the menu panel shows the top matching snippet actions so you can copy one without opening History first.
-12. When you keep reusing the same snippet for an app or window, ScreenTextGrab learns that preference and promotes it as the primary action next time.
-13. The same active app suggestion can also be triggered from automation with `stg active-snippet`, the `stg://active-snippet` URL, or Shortcuts.
-14. If `Smart Collection Sync` is enabled, the `History` tab automatically applies the best matching collection for the active app.
-15. When the active app has a saved profile, copying a saved snippet automatically adapts the output preset and clipboard payload for that target app without losing the snippet's original source metadata.
-16. The same target-app adaptation also applies when you re-copy a history item, use `copy as...` actions, or copy a reviewed table from the table editor.
-
-## Capture modes
-
-| Mode | Best for |
-| --- | --- |
-| `Standard` | documents, UI text, dashboards, general interface copy |
-| `Subtitle` | video subtitles, overlays, repeated lower-third text |
-| `Code` | code blocks, logs, terminals, developer tools |
-| `Table` | spreadsheets, price lists, multi-column layouts |
-
-## Output formats
-
-| Output | Use case |
-| --- | --- |
-| `Smart` | best default output for the selected mode |
-| `Plain Text` | raw text paste |
-| `Cleaned` | cleaned OCR output from noisy captures |
-| `Office` | rich paste for Excel, Numbers, Word, and Pages |
-| `Markdown` | notes, docs, code blocks |
-| `JSON` | automation and structured post-processing |
-
-## Office-ready tables
-
-For the best spreadsheet workflow:
-
-1. Choose `Table` mode.
-2. Choose `Office` output.
-3. Capture the table.
-4. Adjust rows or columns in the built-in table review window if needed.
-5. Paste into Excel, Numbers, Word, or Pages.
-
-## History and favorites
-
-ScreenTextGrab keeps recent capture results locally inside the app.
-
-- Pin important items so they stay at the top of the history list
-- Save reusable entries as named snippets for one-click copy later
-- Filter the history view to pinned entries only
-- Re-copy previous results without repeating OCR
-- Keep table, code, subtitle, and file-based OCR results in one place
-
-## Product tour
+## Product Tour
 
 ### Menu panel
 
-The menu panel is the primary workspace for quick capture, mode switching, output control, saved-region suggestions, active snippet suggestions, and one-click file OCR.
+The menu panel is the day-to-day workspace for capture, mode switching, output control, quick import actions, and contextual suggestions.
 
 ![Menu panel](docs/screenshots/menu-panel.png)
 
-### Launch panel
-
-The launch panel is the lightweight first-run surface. It explains the menu bar flow, shortcut usage, permission status, includes a quick language picker, and supports drag-and-drop import for image and PDF files.
-
-![Launch panel](docs/screenshots/launch-panel.png)
-
 ### Settings: General
 
-The General tab centralizes the interface language, capture defaults, output presets, shortcut setup, launch-at-login, watch behavior, permission checks, and app profile controls.
+The General tab covers interface language, capture defaults, output presets, shortcut setup, launch-at-login, watch behavior, and app profile controls.
 
 ![Settings general](docs/screenshots/settings-general.png)
 
@@ -264,21 +308,30 @@ The OCR tab controls automatic language detection and the recognition language s
 
 ### Settings: History
 
-The History tab is the operational archive for saved regions, reusable snippets, saved snippet collections, and recent capture history.
+The History tab is the operational archive for recent captures, saved regions, reusable snippets, and saved snippet collections.
 
 ![Settings history](docs/screenshots/settings-history.png)
 
 ### Settings: Diagnostics
 
-The Diagnostics tab helps verify permissions, environment state, version details, and troubleshooting metadata when a user needs to confirm the runtime setup.
+The Diagnostics tab helps verify permissions, runtime state, version details, and troubleshooting metadata.
 
 ![Settings diagnostics](docs/screenshots/settings-diagnostics.png)
 
 ### Table review
 
-The built-in table review window lets you correct OCR output cell by cell before copying it back as Office, Markdown, JSON, or plain text output.
+The table review window lets you correct OCR output cell by cell before copying it back as Office, Markdown, JSON, or plain text.
 
 ![Table review](docs/screenshots/table-review.png)
+
+## Typical Use Cases
+
+- Copy a subtitle from a video without pausing your workflow
+- Turn a copied screenshot into editable text
+- Pull a table out of a web page and paste it into Excel
+- Convert a scanned PDF into a searchable document
+- Save a recurring dashboard area and rerun it later with one click
+- Keep reusable OCR results as snippets for the apps you use every day
 
 ## Privacy
 
@@ -289,7 +342,7 @@ ScreenTextGrab does not upload screenshots or OCR results to a remote service. O
 - macOS 14 or newer
 - Xcode 15 or newer only if you are building from source
 
-## Project docs
+## Project Docs
 
 - [Release downloads](https://github.com/batu3384/ScreenTextGrab/releases/latest)
 - [Contributing guide](CONTRIBUTING.md)

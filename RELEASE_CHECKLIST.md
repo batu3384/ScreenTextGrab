@@ -85,7 +85,7 @@ APP_PATH=dist/.app-bundles.noindex/ScreenTextGrab.app ./scripts/verify_release.s
 APP_PATH=dist/.app-bundles.noindex/ScreenTextGrab.app VERIFY_MODE=local ./scripts/verify_release.sh
 ```
 
-- To rerun the launch-panel UI automation locally, use the same ad-hoc signing flags as CI:
+- To rerun the menu-panel UI automation locally, use the same ad-hoc signing flags as CI:
 
 ```bash
 xcodebuild test \

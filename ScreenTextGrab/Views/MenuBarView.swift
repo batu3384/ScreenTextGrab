@@ -1,21 +1,15 @@
 import AppKit
-import Carbon
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
     @EnvironmentObject var appState: AppState
-    @State private var isRecordingHotkey = false
-    @State private var hotkeyFeedback: HotkeyFeedback?
-    @State private var launchAtLoginFeedback: InlineFeedback?
     @State private var captureModeFeedback: InlineFeedback?
     @State private var outputPresetFeedback: InlineFeedback?
-    @State private var languageFeedback: InlineFeedback?
     @State private var ocrFeedback: InlineFeedback?
     @State private var smartActionFeedback: InlineFeedback?
     @State private var isImportDropTargeted = false
-    @State private var hotkeyRecorderMonitor: Any?
 
     var body: some View {
         ZStack {
@@ -36,7 +30,6 @@ struct MenuBarView: View {
             openWindow(id: ScreenTextGrabApp.settingsWindowID)
         }
         .onAppear {
-            refreshLaunchAtLoginState()
             refreshPermission()
         }
     }
@@ -70,15 +63,15 @@ struct MenuBarView: View {
     }
 
     private var panelWidth: CGFloat {
-        isCompactPanel ? 356 : 372
+        isCompactPanel ? 348 : 374
     }
 
     private var panelPadding: CGFloat {
-        isCompactPanel ? 12 : 14
+        isCompactPanel ? 11 : 13
     }
 
     private var sectionSpacing: CGFloat {
-        isCompactPanel ? 10 : 12
+        isCompactPanel ? 9 : 11
     }
 
     private var preferredPanelScreen: NSScreen? {
@@ -118,17 +111,11 @@ struct MenuBarView: View {
                             captureModeToggle(mode)
                         }
                     }
-
-                    Text(selectedModeSummary)
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.76))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 quickSettingRow(
                     title: L10n.pair("Çıktı Biçimi", "Output Format"),
-                    detail: L10n.pair("Yakalamadan sonra panoya hangi biçimin kopyalanacağını seçersin.", "Choose which format will be copied to the clipboard after capture.")
+                    detail: L10n.pair("Panoya kopyalanacak biçimi belirle.", "Choose the format copied to the clipboard.")
                 ) {
                     Menu {
                         ForEach(CaptureOutputPreset.allCases) { preset in
@@ -148,6 +135,7 @@ struct MenuBarView: View {
                         HStack(spacing: 8) {
                             Image(systemName: outputPresetIcon(for: appState.captureOutputPreset))
                                 .font(.system(size: 10.5, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.9))
 
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(appState.captureOutputPreset.title)
@@ -168,71 +156,19 @@ struct MenuBarView: View {
                         .font(.system(size: 10.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .frame(minWidth: isCompactPanel ? 156 : 172, alignment: .leading)
+                        .padding(.vertical, 7)
+                        .frame(minWidth: isCompactPanel ? 146 : 160, alignment: .leading)
                         .background(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.white.opacity(0.10))
+                                .fill(Color.controlFillStrong)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(Color.accentCool.opacity(0.08))
+                                )
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.white.opacity(0.14), lineWidth: 1)
-                        )
-                    }
-                    .menuStyle(.borderlessButton)
-                }
-
-                quickSettingRow(
-                    title: L10n.pair("Arayüz Dili", "Interface Language"),
-                    detail: appState.interfaceLanguage.detail
-                ) {
-                    Menu {
-                        ForEach(InterfaceLanguage.allCases) { language in
-                            Button {
-                                setInterfaceLanguage(language)
-                            } label: {
-                                HStack {
-                                    Text(language.title)
-                                    if language == appState.interfaceLanguage {
-                                        Spacer()
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "globe")
-                                .font(.system(size: 10.5, weight: .bold))
-
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(appState.interfaceLanguage.title)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-
-                                Text(L10n.pair("Panel ve ayarlar için", "For the panel and settings"))
-                                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                                    .foregroundStyle(Color.white.opacity(0.68))
-                                    .lineLimit(2)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.65))
-                        }
-                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .frame(minWidth: isCompactPanel ? 156 : 172, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.white.opacity(0.10))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                                .stroke(Color.controlStroke, lineWidth: 1)
                         )
                     }
                     .menuStyle(.borderlessButton)
@@ -242,103 +178,7 @@ struct MenuBarView: View {
                     .fill(Color.white.opacity(0.08))
                     .frame(height: 1)
 
-                HStack(alignment: .center, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L10n.pair("Kısayol", "Shortcut"))
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-
-                        Text(isRecordingHotkey ? L10n.pair("Yeni tuşu gir", "Enter new shortcut") : appState.hotkeyDisplayLabel)
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color.white.opacity(0.66))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.82)
-                    }
-
-                    Spacer(minLength: 8)
-
-                    HStack(spacing: 8) {
-                        Button(action: toggleHotkeyRecording) {
-                            Text(isRecordingHotkey ? L10n.pair("Tuşa Bas...", "Press Keys...") : appState.hotkeyDisplayLabel)
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.78)
-                                .padding(.horizontal, isCompactPanel ? 10 : 11)
-                                .padding(.vertical, isCompactPanel ? 7 : 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill((isRecordingHotkey ? Color.accentCool : Color.white).opacity(isRecordingHotkey ? 0.22 : 0.12))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-
-                        iconActionButton(
-                            systemName: "arrow.counterclockwise",
-                            tint: .accentNeutral,
-                            accessibilityLabel: L10n.accessibilityResetHotkey,
-                            action: resetHotkey
-                        )
-                    }
-                }
-
-                Group {
-                    if isCompactPanel {
-                        VStack(spacing: 10) {
-                            compactControlCard(
-                                title: L10n.pair("İzleme", "Watch"),
-                                subtitle: appState.watchState.isActive ? L10n.pair("Arka planda çalışıyor", "Running in background") : L10n.pair("Kapalı", "Off"),
-                                tint: watchTint,
-                                actionTitle: appState.watchState.isActive || appState.watchState == .selecting ? L10n.pair("Durdur", "Stop") : L10n.pair("Başlat", "Start"),
-                                actionIcon: appState.watchState.isActive || appState.watchState == .selecting ? "stop.fill" : "dot.scope",
-                                action: toggleWatching
-                            )
-
-                            compactToggleCard(
-                                title: L10n.pair("Açılışta Başlat", "Launch at Login"),
-                                subtitle: appState.launchAtLoginState.title,
-                                tint: launchAtLoginTint
-                            ) {
-                                Toggle("", isOn: launchAtLoginBinding)
-                                    .labelsHidden()
-                                    .toggleStyle(.switch)
-                                    .tint(.accentMint)
-                                    .accessibilityLabel(L10n.accessibilityLaunchAtLoginToggle)
-                            }
-                        }
-                    } else {
-                        HStack(spacing: 10) {
-                            compactControlCard(
-                                title: L10n.pair("İzleme", "Watch"),
-                                subtitle: appState.watchState.isActive ? L10n.pair("Arka planda çalışıyor", "Running in background") : L10n.pair("Kapalı", "Off"),
-                                tint: watchTint,
-                                actionTitle: appState.watchState.isActive || appState.watchState == .selecting ? L10n.pair("Durdur", "Stop") : L10n.pair("Başlat", "Start"),
-                                actionIcon: appState.watchState.isActive || appState.watchState == .selecting ? "stop.fill" : "dot.scope",
-                                action: toggleWatching
-                            )
-
-                            compactToggleCard(
-                                title: L10n.pair("Açılışta Başlat", "Launch at Login"),
-                                subtitle: appState.launchAtLoginState.title,
-                                tint: launchAtLoginTint
-                            ) {
-                                Toggle("", isOn: launchAtLoginBinding)
-                                    .labelsHidden()
-                                    .toggleStyle(.switch)
-                                    .tint(.accentMint)
-                                    .accessibilityLabel(L10n.accessibilityLaunchAtLoginToggle)
-                            }
-                        }
-                    }
-                }
-
-                if let hotkeyFeedback {
-                    feedbackText(hotkeyFeedback.message, tint: hotkeyFeedback.tint)
-                }
+                watchRow
 
                 if let captureModeFeedback {
                     feedbackText(captureModeFeedback.message, tint: captureModeFeedback.tint)
@@ -346,23 +186,6 @@ struct MenuBarView: View {
 
                 if let outputPresetFeedback {
                     feedbackText(outputPresetFeedback.message, tint: outputPresetFeedback.tint)
-                }
-
-                if let languageFeedback {
-                    feedbackText(languageFeedback.message, tint: languageFeedback.tint)
-                }
-
-                if let launchAtLoginFeedback {
-                    feedbackText(launchAtLoginFeedback.message, tint: launchAtLoginFeedback.tint)
-                }
-
-                if appState.launchAtLoginState == .requiresApproval {
-                    compactInlineButton(
-                        title: L10n.actionLoginItems,
-                        icon: "person.crop.circle.badge.gearshape",
-                        tint: .accentAmber,
-                        action: openLoginItemsSettings
-                    )
                 }
 
                 if shouldShowSmartActionsPanel {
@@ -412,17 +235,24 @@ struct MenuBarView: View {
         )
         .overlay(alignment: .topTrailing) {
             Circle()
-                .fill(Color.accentMint.opacity(0.20))
-                .frame(width: 132, height: 132)
-                .blur(radius: 24)
-                .offset(x: 44, y: -36)
+                .fill(Color.accentCool.opacity(0.16))
+                .frame(width: 168, height: 168)
+                .blur(radius: 36)
+                .offset(x: 54, y: -52)
         }
         .overlay(alignment: .bottomLeading) {
             Circle()
-                .fill(Color.accentAmber.opacity(0.16))
-                .frame(width: 150, height: 150)
-                .blur(radius: 32)
-                .offset(x: -36, y: 50)
+                .fill(Color.accentWarm.opacity(0.12))
+                .frame(width: 184, height: 184)
+                .blur(radius: 42)
+                .offset(x: -56, y: 70)
+        }
+        .overlay {
+            LinearGradient(
+                colors: [Color.white.opacity(0.06), Color.clear, Color.black.opacity(0.10)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
         }
         .ignoresSafeArea()
     }
@@ -438,19 +268,21 @@ struct MenuBarView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("ScreenTextGrab")
-                    .font(.system(size: isCompactPanel ? 16.5 : 18, weight: .semibold, design: .rounded))
+                    .font(.system(size: isCompactPanel ? 15 : 16.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
 
                 Text(headerLine)
-                    .font(.system(size: isCompactPanel ? 10.5 : 11.5, weight: .medium, design: .rounded))
+                    .font(.system(size: isCompactPanel ? 10 : 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.white.opacity(0.68))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .minimumScaleFactor(0.8)
             }
 
             Spacer()
 
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
                 updateActionButton
 
                 iconActionButton(
@@ -519,16 +351,17 @@ struct MenuBarView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 LinearGradient(
-                    colors: canStartCapture ? [.accentAmber, .accentCoral] : [.white.opacity(0.12), .white.opacity(0.08)],
+                    colors: canStartCapture ? [.accentAmber, .accentCoral] : [Color.controlFillStrong, Color.controlFill],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    .stroke(canStartCapture ? Color.white.opacity(0.14) : Color.controlStroke, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .shadow(color: canStartCapture ? Color.black.opacity(0.18) : .clear, radius: 12, y: 8)
         }
         .buttonStyle(.plain)
         .disabled(!canStartCapture)
@@ -571,47 +404,21 @@ struct MenuBarView: View {
 
     private var actions: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                if appState.permissionState == .denied || appState.permissionState == .unknown {
-                    secondaryButton(title: L10n.actionAllow, icon: "lock.open.display", tint: .accentAmber, action: requestPermission)
-                } else if appState.permissionState == .requiresRestart {
-                    secondaryButton(title: L10n.actionSystemSettings, icon: "gearshape.2", tint: .accentNeutral, action: openSystemSettings)
+            if shouldShowPermissionActions {
+                HStack(spacing: 8) {
+                    if appState.permissionState == .denied || appState.permissionState == .unknown {
+                        secondaryButton(title: L10n.actionAllow, icon: "lock.open.display", tint: .accentAmber, action: requestPermission)
+                    } else if appState.permissionState == .requiresRestart {
+                        secondaryButton(title: L10n.actionSystemSettings, icon: "gearshape.2", tint: .accentNeutral, action: openSystemSettings)
+                    }
+
+                    secondaryButton(title: L10n.actionRefresh, icon: "arrow.clockwise", tint: .accentMint, action: refreshPermission)
                 }
+            }
 
+            HStack(spacing: 8) {
+                importMenuButton
                 secondaryButton(title: L10n.actionSettings, icon: "slider.horizontal.3", tint: .accentNeutral, action: openSettingsWindow)
-                secondaryButton(title: L10n.actionRefresh, icon: "arrow.clockwise", tint: .accentMint, action: refreshPermission)
-            }
-
-            HStack(spacing: 8) {
-                secondaryButton(
-                    title: L10n.actionClipboardImage,
-                    icon: "photo.on.rectangle",
-                    tint: .accentCool,
-                    action: startClipboardImageCapture
-                )
-
-                secondaryButton(
-                    title: L10n.actionImageFile,
-                    icon: "photo",
-                    tint: .accentNeutral,
-                    action: startImageFileCapture
-                )
-            }
-
-            HStack(spacing: 8) {
-                secondaryButton(
-                    title: L10n.actionPDFFile,
-                    icon: "doc.text.viewfinder",
-                    tint: .accentWarm,
-                    action: startPDFFileCapture
-                )
-
-                secondaryButton(
-                    title: L10n.actionSearchablePDF,
-                    icon: "doc.badge.gearshape",
-                    tint: .accentMint,
-                    action: exportSearchablePDF
-                )
             }
         }
     }
@@ -656,94 +463,182 @@ struct MenuBarView: View {
         !smartActions.isEmpty || canOfferSpeechAction
     }
 
-    private func compactControlCard(
-        title: String,
-        subtitle: String,
-        tint: Color,
-        actionTitle: String,
-        actionIcon: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        VStack(alignment: .leading, spacing: isCompactPanel ? 6 : 8) {
-            Text(title)
-                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
-
-            Text(subtitle)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.white.opacity(0.66))
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-
-            compactInlineButton(title: actionTitle, icon: actionIcon, tint: tint, action: action)
-        }
-        .padding(isCompactPanel ? 10 : 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
-    }
-
-    private func compactToggleCard<Control: View>(
-        title: String,
-        subtitle: String,
-        tint: Color,
-        @ViewBuilder control: () -> Control
-    ) -> some View {
-        VStack(alignment: .leading, spacing: isCompactPanel ? 6 : 8) {
-            HStack(spacing: 8) {
-                Text(title)
+    private var watchRow: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L10n.pair("İzleme", "Watch"))
                     .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
 
-                Spacer(minLength: 8)
-
-                control()
+                Text(watchSummary)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.white.opacity(0.66))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text(subtitle)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(tint)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+
+            HStack(spacing: 8) {
+                statusBadge(text: watchStatusTitle, tint: watchTint)
+                smallActionButton(
+                    title: watchActionTitle,
+                    icon: watchActionIcon,
+                    tint: watchTint,
+                    action: toggleWatching
+                )
+            }
         }
-        .padding(isCompactPanel ? 10 : 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
+        .padding(.vertical, 1)
+    }
+
+    private var importMenuButton: some View {
+        Menu {
+            Button(action: startClipboardImageCapture) {
+                Label(L10n.actionClipboardImage, systemImage: "photo.on.rectangle")
+            }
+
+            Button(action: startImageFileCapture) {
+                Label(L10n.actionImageFile, systemImage: "photo")
+            }
+
+            Button(action: startPDFFileCapture) {
+                Label(L10n.actionPDFFile, systemImage: "doc.text.viewfinder")
+            }
+
+            Button(action: exportSearchablePDF) {
+                Label(L10n.actionSearchablePDF, systemImage: "doc.badge.gearshape")
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "tray.and.arrow.down")
+                    .frame(width: isCompactPanel ? 11 : 12)
+
+                Text(L10n.pair("İçe Aktar", "Import"))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8.5, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.64))
+            }
+            .font(.system(size: isCompactPanel ? 9.6 : 10.2, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, isCompactPanel ? 10 : 11)
+            .padding(.vertical, isCompactPanel ? 7 : 8)
+            .frame(maxWidth: .infinity, minHeight: isCompactPanel ? 40 : 42)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.controlFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.accentCool.opacity(0.13))
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.controlStrokeStrong, lineWidth: 1)
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .accessibilityLabel(L10n.pair("İçe Aktar", "Import"))
+    }
+
+    private func smallActionButton(title: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .frame(width: isCompactPanel ? 10 : 11)
+                Text(title)
+            }
+            .font(.system(size: isCompactPanel ? 9.5 : 10, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .padding(.horizontal, isCompactPanel ? 10 : 11)
+            .padding(.vertical, isCompactPanel ? 6.5 : 7.5)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.controlFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(tint.opacity(0.14))
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.controlStrokeStrong, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var shouldShowPermissionActions: Bool {
+        appState.permissionState == .denied ||
+        appState.permissionState == .unknown ||
+        appState.permissionState == .requiresRestart
+    }
+
+    private var watchStatusTitle: String {
+        switch appState.watchState {
+        case .active:
+            return L10n.pair("Açık", "On")
+        case .selecting:
+            return L10n.pair("Seçim", "Selecting")
+        case .inactive:
+            return L10n.pair("Kapalı", "Off")
+        }
+    }
+
+    private var watchSummary: String {
+        switch appState.watchState {
+        case .active:
+            return L10n.pair("Seçilen alan arka planda izleniyor.", "The selected region is being watched in the background.")
+        case .selecting:
+            return L10n.pair("İzlenecek alanı seçmen bekleniyor.", "Waiting for you to pick a region to watch.")
+        case .inactive:
+            return L10n.pair("Tekrar eden içerikleri otomatik izle.", "Automatically monitor repeating content.")
+        }
+    }
+
+    private var watchActionTitle: String {
+        appState.watchState == .active || appState.watchState == .selecting
+            ? L10n.pair("Durdur", "Stop")
+            : L10n.pair("Başlat", "Start")
+    }
+
+    private var watchActionIcon: String {
+        appState.watchState == .active || appState.watchState == .selecting ? "stop.fill" : "dot.scope"
     }
 
     private func compactInlineButton(title: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
+                    .frame(width: isCompactPanel ? 11 : 12)
                 Text(title)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .font(.system(size: isCompactPanel ? 10 : 10.5, weight: .semibold, design: .rounded))
+            .font(.system(size: isCompactPanel ? 9.6 : 10.1, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
-            .lineLimit(1)
-            .minimumScaleFactor(0.82)
+            .lineLimit(2)
+            .minimumScaleFactor(0.8)
             .padding(.horizontal, isCompactPanel ? 9 : 10)
-            .padding(.vertical, isCompactPanel ? 7 : 8)
-            .frame(maxWidth: .infinity)
+            .padding(.vertical, isCompactPanel ? 6.5 : 7.5)
+            .frame(maxWidth: .infinity, minHeight: isCompactPanel ? 34 : 36)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(tint.opacity(0.18))
+                    .fill(Color.controlFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(tint.opacity(0.13))
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(tint.opacity(0.24), lineWidth: 1)
+                    .stroke(Color.controlStrokeStrong, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -751,11 +646,21 @@ struct MenuBarView: View {
 
     private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 0, content: content)
-            .padding(isCompactPanel ? 12 : 14)
+            .padding(isCompactPanel ? 11 : 13)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.cardFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.04), Color.clear],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -771,11 +676,11 @@ struct MenuBarView: View {
         HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.system(size: isCompactPanel ? 11.5 : 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
 
                 Text(detail)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                    .font(.system(size: isCompactPanel ? 10 : 10.3, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.white.opacity(0.66))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -788,33 +693,47 @@ struct MenuBarView: View {
 
     private func statusBadge(text: String, tint: Color) -> some View {
         Text(text)
-            .font(.system(size: 10.5, weight: .bold, design: .rounded))
+            .font(.system(size: isCompactPanel ? 10 : 10.5, weight: .bold, design: .rounded))
             .foregroundStyle(tint)
             .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(tint.opacity(0.14), in: Capsule(style: .continuous))
+            .padding(.vertical, 4.5)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.controlFill)
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .fill(tint.opacity(0.13))
+                    )
+            )
     }
 
     private func secondaryButton(title: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
+                    .frame(width: isCompactPanel ? 11 : 12)
                 Text(title)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .font(.system(size: isCompactPanel ? 10 : 11, weight: .semibold, design: .rounded))
+            .font(.system(size: isCompactPanel ? 9.6 : 10.2, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
-            .lineLimit(1)
-            .minimumScaleFactor(0.82)
+            .lineLimit(2)
+            .minimumScaleFactor(0.8)
             .padding(.horizontal, isCompactPanel ? 10 : 11)
-            .padding(.vertical, isCompactPanel ? 8 : 9)
-            .frame(maxWidth: .infinity)
+            .padding(.vertical, isCompactPanel ? 7 : 8)
+            .frame(maxWidth: .infinity, minHeight: isCompactPanel ? 40 : 42)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(tint.opacity(0.16))
+                    .fill(Color.controlFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(tint.opacity(0.12))
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(tint.opacity(0.2), lineWidth: 1)
+                    .stroke(Color.controlStrokeStrong, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -825,30 +744,34 @@ struct MenuBarView: View {
         Button(action: performUpdateAction) {
             HStack(spacing: 6) {
                 Image(systemName: appState.updateState.buttonIcon)
-                    .font(.system(size: isCompactPanel ? 9.5 : 10.5, weight: .bold))
+                    .font(.system(size: isCompactPanel ? 9 : 10, weight: .bold))
 
-                Text(appState.updateState.buttonTitle)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.74)
+                Text(updateButtonTitle)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.84)
             }
-            .font(.system(size: isCompactPanel ? 9.5 : 10.5, weight: .semibold, design: .rounded))
+            .font(.system(size: isCompactPanel ? 8.9 : 9.8, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
-            .padding(.horizontal, isCompactPanel ? 9 : 10)
+            .padding(.horizontal, isCompactPanel ? 10 : 11)
             .padding(.vertical, isCompactPanel ? 6 : 7)
-            .frame(width: isCompactPanel ? 122 : 138, height: isCompactPanel ? 30 : 32)
+            .frame(width: updateButtonWidth, height: isCompactPanel ? 32 : 34)
             .background(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(updateButtonTint.opacity(0.18))
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color.controlFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .fill(updateButtonTint.opacity(updateButtonBackgroundOpacity))
+                    )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .stroke(updateButtonTint.opacity(0.28), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .stroke(updateButtonTint.opacity(0.48), lineWidth: 1)
             )
+            .shadow(color: updateButtonTint.opacity(appState.updateManager == nil ? 0 : 0.16), radius: 8, y: 3)
         }
         .buttonStyle(.plain)
         .disabled(appState.updateState.isBusy || appState.updateManager == nil)
-        .opacity(appState.updateManager == nil ? 0.55 : 1)
+        .opacity(appState.updateManager == nil ? 0.62 : 1)
         .help(appState.updateState.helpText)
         .accessibilityLabel(L10n.accessibilityCheckForUpdates)
     }
@@ -863,14 +786,18 @@ struct MenuBarView: View {
             Image(systemName: systemName)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(.white)
-                .frame(width: isCompactPanel ? 28 : 30, height: isCompactPanel ? 28 : 30)
+                .frame(width: isCompactPanel ? 30 : 32, height: isCompactPanel ? 30 : 32)
                 .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(tint.opacity(0.16))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.controlFill)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(tint.opacity(0.12))
+                        )
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(tint.opacity(0.2), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.controlStrokeStrong, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
@@ -886,12 +813,19 @@ struct MenuBarView: View {
 
     private func captureModeToggle(_ mode: CaptureMode) -> some View {
         let isSelected = appState.captureMode == mode
+        let tint = captureModeTint(for: mode)
 
         return Button(action: { setCaptureMode(mode) }) {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Image(systemName: captureModeIcon(for: mode))
                         .font(.system(size: isCompactPanel ? 9.5 : 10.5, weight: .bold))
+                        .foregroundStyle(isSelected ? .white : tint)
+                        .frame(width: isCompactPanel ? 22 : 24, height: isCompactPanel ? 22 : 24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(isSelected ? Color.white.opacity(0.14) : tint.opacity(0.12))
+                        )
                     Text(mode.title)
                         .font(.system(size: isCompactPanel ? 11 : 12, weight: .bold, design: .rounded))
                         .lineLimit(1)
@@ -912,15 +846,67 @@ struct MenuBarView: View {
             .frame(maxWidth: .infinity, minHeight: isCompactPanel ? 68 : 74, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill((isSelected ? Color.accentAmber : Color.white).opacity(isSelected ? 0.24 : 0.10))
+                    .fill(isSelected ? Color.controlFillStrong : Color.controlFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(tint.opacity(isSelected ? 0.18 : 0.07))
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke((isSelected ? Color.accentAmber : Color.white).opacity(0.24), lineWidth: 1)
+                    .stroke(isSelected ? tint.opacity(0.62) : Color.controlStroke, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(L10n.accessibilityCaptureMode): \(mode.title)")
+    }
+
+    private func captureModeTint(for mode: CaptureMode) -> Color {
+        switch mode {
+        case .standard:
+            return .accentCool
+        case .subtitle:
+            return .accentMint
+        case .code:
+            return .accentNeutral
+        case .table:
+            return .accentWarm
+        }
+    }
+
+    private var updateButtonTitle: String {
+        switch appState.updateState {
+        case .idle:
+            return L10n.pair("Kontrol Et", "Check")
+        case .checking:
+            return L10n.pair("Kontrol...", "Checking...")
+        case .downloading(_, let progressPercent):
+            guard let progressPercent else {
+                return L10n.pair("İndiriliyor", "Downloading")
+            }
+            return "\(progressPercent)%"
+        case .readyToInstall:
+            return L10n.pair("Yeniden Başlat", "Restart & Update")
+        case .upToDate:
+            return L10n.pair("Güncel", "Up to Date")
+        case .failed:
+            return L10n.pair("Tekrar Dene", "Retry")
+        }
+    }
+
+    private var updateButtonWidth: CGFloat {
+        switch appState.updateState {
+        case .idle, .upToDate:
+            return isCompactPanel ? 92 : 100
+        case .checking:
+            return isCompactPanel ? 106 : 118
+        case .downloading:
+            return isCompactPanel ? 88 : 96
+        case .readyToInstall:
+            return isCompactPanel ? 118 : 138
+        case .failed:
+            return isCompactPanel ? 102 : 112
+        }
     }
 
     private func captureModeIcon(for mode: CaptureMode) -> String {
@@ -964,10 +950,6 @@ struct MenuBarView: View {
         case .json:
             return "curlybraces"
         }
-    }
-
-    private var selectedModeSummary: String {
-        isCompactPanel ? appState.captureMode.readyDescription : appState.captureMode.detail
     }
 
     private var canStartCapture: Bool {
@@ -1106,7 +1088,7 @@ struct MenuBarView: View {
             if let region = primaryQuickStartRegion {
                 switch appState.activeSavedCaptureRegionSuggestion?.matchKind {
                 case .windowTitle(let windowTitle):
-                    return L10n.format("\"%@\" için %@ otomatik seçildi.", "\"%@\" automatically matched %@.", windowTitle, region.name)
+                    return L10n.format("\"%@\" için %@ kullanılacak.", "Using %@ for \"%@\".", region.name, windowTitle)
                 case .application, .none:
                     return L10n.format("%@ hızlı başlangıç için otomatik seçildi.", "%@ was auto-selected for quick start.", region.name)
                 }
@@ -1292,7 +1274,7 @@ struct MenuBarView: View {
         case .application:
             title = L10n.format("%@ için kayıtlı bölge bulundu", "Saved region found for %@", suggestion.source.displayName)
         case .windowTitle:
-            title = L10n.format("%@ için pencere eşleşmesi bulundu", "Window match found for %@", suggestion.source.displayName)
+            title = L10n.format("%@ için eşleşen pencere bölgesi hazır", "Window-ready region for %@", suggestion.source.displayName)
         }
 
         return NoticeContent(
@@ -1343,7 +1325,7 @@ struct MenuBarView: View {
         case .application:
             title = L10n.format("%@ snippet koleksiyonu hazır", "%@ snippet collection is ready", suggestion.source.displayName)
         case .windowTitle:
-            title = L10n.format("%@ için snippet eşleşmesi bulundu", "Snippet match found for %@", suggestion.source.displayName)
+            title = L10n.format("%@ için eşleşen snippet koleksiyonu hazır", "Snippet collection ready for %@", suggestion.source.displayName)
         }
 
         return NoticeContent(
@@ -1501,104 +1483,6 @@ struct MenuBarView: View {
         appState.coordinator?.startCapture(trigger: .menu)
     }
 
-    private func toggleHotkeyRecording() {
-        if isRecordingHotkey {
-            hotkeyFeedback = HotkeyFeedback(
-                message: "Kısayol değiştirme iptal edildi.",
-                tint: .accentNeutral
-            )
-            stopHotkeyRecording()
-            return
-        }
-
-        beginHotkeyRecording()
-    }
-
-    private func beginHotkeyRecording() {
-        stopHotkeyRecording()
-        isRecordingHotkey = true
-        hotkeyFeedback = HotkeyFeedback(
-            message: "Yeni kısayol için bir kombinasyona bas.",
-            tint: .accentCool
-        )
-
-        hotkeyRecorderMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            handleHotkeyRecording(event)
-        }
-    }
-
-    private func handleHotkeyRecording(_ event: NSEvent) -> NSEvent? {
-        guard isRecordingHotkey else {
-            return event
-        }
-
-        if event.keyCode == UInt16(kVK_Escape) {
-            hotkeyFeedback = HotkeyFeedback(
-                message: "Kısayol değiştirme iptal edildi.",
-                tint: .accentNeutral
-            )
-            stopHotkeyRecording()
-            return nil
-        }
-
-        guard let configuration = HotkeyConfiguration.from(event: event) else {
-            hotkeyFeedback = HotkeyFeedback(
-                message: "En az bir değiştirici tuş ile harf, rakam veya özel tuş kullan.",
-                tint: .accentWarm
-            )
-            return nil
-        }
-
-        guard let hotkeyManager = appState.hotkeyManager else {
-            hotkeyFeedback = HotkeyFeedback(
-                message: "Kısayol servisi şu anda hazır değil.",
-                tint: .accentRose
-            )
-            stopHotkeyRecording()
-            return nil
-        }
-
-        do {
-            try hotkeyManager.updateHotkey(to: configuration)
-            hotkeyFeedback = HotkeyFeedback(
-                message: "Kısayol güncellendi: \(configuration.displayLabel)",
-                tint: .accentCool
-            )
-            stopHotkeyRecording()
-        } catch {
-            hotkeyFeedback = HotkeyFeedback(
-                message: error.localizedDescription,
-                tint: .accentRose
-            )
-        }
-
-        return nil
-    }
-
-    private func stopHotkeyRecording() {
-        if let hotkeyRecorderMonitor {
-            NSEvent.removeMonitor(hotkeyRecorderMonitor)
-            self.hotkeyRecorderMonitor = nil
-        }
-        isRecordingHotkey = false
-    }
-
-    private func resetHotkey() {
-        do {
-            try appState.hotkeyManager?.resetHotkeyToDefault()
-            hotkeyFeedback = HotkeyFeedback(
-                message: "Kısayol varsayılana döndü: \(HotkeyConfiguration.defaultValue.displayLabel)",
-                tint: .accentCool
-            )
-            stopHotkeyRecording()
-        } catch {
-            hotkeyFeedback = HotkeyFeedback(
-                message: error.localizedDescription,
-                tint: .accentRose
-            )
-        }
-    }
-
     private func setCaptureMode(_ mode: CaptureMode) {
         guard appState.captureMode != mode else { return }
         appState.setCaptureMode(mode)
@@ -1617,19 +1501,6 @@ struct MenuBarView: View {
         )
     }
 
-    private func setInterfaceLanguage(_ language: InterfaceLanguage) {
-        guard appState.interfaceLanguage != language else { return }
-        appState.setInterfaceLanguage(language)
-        languageFeedback = InlineFeedback(
-            message: language == .system
-                ? L10n.pair("Arayüz artık macOS dilini takip edecek.", "The interface will now follow your macOS language.")
-                : L10n.usesEnglish
-                    ? "The interface switched to \(language.title)."
-                    : "Arayüz \(language.title) olarak değiştirildi.",
-            tint: .accentCool
-        )
-    }
-
     private func applyActiveAppProfileSuggestion(_ suggestion: ActiveAppProfileSuggestion) {
         appState.applyCaptureProfile(suggestion.profile)
         captureModeFeedback = InlineFeedback(
@@ -1642,77 +1513,6 @@ struct MenuBarView: View {
 
     private func runActiveSavedCaptureRegionSuggestion(_ suggestion: ActiveSavedCaptureRegionSuggestion) {
         appState.coordinator?.captureSavedRegion(suggestion.primaryRegion, sessionOverrides: nil)
-    }
-
-    private var launchAtLoginBinding: Binding<Bool> {
-        Binding(
-            get: { appState.launchAtLoginState.toggleIsOn },
-            set: { setLaunchAtLogin($0) }
-        )
-    }
-
-    private var launchAtLoginTint: Color {
-        switch appState.launchAtLoginState {
-        case .enabled:
-            return .accentCool
-        case .disabled:
-            return .accentNeutral
-        case .requiresApproval:
-            return .accentWarm
-        case .unavailable:
-            return .accentRose
-        }
-    }
-
-    private func refreshLaunchAtLoginState() {
-        let state = appState.launchAtLoginManager?.refreshLaunchAtLoginState() ?? .unavailable
-        if state != .enabled {
-            launchAtLoginFeedback = nil
-        }
-    }
-
-    private func setLaunchAtLogin(_ enabled: Bool) {
-        guard let launchAtLoginManager = appState.launchAtLoginManager else {
-            launchAtLoginFeedback = InlineFeedback(
-                message: "Başlangıç servisi şu anda hazır değil.",
-                tint: .accentRose
-            )
-            return
-        }
-
-        Task { @MainActor in
-            do {
-                let state = try await launchAtLoginManager.setLaunchAtLogin(enabled: enabled)
-                switch state {
-                case .enabled:
-                    launchAtLoginFeedback = InlineFeedback(
-                        message: "Uygulama artık bilgisayar açıldığında otomatik başlayacak.",
-                        tint: .accentCool
-                    )
-                case .disabled:
-                    launchAtLoginFeedback = InlineFeedback(
-                        message: "Otomatik başlatma kapatıldı.",
-                        tint: .accentNeutral
-                    )
-                case .requiresApproval:
-                    openLoginItemsSettings()
-                    launchAtLoginFeedback = InlineFeedback(
-                        message: "macOS ek onay istiyor. Giriş Öğeleri açıldı; onaydan sonra durum otomatik yenilenecek.",
-                        tint: .accentWarm
-                    )
-                case .unavailable:
-                    launchAtLoginFeedback = InlineFeedback(
-                        message: LaunchAtLoginError.unavailable.errorDescription ?? "Bu özellik şu anda kullanılamıyor.",
-                        tint: .accentRose
-                    )
-                }
-            } catch {
-                launchAtLoginFeedback = InlineFeedback(
-                    message: error.localizedDescription,
-                    tint: .accentRose
-                )
-            }
-        }
     }
 
     private func toggleOCRLanguage(_ language: OCRLanguagePreference) {
@@ -1751,6 +1551,23 @@ struct MenuBarView: View {
             return .accentMint
         case .failed:
             return .accentRose
+        }
+    }
+
+    private var updateButtonBackgroundOpacity: Double {
+        switch appState.updateState {
+        case .idle:
+            return 0.22
+        case .checking:
+            return 0.18
+        case .downloading:
+            return 0.2
+        case .readyToInstall:
+            return 0.24
+        case .upToDate:
+            return 0.16
+        case .failed:
+            return 0.2
         }
     }
 
@@ -2547,15 +2364,19 @@ struct InlineFeedback {
 }
 
 extension Color {
-    static let surfaceTop = Color(red: 0.05, green: 0.11, blue: 0.15)
-    static let surfaceBottom = Color(red: 0.09, green: 0.18, blue: 0.20)
-    static let accentWarm = Color(red: 0.83, green: 0.57, blue: 0.36)
-    static let accentAmber = Color(red: 0.90, green: 0.63, blue: 0.42)
-    static let accentCoral = Color(red: 0.79, green: 0.39, blue: 0.32)
-    static let accentCool = Color(red: 0.40, green: 0.72, blue: 0.76)
-    static let accentMint = Color(red: 0.53, green: 0.83, blue: 0.76)
-    static let accentNeutral = Color(red: 0.86, green: 0.90, blue: 0.91)
-    static let accentRose = Color(red: 0.84, green: 0.43, blue: 0.39)
-    static let cardFill = Color.white.opacity(0.074)
-    static let cardStroke = Color.white.opacity(0.12)
+    static let surfaceTop = Color(red: 0.03, green: 0.07, blue: 0.11)
+    static let surfaceBottom = Color(red: 0.07, green: 0.12, blue: 0.18)
+    static let accentWarm = Color(red: 0.57, green: 0.73, blue: 0.86)
+    static let accentAmber = Color(red: 0.70, green: 0.85, blue: 0.95)
+    static let accentCoral = Color(red: 0.47, green: 0.76, blue: 0.90)
+    static let accentCool = Color(red: 0.52, green: 0.82, blue: 0.96)
+    static let accentMint = Color(red: 0.63, green: 0.90, blue: 0.93)
+    static let accentNeutral = Color(red: 0.86, green: 0.93, blue: 0.97)
+    static let accentRose = Color(red: 0.51, green: 0.66, blue: 0.80)
+    static let cardFill = Color(red: 0.10, green: 0.15, blue: 0.20).opacity(0.90)
+    static let cardStroke = Color.white.opacity(0.08)
+    static let controlFill = Color(red: 0.96, green: 0.99, blue: 1.0).opacity(0.055)
+    static let controlFillStrong = Color(red: 0.96, green: 0.99, blue: 1.0).opacity(0.082)
+    static let controlStroke = Color(red: 0.80, green: 0.90, blue: 0.98).opacity(0.12)
+    static let controlStrokeStrong = Color(red: 0.80, green: 0.90, blue: 0.98).opacity(0.18)
 }
