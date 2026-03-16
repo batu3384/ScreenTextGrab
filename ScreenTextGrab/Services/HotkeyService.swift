@@ -9,11 +9,11 @@ enum HotkeyRegistrationError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidShortcut:
-            return "Geçerli bir kısayol seçin. En az bir değiştirici tuş gerekir."
+            return L10n.pair("Geçerli bir kısayol seçin. En az bir değiştirici tuş gerekir.", "Choose a valid shortcut. At least one modifier key is required.")
         case .installHandlerFailed(let status):
-            return "Global hotkey event handler kurulamadı (\(status))."
+            return L10n.format("Global hotkey event handler kurulamadı (%d).", "The global hotkey event handler could not be installed (%d).", status)
         case .registerHotKeyFailed(let status):
-            return "Global hotkey kaydedilemedi (\(status)). Muhtemelen kısayol başka bir uygulama tarafından kullanılıyor."
+            return L10n.format("Global hotkey kaydedilemedi (%d). Muhtemelen kısayol başka bir uygulama tarafından kullanılıyor.", "The global hotkey could not be registered (%d). The shortcut is likely in use by another app.", status)
         }
     }
 }

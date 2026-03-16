@@ -72,6 +72,7 @@ final class AppStatePreferencesTests: XCTestCase {
             OCRLanguageSelection(automaticDetection: false, languages: [.turkish]),
             defaults: defaults
         )
+        InterfaceLanguageStore.save(.english, defaults: defaults)
 
         let appState = AppState(defaults: defaults, persistsUserPreferences: true)
 
@@ -87,6 +88,7 @@ final class AppStatePreferencesTests: XCTestCase {
         XCTAssertEqual(appState.historyExportFormat, .json)
         XCTAssertFalse(appState.ocrLanguageSelection.automaticDetection)
         XCTAssertEqual(appState.ocrLanguageSelection.languages, [.turkish])
+        XCTAssertEqual(appState.interfaceLanguage, .english)
     }
 
     func testRecordCopiedTextPersistsHistory() {
@@ -228,6 +230,46 @@ final class AppStatePreferencesTests: XCTestCase {
 
         let restored = AppState(defaults: defaults, persistsUserPreferences: true)
         XCTAssertEqual(restored.captureOutputPreset, .markdown)
+    }
+
+    func testSetInterfaceLanguagePersistsSelection() {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let appState = AppState(defaults: defaults, persistsUserPreferences: true)
+        appState.setInterfaceLanguage(.english)
+
+        let restored = AppState(defaults: defaults, persistsUserPreferences: true)
+        XCTAssertEqual(restored.interfaceLanguage, .english)
+    }
+
+    func testL10nUsesStoredInterfaceLanguagePreference() {
+        let standardDefaults = UserDefaults.standard
+        let previousInterfaceLanguage = standardDefaults.string(forKey: InterfaceLanguageStore.key)
+        let previousAppleLanguages = standardDefaults.array(forKey: "AppleLanguages")
+        defer {
+            if let previousInterfaceLanguage {
+                standardDefaults.set(previousInterfaceLanguage, forKey: InterfaceLanguageStore.key)
+            } else {
+                standardDefaults.removeObject(forKey: InterfaceLanguageStore.key)
+            }
+
+            if let previousAppleLanguages {
+                standardDefaults.set(previousAppleLanguages, forKey: "AppleLanguages")
+            } else {
+                standardDefaults.removeObject(forKey: "AppleLanguages")
+            }
+        }
+
+        standardDefaults.set(["tr"], forKey: "AppleLanguages")
+        InterfaceLanguageStore.save(.english, defaults: standardDefaults)
+        XCTAssertEqual(L10n.pair("Merhaba", "Hello"), "Hello")
+
+        InterfaceLanguageStore.save(.turkish, defaults: standardDefaults)
+        XCTAssertEqual(L10n.pair("Merhaba", "Hello"), "Merhaba")
+
+        InterfaceLanguageStore.save(.system, defaults: standardDefaults)
+        XCTAssertEqual(L10n.pair("Merhaba", "Hello"), "Merhaba")
     }
 
     func testWatchConfigurationPersists() {

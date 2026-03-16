@@ -1,51 +1,86 @@
 import Foundation
 
 enum L10n {
-    static let controlsTitle = NSLocalizedString("controls.title", value: "Kontroller", comment: "")
-    static let settingsTitle = NSLocalizedString("settings.title", value: "ScreenTextGrab Ayarları", comment: "")
-    static let settingsSubtitle = NSLocalizedString("settings.subtitle", value: "Kısayol, izinler, OCR dili ve geçmiş yönetimini buradan düzenle.", comment: "")
+    private static var languageIdentifier: String {
+        if let override = ProcessInfo.processInfo.environment["SCREENTEXTGRAB_UI_LANGUAGE"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(),
+           !override.isEmpty {
+            return override
+        }
 
-    static let settingsTabGeneral = NSLocalizedString("settings.tab.general", value: "Genel", comment: "")
-    static let settingsTabOCR = NSLocalizedString("settings.tab.ocr", value: "OCR", comment: "")
-    static let settingsTabDiagnostics = NSLocalizedString("settings.tab.diagnostics", value: "Tanı", comment: "")
-    static let settingsTabHistory = NSLocalizedString("settings.tab.history", value: "Geçmiş", comment: "")
+        if let storedIdentifier = InterfaceLanguageStore.load().resolvedIdentifier {
+            return storedIdentifier
+        }
 
-    static let actionSettings = NSLocalizedString("action.settings", value: "Ayarlar", comment: "")
-    static let actionRefresh = NSLocalizedString("action.refresh", value: "Yenile", comment: "")
-    static let actionClipboardImage = NSLocalizedString("action.clipboard_image", value: "Panodaki Görseli Oku", comment: "")
-    static let actionImageFile = NSLocalizedString("action.image_file", value: "Görsel Dosyası Oku", comment: "")
-    static let actionPDFFile = NSLocalizedString("action.pdf_file", value: "PDF Oku", comment: "")
-    static let actionSearchablePDF = NSLocalizedString("action.searchable_pdf", value: "Searchable PDF", comment: "")
-    static let actionAllow = NSLocalizedString("action.allow", value: "İzin Ver", comment: "")
-    static let actionSystemSettings = NSLocalizedString("action.system_settings", value: "Sistem Ayarları", comment: "")
-    static let actionRequestPermission = NSLocalizedString("action.request_permission", value: "İzin İste", comment: "")
-    static let actionDiagnostics = NSLocalizedString("action.diagnostics", value: "Tanı", comment: "")
-    static let actionCopy = NSLocalizedString("action.copy", value: "Kopyala", comment: "")
-    static let actionDelete = NSLocalizedString("action.delete", value: "Sil", comment: "")
-    static let actionExport = NSLocalizedString("action.export", value: "Dışa Aktar", comment: "")
-    static let actionClear = NSLocalizedString("action.clear", value: "Temizle", comment: "")
-    static let actionSupportBundle = NSLocalizedString("action.support_bundle", value: "Support Paketi", comment: "")
-    static let actionCopyDiagnostics = NSLocalizedString("action.copy_diagnostics", value: "Tanıyı Kopyala", comment: "")
-    static let actionLoginItems = NSLocalizedString("action.login_items", value: "Giriş Öğeleri", comment: "")
-    static let actionDefault = NSLocalizedString("action.default", value: "Varsayılan", comment: "")
-    static let actionChange = NSLocalizedString("action.change", value: "Değiştir", comment: "")
-    static let actionCancel = NSLocalizedString("action.cancel", value: "İptal", comment: "")
-    static let actionOpenApplicationsFolder = NSLocalizedString("action.open_applications_folder", value: "Applications Klasörünü Aç", comment: "")
-    static let actionContinue = NSLocalizedString("action.continue", value: "Devam Et", comment: "")
-    static let ocrAutomaticLanguage = NSLocalizedString("ocr.automatic_language", value: "Dili otomatik algıla", comment: "")
+        if let defaultsLanguages = UserDefaults.standard.array(forKey: "AppleLanguages") as? [String],
+           let firstLanguage = defaultsLanguages.first?.lowercased(),
+           !firstLanguage.isEmpty {
+            return firstLanguage
+        }
 
-    static let installRootUnavailable = NSLocalizedString("install.root_unavailable", value: "Applications klasöründe yazılabilir bir hedef bulunamadı.", comment: "")
-    static let installCopyFailedPrefix = NSLocalizedString("install.copy_failed_prefix", value: "Uygulama Applications klasörüne taşınamadı:", comment: "")
-    static let installRelocatingStatus = NSLocalizedString("install.relocating_status", value: "⚠️ Uygulama Applications klasörüne taşınıyor...", comment: "")
-    static let installOpenFromApplicationsStatus = NSLocalizedString("install.open_from_applications_status", value: "⚠️ Uygulamayı Applications klasöründen aç", comment: "")
-    static let installOpeningInstalledCopyStatus = NSLocalizedString("install.opening_installed_copy_status", value: "⚠️ Yüklü uygulama kopyası açılıyor...", comment: "")
-    static let installAlertTitle = NSLocalizedString("install.alert_title", value: "Uygulamayı Applications klasöründen aç", comment: "")
-    static let installAlertBody = NSLocalizedString("install.alert_body", value: "ScreenTextGrab izinleri ve Spotlight kaydını stabil tutmak için Applications klasöründen çalışmalıdır.", comment: "")
+        return Locale.preferredLanguages.first?.lowercased() ?? "en"
+    }
 
-    static let accessibilityQuitApp = NSLocalizedString("accessibility.quit_app", value: "Uygulamadan çık", comment: "")
-    static let accessibilityResetHotkey = NSLocalizedString("accessibility.reset_hotkey", value: "Kısayolu varsayılana döndür", comment: "")
-    static let accessibilityLaunchAtLoginToggle = NSLocalizedString("accessibility.launch_at_login_toggle", value: "Açılışta başlat", comment: "")
-    static let accessibilityCaptureMode = NSLocalizedString("accessibility.capture_mode", value: "Yakalama modu", comment: "")
-    static let accessibilityOCRLanguage = NSLocalizedString("accessibility.ocr_language", value: "OCR dili", comment: "")
-    static let accessibilityAutomaticLanguage = NSLocalizedString("accessibility.automatic_language", value: "Dili otomatik algıla", comment: "")
+    static var usesEnglish: Bool {
+        languageIdentifier.hasPrefix("en")
+    }
+
+    static func pair(_ tr: String, _ en: String) -> String {
+        usesEnglish ? en : tr
+    }
+
+    static func format(_ tr: String, _ en: String, _ arguments: CVarArg...) -> String {
+        let format = pair(tr, en)
+        return String(format: format, locale: Locale.current, arguments: arguments)
+    }
+
+    static var controlsTitle: String { pair("Kontroller", "Controls") }
+    static var settingsTitle: String { pair("ScreenTextGrab Ayarları", "ScreenTextGrab Settings") }
+    static var settingsSubtitle: String { pair("Kısayol, izinler, OCR dili ve geçmiş yönetimini buradan düzenle.", "Manage shortcuts, permissions, OCR language, and history here.") }
+
+    static var settingsTabGeneral: String { pair("Genel", "General") }
+    static var settingsTabOCR: String { "OCR" }
+    static var settingsTabDiagnostics: String { pair("Tanı", "Diagnostics") }
+    static var settingsTabHistory: String { pair("Geçmiş", "History") }
+
+    static var actionSettings: String { pair("Ayarlar", "Settings") }
+    static var actionRefresh: String { pair("Yenile", "Refresh") }
+    static var actionClipboardImage: String { pair("Panodaki Görseli Oku", "Read Clipboard Image") }
+    static var actionImageFile: String { pair("Görsel Dosyası Oku", "Read Image File") }
+    static var actionPDFFile: String { pair("PDF Oku", "Read PDF") }
+    static var actionSearchablePDF: String { "Searchable PDF" }
+    static var actionAllow: String { pair("İzin Ver", "Allow Access") }
+    static var actionSystemSettings: String { pair("Sistem Ayarları", "System Settings") }
+    static var actionRequestPermission: String { pair("İzin İste", "Request Access") }
+    static var actionDiagnostics: String { pair("Tanı", "Diagnostics") }
+    static var actionCopy: String { pair("Kopyala", "Copy") }
+    static var actionDelete: String { pair("Sil", "Delete") }
+    static var actionExport: String { pair("Dışa Aktar", "Export") }
+    static var actionClear: String { pair("Temizle", "Clear") }
+    static var actionSupportBundle: String { pair("Support Paketi", "Support Bundle") }
+    static var actionCopyDiagnostics: String { pair("Tanıyı Kopyala", "Copy Diagnostics") }
+    static var actionLoginItems: String { pair("Giriş Öğeleri", "Login Items") }
+    static var actionDefault: String { pair("Varsayılan", "Default") }
+    static var actionChange: String { pair("Değiştir", "Change") }
+    static var actionCancel: String { pair("İptal", "Cancel") }
+    static var actionOpenApplicationsFolder: String { pair("Applications Klasörünü Aç", "Open Applications Folder") }
+    static var actionContinue: String { pair("Devam Et", "Continue") }
+    static var ocrAutomaticLanguage: String { pair("Dili otomatik algıla", "Automatically detect language") }
+
+    static var installRootUnavailable: String { pair("Applications klasöründe yazılabilir bir hedef bulunamadı.", "No writable install destination was found in Applications.") }
+    static var installCopyFailedPrefix: String { pair("Uygulama Applications klasörüne taşınamadı:", "The app could not be moved to Applications:") }
+    static var installRelocatingStatus: String { pair("⚠️ Uygulama Applications klasörüne taşınıyor...", "⚠️ Moving the app to Applications...") }
+    static var installOpenFromApplicationsStatus: String { pair("⚠️ Uygulamayı Applications klasöründen aç", "⚠️ Open the app from Applications") }
+    static var installOpeningInstalledCopyStatus: String { pair("⚠️ Yüklü uygulama kopyası açılıyor...", "⚠️ Opening the installed app copy...") }
+    static var installAlertTitle: String { pair("Uygulamayı Applications klasöründen aç", "Open the app from Applications") }
+    static var installAlertBody: String { pair("ScreenTextGrab izinleri ve Spotlight kaydını stabil tutmak için Applications klasöründen çalışmalıdır.", "ScreenTextGrab should run from Applications so permissions and Spotlight registration stay stable.") }
+
+    static var accessibilityQuitApp: String { pair("Uygulamadan çık", "Quit app") }
+    static var accessibilityResetHotkey: String { pair("Kısayolu varsayılana döndür", "Reset shortcut to default") }
+    static var accessibilityLaunchAtLoginToggle: String { pair("Açılışta başlat", "Launch at login") }
+    static var accessibilityCaptureMode: String { pair("Yakalama modu", "Capture mode") }
+    static var accessibilityOCRLanguage: String { pair("OCR dili", "OCR language") }
+    static var accessibilityAutomaticLanguage: String { pair("Dili otomatik algıla", "Automatically detect language") }
+    static var accessibilityInterfaceLanguage: String { pair("Arayüz dili", "Interface language") }
 }

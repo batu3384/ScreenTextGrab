@@ -150,7 +150,7 @@ final class ClipboardManager: ClipboardProviding {
         stackView.alignment = .leading
         stackView.spacing = 4
 
-        let titleLabel = NSTextField(labelWithString: "✅ Metin kopyalandı!")
+        let titleLabel = NSTextField(labelWithString: L10n.pair("✅ Metin kopyalandı!", "✅ Text copied!"))
         titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
         titleLabel.textColor = .labelColor
 

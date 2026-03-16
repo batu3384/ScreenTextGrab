@@ -11,6 +11,7 @@ struct MenuBarView: View {
     @State private var launchAtLoginFeedback: InlineFeedback?
     @State private var captureModeFeedback: InlineFeedback?
     @State private var outputPresetFeedback: InlineFeedback?
+    @State private var languageFeedback: InlineFeedback?
     @State private var ocrFeedback: InlineFeedback?
     @State private var smartActionFeedback: InlineFeedback?
     @State private var isImportDropTargeted = false
@@ -102,7 +103,7 @@ struct MenuBarView: View {
                 }
 
                 VStack(alignment: .leading, spacing: isCompactPanel ? 8 : 10) {
-                    Text("Yakalama Modu")
+                    Text(L10n.pair("Yakalama Modu", "Capture Mode"))
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white)
 
@@ -126,8 +127,8 @@ struct MenuBarView: View {
                 }
 
                 quickSettingRow(
-                    title: "Çıktı Biçimi",
-                    detail: "Yakalamadan sonra panoya hangi biçimin kopyalanacağını seçersin."
+                    title: L10n.pair("Çıktı Biçimi", "Output Format"),
+                    detail: L10n.pair("Yakalamadan sonra panoya hangi biçimin kopyalanacağını seçersin.", "Choose which format will be copied to the clipboard after capture.")
                 ) {
                     Menu {
                         ForEach(CaptureOutputPreset.allCases) { preset in
@@ -181,17 +182,73 @@ struct MenuBarView: View {
                     .menuStyle(.borderlessButton)
                 }
 
+                quickSettingRow(
+                    title: L10n.pair("Arayüz Dili", "Interface Language"),
+                    detail: appState.interfaceLanguage.detail
+                ) {
+                    Menu {
+                        ForEach(InterfaceLanguage.allCases) { language in
+                            Button {
+                                setInterfaceLanguage(language)
+                            } label: {
+                                HStack {
+                                    Text(language.title)
+                                    if language == appState.interfaceLanguage {
+                                        Spacer()
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "globe")
+                                .font(.system(size: 10.5, weight: .bold))
+
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(appState.interfaceLanguage.title)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+
+                                Text(L10n.pair("Panel ve ayarlar için", "For the panel and settings"))
+                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    .foregroundStyle(Color.white.opacity(0.68))
+                                    .lineLimit(2)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.65))
+                        }
+                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .frame(minWidth: isCompactPanel ? 156 : 172, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white.opacity(0.10))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                        )
+                    }
+                    .menuStyle(.borderlessButton)
+                }
+
                 Rectangle()
                     .fill(Color.white.opacity(0.08))
                     .frame(height: 1)
 
                 HStack(alignment: .center, spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Kısayol")
+                        Text(L10n.pair("Kısayol", "Shortcut"))
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white)
 
-                        Text(isRecordingHotkey ? "Yeni tuşu gir" : appState.hotkeyDisplayLabel)
+                        Text(isRecordingHotkey ? L10n.pair("Yeni tuşu gir", "Enter new shortcut") : appState.hotkeyDisplayLabel)
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.white.opacity(0.66))
                             .lineLimit(1)
@@ -202,7 +259,7 @@ struct MenuBarView: View {
 
                     HStack(spacing: 8) {
                         Button(action: toggleHotkeyRecording) {
-                            Text(isRecordingHotkey ? "Tuşa Bas..." : appState.hotkeyDisplayLabel)
+                            Text(isRecordingHotkey ? L10n.pair("Tuşa Bas...", "Press Keys...") : appState.hotkeyDisplayLabel)
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white)
                                 .lineLimit(1)
@@ -233,16 +290,16 @@ struct MenuBarView: View {
                     if isCompactPanel {
                         VStack(spacing: 10) {
                             compactControlCard(
-                                title: "İzleme",
-                                subtitle: appState.watchState.isActive ? "Arka planda çalışıyor" : "Kapalı",
+                                title: L10n.pair("İzleme", "Watch"),
+                                subtitle: appState.watchState.isActive ? L10n.pair("Arka planda çalışıyor", "Running in background") : L10n.pair("Kapalı", "Off"),
                                 tint: watchTint,
-                                actionTitle: appState.watchState.isActive || appState.watchState == .selecting ? "Durdur" : "Başlat",
+                                actionTitle: appState.watchState.isActive || appState.watchState == .selecting ? L10n.pair("Durdur", "Stop") : L10n.pair("Başlat", "Start"),
                                 actionIcon: appState.watchState.isActive || appState.watchState == .selecting ? "stop.fill" : "dot.scope",
                                 action: toggleWatching
                             )
 
                             compactToggleCard(
-                                title: "Açılışta Başlat",
+                                title: L10n.pair("Açılışta Başlat", "Launch at Login"),
                                 subtitle: appState.launchAtLoginState.title,
                                 tint: launchAtLoginTint
                             ) {
@@ -256,16 +313,16 @@ struct MenuBarView: View {
                     } else {
                         HStack(spacing: 10) {
                             compactControlCard(
-                                title: "İzleme",
-                                subtitle: appState.watchState.isActive ? "Arka planda çalışıyor" : "Kapalı",
+                                title: L10n.pair("İzleme", "Watch"),
+                                subtitle: appState.watchState.isActive ? L10n.pair("Arka planda çalışıyor", "Running in background") : L10n.pair("Kapalı", "Off"),
                                 tint: watchTint,
-                                actionTitle: appState.watchState.isActive || appState.watchState == .selecting ? "Durdur" : "Başlat",
+                                actionTitle: appState.watchState.isActive || appState.watchState == .selecting ? L10n.pair("Durdur", "Stop") : L10n.pair("Başlat", "Start"),
                                 actionIcon: appState.watchState.isActive || appState.watchState == .selecting ? "stop.fill" : "dot.scope",
                                 action: toggleWatching
                             )
 
                             compactToggleCard(
-                                title: "Açılışta Başlat",
+                                title: L10n.pair("Açılışta Başlat", "Launch at Login"),
                                 subtitle: appState.launchAtLoginState.title,
                                 tint: launchAtLoginTint
                             ) {
@@ -291,6 +348,10 @@ struct MenuBarView: View {
                     feedbackText(outputPresetFeedback.message, tint: outputPresetFeedback.tint)
                 }
 
+                if let languageFeedback {
+                    feedbackText(languageFeedback.message, tint: languageFeedback.tint)
+                }
+
                 if let launchAtLoginFeedback {
                     feedbackText(launchAtLoginFeedback.message, tint: launchAtLoginFeedback.tint)
                 }
@@ -310,7 +371,7 @@ struct MenuBarView: View {
                         .frame(height: 1)
 
                     VStack(alignment: .leading, spacing: 7) {
-                        Text("Hızlı İşlem")
+                        Text(L10n.pair("Hızlı İşlem", "Quick Actions"))
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white)
 
@@ -326,7 +387,7 @@ struct MenuBarView: View {
 
                             if canOfferSpeechAction {
                                 compactInlineButton(
-                                    title: appState.speechState == .speaking ? "Durdur" : "Sesli Oku",
+                                    title: appState.speechState == .speaking ? L10n.pair("Durdur", "Stop") : L10n.pair("Sesli Oku", "Read Aloud"),
                                     icon: appState.speechState == .speaking ? "stop.fill" : "speaker.wave.2.fill",
                                     tint: appState.speechState == .speaking ? .accentRose : .accentMint,
                                     action: toggleSpeechPlayback
@@ -564,11 +625,11 @@ struct MenuBarView: View {
                         .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(Color.accentMint)
 
-                    Text("Görsel veya PDF bırak")
+                    Text(L10n.pair("Görsel veya PDF bırak", "Drop an Image or PDF"))
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
 
-                    Text("Görsel dosyası OCR’a gider, PDF dosyası doğrudan içe alınır.")
+                    Text(L10n.pair("Görsel dosyası OCR’a gider, PDF dosyası doğrudan içe alınır.", "Image files go through OCR, and PDF files are imported directly."))
                         .font(.system(size: 11.5, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.white.opacity(0.72))
                         .multilineTextAlignment(.center)
@@ -842,13 +903,13 @@ struct MenuBarView: View {
     private func captureModeSummary(for mode: CaptureMode) -> String {
         switch mode {
         case .standard:
-            return "Genel OCR"
+            return L10n.pair("Genel OCR", "General OCR")
         case .subtitle:
-            return "Video ve altyazı"
+            return L10n.pair("Video ve altyazı", "Video and subtitles")
         case .code:
-            return "Kod ve terminal"
+            return L10n.pair("Kod ve terminal", "Code and terminal")
         case .table:
-            return "Tablo ve liste"
+            return L10n.pair("Tablo ve liste", "Tables and lists")
         }
     }
 
@@ -890,10 +951,10 @@ struct MenuBarView: View {
 
     private var primaryActionTitle: String {
         if primaryQuickStartRegion != nil {
-            return "Kayıtlı Bölgeyi Yakala"
+            return L10n.pair("Kayıtlı Bölgeyi Yakala", "Capture Saved Region")
         }
 
-        return canStartCapture ? "Metni Yakala" : "Yakalama Hazır Değil"
+        return canStartCapture ? L10n.pair("Metni Yakala", "Capture Text") : L10n.pair("Yakalama Hazır Değil", "Capture Unavailable")
     }
 
     private var primaryActionIcon: String {
@@ -903,97 +964,105 @@ struct MenuBarView: View {
     private var headerLine: String {
         if appState.captureMode == .subtitle {
             return appState.isHotkeyAvailable
-                ? "\(appState.hotkeyDisplayLabel) ile video ve canlı altyazı yakala."
-                : "Video ve canlı altyazılar için optimize."
+                ? L10n.format("%@ ile video ve canlı altyazı yakala.", "Capture video and live subtitles with %@.", appState.hotkeyDisplayLabel)
+                : L10n.pair("Video ve canlı altyazılar için optimize.", "Optimized for video and live subtitles.")
         }
 
         if appState.captureMode == .code {
             return appState.isHotkeyAvailable
-                ? "\(appState.hotkeyDisplayLabel) ile kod blokları ve terminal çıktıları yakala."
-                : "Kod blokları ve terminal çıktıları için optimize."
+                ? L10n.format("%@ ile kod blokları ve terminal çıktıları yakala.", "Capture code blocks and terminal output with %@.", appState.hotkeyDisplayLabel)
+                : L10n.pair("Kod blokları ve terminal çıktıları için optimize.", "Optimized for code blocks and terminal output.")
         }
 
         if appState.captureMode == .table {
             return appState.isHotkeyAvailable
-                ? "\(appState.hotkeyDisplayLabel) ile tablo ve çok sütunlu listeleri yakala."
-                : "Tablo ve çok sütunlu içerikler için optimize."
+                ? L10n.format("%@ ile tablo ve çok sütunlu listeleri yakala.", "Capture tables and multi-column lists with %@.", appState.hotkeyDisplayLabel)
+                : L10n.pair("Tablo ve çok sütunlu içerikler için optimize.", "Optimized for tables and multi-column content.")
         }
 
         if appState.isHotkeyAvailable {
-            return "\(appState.hotkeyDisplayLabel) ile veya panelden başlat."
+            return L10n.format("%@ ile veya panelden başlat.", "Start with %@ or from the panel.", appState.hotkeyDisplayLabel)
         }
 
-        return "Ekrandaki metni tek adımda yakala."
+        return L10n.pair("Ekrandaki metni tek adımda yakala.", "Capture on-screen text in one step.")
     }
 
     private var statusTitle: String {
         if appState.watchState == .active {
-            return "İzleme Aktif"
+            return L10n.pair("İzleme Aktif", "Watch Active")
         }
 
         if appState.watchState == .selecting {
-            return "İzleme Seçimi"
+            return L10n.pair("İzleme Seçimi", "Watch Selection")
         }
 
         switch appState.captureState {
         case .idle:
-            return appState.permissionState == .granted ? "Hazır" : "Kurulum Gerekli"
+            return appState.permissionState == .granted ? L10n.pair("Hazır", "Ready") : L10n.pair("Kurulum Gerekli", "Setup Required")
         case .preparing:
-            return "Hazırlanıyor"
+            return L10n.pair("Hazırlanıyor", "Preparing")
         case .selecting:
-            return "Alan Seçiliyor"
+            return L10n.pair("Alan Seçiliyor", "Selecting Region")
         case .capturing:
-            return "Görüntü Alınıyor"
+            return L10n.pair("Görüntü Alınıyor", "Capturing Image")
         case .recognizing:
-            return "Metin Tanınıyor"
+            return L10n.pair("Metin Tanınıyor", "Recognizing Text")
         case .copying:
-            return "Panoya Yazılıyor"
+            return L10n.pair("Panoya Yazılıyor", "Writing to Clipboard")
         case .completed:
-            return "Kopyalandı"
+            return L10n.pair("Kopyalandı", "Copied")
         case .completedEmpty:
-            return "Metin Bulunamadı"
+            return L10n.pair("Metin Bulunamadı", "No Text Found")
         case .failed:
-            return "İşlem Başarısız"
+            return L10n.pair("İşlem Başarısız", "Action Failed")
         case .cancelled:
-            return "İptal Edildi"
+            return L10n.pair("İptal Edildi", "Cancelled")
         }
     }
 
     private var statusDescription: String {
         if appState.watchState == .active {
-            return "Seçilen alan arka planda izleniyor. Yeni içerik algılanırsa pano otomatik güncellenir."
+            return L10n.pair("Seçilen alan arka planda izleniyor. Yeni içerik algılanırsa pano otomatik güncellenir.", "The selected region is being watched in the background. The clipboard updates automatically when new content appears.")
         }
 
         if appState.watchState == .selecting {
-            return "İzlenecek alanı seçmen bekleniyor. ESC ile iptal edebilirsin."
+            return L10n.pair("İzlenecek alanı seçmen bekleniyor. ESC ile iptal edebilirsin.", "Waiting for you to select a region to watch. Press ESC to cancel.")
         }
 
         switch appState.permissionState {
         case .granted:
             if appState.captureState == .idle || appState.captureState == .completed || appState.captureState == .cancelled {
                 return appState.isHotkeyAvailable
-                    ? "Ekran kaydı izni aktif. \(appState.hotkeyDisplayLabel) ile veya aşağıdaki butonla \(appState.captureMode.title.lowercased()) yakalamayı başlatabilirsin."
-                    : "Ekran kaydı izni aktif. \(appState.captureMode.title) modunda doğrudan yakalama başlatabilirsin."
+                    ? (
+                        L10n.usesEnglish
+                            ? "Screen recording access is active. Start \(appState.captureMode.title.lowercased()) capture with \(appState.hotkeyDisplayLabel) or use the button below."
+                            : "Ekran kaydı izni aktif. \(appState.hotkeyDisplayLabel) ile veya aşağıdaki butonla \(appState.captureMode.title.lowercased()) yakalamayı başlatabilirsin."
+                    )
+                    : (
+                        L10n.usesEnglish
+                            ? "Screen recording access is active. You can start capture directly in \(appState.captureMode.title) mode."
+                            : "Ekran kaydı izni aktif. \(appState.captureMode.title) modunda doğrudan yakalama başlatabilirsin."
+                    )
             }
             return appState.statusMessage
         case .requiresRestart:
-            return "İzin verildi ancak yeni yetkiyi almak için uygulamayı yeniden açman gerekiyor."
+            return L10n.pair("İzin verildi ancak yeni yetkiyi almak için uygulamayı yeniden açman gerekiyor.", "Access was granted, but you need to reopen the app to pick up the new permission.")
         case .denied:
-            return "Ekran kaydı izni kapalı görünüyor. İzin verdiysen Yenile'ye bas."
+            return L10n.pair("Ekran kaydı izni kapalı görünüyor. İzin verdiysen Yenile'ye bas.", "Screen recording access appears to be off. Press Refresh if you already granted it.")
         case .unknown:
-            return "İzin durumu şu anda doğrulanamadı. Sistem Ayarları veya Yenile ile tekrar kontrol et."
+            return L10n.pair("İzin durumu şu anda doğrulanamadı. Sistem Ayarları veya Yenile ile tekrar kontrol et.", "The permission status could not be verified right now. Check again from System Settings or Refresh.")
         case .requestInProgress:
-            return "İzin penceresi açık. Onay verdikten sonra durum otomatik güncellenecek."
+            return L10n.pair("İzin penceresi açık. Onay verdikten sonra durum otomatik güncellenecek.", "The permission prompt is open. Status updates automatically after you approve it.")
         }
     }
 
     private var primarySubtitle: String {
         if appState.watchState == .active {
-            return "İzleme aktifken normal yakalama devre dışı."
+            return L10n.pair("İzleme aktifken normal yakalama devre dışı.", "Normal capture is disabled while watch mode is active.")
         }
 
         if appState.watchState == .selecting {
-            return "Önce izlenecek alanı seç."
+            return L10n.pair("Önce izlenecek alanı seç.", "Select the watched region first.")
         }
 
         switch appState.permissionState {
@@ -1001,30 +1070,30 @@ struct MenuBarView: View {
             if let region = primaryQuickStartRegion {
                 switch appState.activeSavedCaptureRegionSuggestion?.matchKind {
                 case .windowTitle(let windowTitle):
-                    return "\"\(windowTitle)\" için \(region.name) otomatik seçildi."
+                    return L10n.format("\"%@\" için %@ otomatik seçildi.", "\"%@\" automatically matched %@.", windowTitle, region.name)
                 case .application, .none:
-                    return "\(region.name) hızlı başlangıç için otomatik seçildi."
+                    return L10n.format("%@ hızlı başlangıç için otomatik seçildi.", "%@ was auto-selected for quick start.", region.name)
                 }
             }
             return appState.captureMode.readyDescription
         case .requiresRestart:
-            return "Önce uygulamayı yeniden aç."
+            return L10n.pair("Önce uygulamayı yeniden aç.", "Reopen the app first.")
         case .denied:
-            return "Önce ekran kaydı iznini etkinleştir."
+            return L10n.pair("Önce ekran kaydı iznini etkinleştir.", "Enable screen recording permission first.")
         case .unknown:
-            return "Önce izin durumunu doğrula."
+            return L10n.pair("Önce izin durumunu doğrula.", "Verify the permission status first.")
         case .requestInProgress:
-            return "İzin işlemi tamamlanınca yakalama açılacak."
+            return L10n.pair("İzin işlemi tamamlanınca yakalama açılacak.", "Capture will be available once the permission flow finishes.")
         }
     }
 
     private var permissionBadge: String {
         switch appState.permissionState {
-        case .granted: return "Açık"
-        case .requiresRestart: return "Yeniden Aç"
-        case .denied: return "Kapalı"
-        case .unknown: return "Belirsiz"
-        case .requestInProgress: return "Bekliyor"
+        case .granted: return L10n.pair("Açık", "On")
+        case .requiresRestart: return L10n.pair("Yeniden Aç", "Reopen")
+        case .denied: return L10n.pair("Kapalı", "Off")
+        case .unknown: return L10n.pair("Belirsiz", "Unknown")
+        case .requestInProgress: return L10n.pair("Bekliyor", "Pending")
         }
     }
 
@@ -1068,8 +1137,8 @@ struct MenuBarView: View {
     private var helperNotice: NoticeContent? {
         if appState.watchState == .active {
             return NoticeContent(
-                title: "İzleme açık",
-                message: "Seçilen bölgede metin değişirse yeni içerik otomatik olarak panoya kopyalanır.",
+                title: L10n.pair("İzleme açık", "Watch is on"),
+                message: L10n.pair("Seçilen bölgede metin değişirse yeni içerik otomatik olarak panoya kopyalanır.", "If text changes inside the selected region, the new content is copied automatically."),
                 icon: "dot.radiowaves.left.and.right",
                 tint: .accentMint
             )
@@ -1077,8 +1146,8 @@ struct MenuBarView: View {
 
         if appState.permissionState == .requiresRestart {
             return NoticeContent(
-                title: "Yeniden başlatma gerekiyor",
-                message: "macOS yeni ekran kaydı iznini bir sonraki açılışta uyguluyor.",
+                title: L10n.pair("Yeniden başlatma gerekiyor", "Restart required"),
+                message: L10n.pair("macOS yeni ekran kaydı iznini bir sonraki açılışta uyguluyor.", "macOS applies the new screen recording permission on the next launch."),
                 icon: "power.circle",
                 tint: .accentAmber
             )
@@ -1086,8 +1155,8 @@ struct MenuBarView: View {
 
         if !appState.isHotkeyAvailable {
             return NoticeContent(
-                title: "Global kısayol etkin değil",
-                message: "Seçili kombinasyon başka bir uygulamayla çakışıyor veya sistem hotkey kaydı tamamlanamadı. Farklı bir kombinasyon deneyebilirsin.",
+                title: L10n.pair("Global kısayol etkin değil", "Global shortcut unavailable"),
+                message: L10n.pair("Seçili kombinasyon başka bir uygulamayla çakışıyor veya sistem hotkey kaydı tamamlanamadı. Farklı bir kombinasyon deneyebilirsin.", "The selected combination conflicts with another app or the system hotkey registration could not finish. Try a different shortcut."),
                 icon: "bolt.horizontal.circle",
                 tint: .accentNeutral
             )
@@ -1095,8 +1164,8 @@ struct MenuBarView: View {
 
         if appState.launchAtLoginState == .requiresApproval {
             return NoticeContent(
-                title: "Açılış ayarı onay bekliyor",
-                message: "macOS giriş öğesi değişikliğini hemen uygulamamış olabilir. Ayarlar penceresinden Giriş Öğeleri'ni açabilirsin.",
+                title: L10n.pair("Açılış ayarı onay bekliyor", "Launch setting needs approval"),
+                message: L10n.pair("macOS giriş öğesi değişikliğini hemen uygulamamış olabilir. Ayarlar penceresinden Giriş Öğeleri'ni açabilirsin.", "macOS may not have applied the login item change yet. You can open Login Items from Settings."),
                 icon: "person.crop.circle.badge.clock",
                 tint: .accentAmber
             )
@@ -1124,8 +1193,8 @@ struct MenuBarView: View {
 
         if appState.captureState == .failed, let lastError = appState.lastError {
             return NoticeContent(
-                title: "Son hata",
-                message: lastError.errorDescription ?? "Beklenmeyen bir hata oluştu.",
+                title: L10n.pair("Son hata", "Latest error"),
+                message: lastError.errorDescription ?? L10n.pair("Beklenmeyen bir hata oluştu.", "An unexpected error occurred."),
                 icon: "exclamationmark.triangle",
                 tint: .accentRose
             )
@@ -1141,11 +1210,11 @@ struct MenuBarView: View {
 
         let sourceName = suggestion.source.displayName
         return NoticeContent(
-            title: "\(sourceName) profili hazır",
-            message: "Bu uygulama için \(suggestion.profile.summary) yakalaması kayıtlı. Yakalama bu profili zaten kullanır; panelde de aynı ayarları görmek istersen eşitle.",
+            title: L10n.format("%@ profili hazır", "%@ profile is ready", sourceName),
+            message: L10n.format("Bu uygulama için %@ yakalaması kayıtlı. Yakalama bu profili zaten kullanır; panelde de aynı ayarları görmek istersen eşitle.", "A %@ capture profile is saved for this app. Capture already uses it; sync the panel if you want to see the same settings there.", suggestion.profile.summary),
             icon: "sparkles.rectangle.stack",
             tint: .accentMint,
-            actionTitle: "Paneli Eşitle",
+            actionTitle: L10n.pair("Paneli Eşitle", "Sync Panel"),
             action: {
                 applyActiveAppProfileSuggestion(suggestion)
             }
@@ -1164,24 +1233,30 @@ struct MenuBarView: View {
         switch suggestion.matchKind {
         case .application:
             if suggestion.regionCount == 1 {
-                message = "\(suggestion.primaryRegion.name) bu uygulama için kayıtlı. Aynı bölgeyi tek tıkla yeniden yakalayabilirsin."
+                message = L10n.format("%@ bu uygulama için kayıtlı. Aynı bölgeyi tek tıkla yeniden yakalayabilirsin.", "%@ is saved for this app. You can recapture the same region with one click.", suggestion.primaryRegion.name)
             } else {
-                message = "\(suggestion.regionCount) kayıtlı bölgeden en güncel olanı \(suggestion.primaryRegion.name). İstersen hemen bu bölgeyi çalıştır."
+                message = L10n.usesEnglish
+                    ? "\(suggestion.primaryRegion.name) is the newest of \(suggestion.regionCount) saved regions for this app. Run it right away if you want."
+                    : "\(suggestion.regionCount) kayıtlı bölgeden en güncel olanı \(suggestion.primaryRegion.name). İstersen hemen bu bölgeyi çalıştır."
             }
         case .windowTitle(let windowTitle):
             if suggestion.regionCount == 1 {
-                message = "\"\(windowTitle)\" penceresiyle eşleşen kayıtlı bölge \(suggestion.primaryRegion.name). Aynı görünümü tek tıkla yeniden yakalayabilirsin."
+                message = L10n.usesEnglish
+                    ? "The saved region \(suggestion.primaryRegion.name) matches the “\(windowTitle)” window. You can recapture the same view with one click."
+                    : "\"\(windowTitle)\" penceresiyle eşleşen kayıtlı bölge \(suggestion.primaryRegion.name). Aynı görünümü tek tıkla yeniden yakalayabilirsin."
             } else {
-                message = "\"\(windowTitle)\" penceresi için \(suggestion.regionCount) eşleşen bölge bulundu. En güncel olan \(suggestion.primaryRegion.name)."
+                message = L10n.usesEnglish
+                    ? "\(suggestion.regionCount) matching regions were found for the “\(windowTitle)” window. The newest one is \(suggestion.primaryRegion.name)."
+                    : "\"\(windowTitle)\" penceresi için \(suggestion.regionCount) eşleşen bölge bulundu. En güncel olan \(suggestion.primaryRegion.name)."
             }
         }
 
         let title: String
         switch suggestion.matchKind {
         case .application:
-            title = "\(suggestion.source.displayName) için kayıtlı bölge bulundu"
+            title = L10n.format("%@ için kayıtlı bölge bulundu", "Saved region found for %@", suggestion.source.displayName)
         case .windowTitle:
-            title = "\(suggestion.source.displayName) için pencere eşleşmesi bulundu"
+            title = L10n.format("%@ için pencere eşleşmesi bulundu", "Window match found for %@", suggestion.source.displayName)
         }
 
         return NoticeContent(
@@ -1189,7 +1264,7 @@ struct MenuBarView: View {
             message: message,
             icon: "rectangle.on.rectangle.circle",
             tint: .accentCool,
-            actionTitle: "Bölgeyi Çalıştır",
+            actionTitle: L10n.pair("Bölgeyi Çalıştır", "Run Region"),
             action: {
                 runActiveSavedCaptureRegionSuggestion(suggestion)
             }
@@ -1207,24 +1282,32 @@ struct MenuBarView: View {
         switch suggestion.matchKind {
         case .application:
             if suggestion.snippetCount == 1 {
-                message = "\(suggestion.collection.name) koleksiyonunda \(suggestion.source.displayName) kaynaklı bir snippet hazır. Ayarlar > Geçmiş içinden doğrudan açabilirsin."
+                message = L10n.usesEnglish
+                    ? "One snippet from \(suggestion.source.displayName) is ready in the \(suggestion.collection.name) collection. You can open it directly from Settings > History."
+                    : "\(suggestion.collection.name) koleksiyonunda \(suggestion.source.displayName) kaynaklı bir snippet hazır. Ayarlar > Geçmiş içinden doğrudan açabilirsin."
             } else {
-                message = "\(suggestion.collection.name) koleksiyonunda \(suggestion.source.displayName) kaynaklı \(suggestion.snippetCount) snippet var. İlgili görünümü tek tıkla açabilirsin."
+                message = L10n.usesEnglish
+                    ? "There are \(suggestion.snippetCount) snippets from \(suggestion.source.displayName) in the \(suggestion.collection.name) collection. Open the filtered view with one click."
+                    : "\(suggestion.collection.name) koleksiyonunda \(suggestion.source.displayName) kaynaklı \(suggestion.snippetCount) snippet var. İlgili görünümü tek tıkla açabilirsin."
             }
         case .windowTitle(let windowTitle):
             if suggestion.snippetCount == 1 {
-                message = "\"\(windowTitle)\" penceresiyle eşleşen \(suggestion.collection.name) koleksiyonunda 1 snippet var. Aynı filtreyle hızlıca açabilirsin."
+                message = L10n.usesEnglish
+                    ? "There is 1 snippet in the \(suggestion.collection.name) collection that matches the “\(windowTitle)” window. Open it quickly with the same filter."
+                    : "\"\(windowTitle)\" penceresiyle eşleşen \(suggestion.collection.name) koleksiyonunda 1 snippet var. Aynı filtreyle hızlıca açabilirsin."
             } else {
-                message = "\"\(windowTitle)\" penceresiyle eşleşen \(suggestion.collection.name) koleksiyonunda \(suggestion.snippetCount) snippet var."
+                message = L10n.usesEnglish
+                    ? "There are \(suggestion.snippetCount) snippets in the \(suggestion.collection.name) collection that match the “\(windowTitle)” window."
+                    : "\"\(windowTitle)\" penceresiyle eşleşen \(suggestion.collection.name) koleksiyonunda \(suggestion.snippetCount) snippet var."
             }
         }
 
         let title: String
         switch suggestion.matchKind {
         case .application:
-            title = "\(suggestion.source.displayName) snippet koleksiyonu hazır"
+            title = L10n.format("%@ snippet koleksiyonu hazır", "%@ snippet collection is ready", suggestion.source.displayName)
         case .windowTitle:
-            title = "\(suggestion.source.displayName) için snippet eşleşmesi bulundu"
+            title = L10n.format("%@ için snippet eşleşmesi bulundu", "Snippet match found for %@", suggestion.source.displayName)
         }
 
         return NoticeContent(
@@ -1232,7 +1315,7 @@ struct MenuBarView: View {
             message: message,
             icon: "square.stack.3d.up.fill",
             tint: .accentAmber,
-            actionTitle: "Koleksiyonu Aç",
+            actionTitle: L10n.pair("Koleksiyonu Aç", "Open Collection"),
             action: {
                 openSavedSnippetCollectionSuggestion(suggestion)
             }
@@ -1248,25 +1331,33 @@ struct MenuBarView: View {
         let message: String
         switch (suggestion.matchKind, suggestion.selectionKind) {
         case (.application, .onlyMatch):
-            message = "\"\(suggestion.snippet.name)\" \(suggestion.collection.name) koleksiyonundan bu uygulama için hazır. Tek tıkla aynı biçimde panoya kopyalayabilirsin."
+            message = L10n.usesEnglish
+                ? "\"\(suggestion.snippet.name)\" from the \(suggestion.collection.name) collection is ready for this app. Copy it to the clipboard in one click."
+                : "\"\(suggestion.snippet.name)\" \(suggestion.collection.name) koleksiyonundan bu uygulama için hazır. Tek tıkla aynı biçimde panoya kopyalayabilirsin."
         case (.application, .learnedPreference):
-            message = "\"\(suggestion.snippet.name)\" bu uygulamada daha önce kullandığın snippet olarak öne çıkarıldı. İstersen tek tıkla yeniden panoya kopyala."
+            message = L10n.usesEnglish
+                ? "\"\(suggestion.snippet.name)\" was promoted because you used it in this app before. Copy it back to the clipboard in one click if you want."
+                : "\"\(suggestion.snippet.name)\" bu uygulamada daha önce kullandığın snippet olarak öne çıkarıldı. İstersen tek tıkla yeniden panoya kopyala."
         case let (.windowTitle(windowTitle), .onlyMatch):
-            message = "\"\(windowTitle)\" penceresiyle eşleşen \"\(suggestion.snippet.name)\" snippet'i hazır. İstersen doğrudan panoya kopyala."
+            message = L10n.usesEnglish
+                ? "\"\(suggestion.snippet.name)\" is ready for the “\(windowTitle)” window. Copy it directly to the clipboard if you want."
+                : "\"\(windowTitle)\" penceresiyle eşleşen \"\(suggestion.snippet.name)\" snippet'i hazır. İstersen doğrudan panoya kopyala."
         case let (.windowTitle(windowTitle), .learnedPreference):
-            message = "\"\(windowTitle)\" penceresinde daha önce kullandığın \"\(suggestion.snippet.name)\" snippet'i öne çıkarıldı."
+            message = L10n.usesEnglish
+                ? "\"\(suggestion.snippet.name)\" was promoted because you used it before in the “\(windowTitle)” window."
+                : "\"\(windowTitle)\" penceresinde daha önce kullandığın \"\(suggestion.snippet.name)\" snippet'i öne çıkarıldı."
         }
 
         let title: String
         switch (suggestion.matchKind, suggestion.selectionKind) {
         case (.application, .onlyMatch):
-            title = "\(suggestion.source.displayName) için hazır snippet"
+            title = L10n.format("%@ için hazır snippet", "Ready snippet for %@", suggestion.source.displayName)
         case (.application, .learnedPreference):
-            title = "\(suggestion.source.displayName) için öncelikli snippet"
+            title = L10n.format("%@ için öncelikli snippet", "Preferred snippet for %@", suggestion.source.displayName)
         case (.windowTitle, .onlyMatch):
-            title = "\(suggestion.source.displayName) için pencere snippet'i hazır"
+            title = L10n.format("%@ için pencere snippet'i hazır", "Window snippet ready for %@", suggestion.source.displayName)
         case (.windowTitle, .learnedPreference):
-            title = "\(suggestion.source.displayName) için öğrenilen snippet hazır"
+            title = L10n.format("%@ için öğrenilen snippet hazır", "Learned snippet ready for %@", suggestion.source.displayName)
         }
 
         return NoticeContent(
@@ -1274,7 +1365,7 @@ struct MenuBarView: View {
             message: message,
             icon: "text.badge.star",
             tint: .accentAmber,
-            actionTitle: "Snippet'i Kopyala",
+            actionTitle: L10n.pair("Snippet'i Kopyala", "Copy Snippet"),
             action: {
                 copyActiveSavedSnippetSuggestion(suggestion)
             }
@@ -1303,7 +1394,7 @@ struct MenuBarView: View {
                             .foregroundStyle(Color.accentAmber)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Hazır snippet'ler")
+                            Text(L10n.pair("Hazır snippet'ler", "Ready snippets"))
                                 .font(.system(size: isCompactPanel ? 11 : 11.5, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.white)
 
@@ -1350,15 +1441,15 @@ struct MenuBarView: View {
 
         let message: String
         if entry.captureMode == .table {
-            message = "Son tablo yakalaması düşük güvenle çıktı. Yapıştırmadan önce Tablo Düzenleyici ile satır ve sütunları kontrol etmen iyi olur."
+            message = L10n.pair("Son tablo yakalaması düşük güvenle çıktı. Yapıştırmadan önce Tablo Düzenleyici ile satır ve sütunları kontrol etmen iyi olur.", "The last table capture was produced with low confidence. Review rows and columns in the Table Editor before pasting.")
         } else if entry.captureMode == .code {
-            message = "Son kod yakalaması düşük güvenle çıktı. Özellikle girinti, noktalama ve benzer karakterleri kontrol et."
+            message = L10n.pair("Son kod yakalaması düşük güvenle çıktı. Özellikle girinti, noktalama ve benzer karakterleri kontrol et.", "The last code capture was produced with low confidence. Check indentation, punctuation, and similar characters carefully.")
         } else {
-            message = entry.confidenceIndicator?.detail ?? "Son OCR çıktısını gözden geçirmek iyi olur."
+            message = entry.confidenceIndicator?.detail ?? L10n.pair("Son OCR çıktısını gözden geçirmek iyi olur.", "It is a good idea to review the latest OCR output.")
         }
 
         return NoticeContent(
-            title: "Son OCR çıktısını kontrol et",
+            title: L10n.pair("Son OCR çıktısını kontrol et", "Review the latest OCR result"),
             message: message,
             icon: "exclamationmark.triangle.fill",
             tint: .accentRose
@@ -1486,6 +1577,19 @@ struct MenuBarView: View {
         appState.setCaptureOutputPreset(preset)
         outputPresetFeedback = InlineFeedback(
             message: "Çıktı biçimi \(preset.title) olarak ayarlandı.",
+            tint: .accentCool
+        )
+    }
+
+    private func setInterfaceLanguage(_ language: InterfaceLanguage) {
+        guard appState.interfaceLanguage != language else { return }
+        appState.setInterfaceLanguage(language)
+        languageFeedback = InlineFeedback(
+            message: language == .system
+                ? L10n.pair("Arayüz artık macOS dilini takip edecek.", "The interface will now follow your macOS language.")
+                : L10n.usesEnglish
+                    ? "The interface switched to \(language.title)."
+                    : "Arayüz \(language.title) olarak değiştirildi.",
             tint: .accentCool
         )
     }
@@ -1996,10 +2100,10 @@ struct TableReviewView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
             VStack(alignment: .leading, spacing: 5) {
-                Text("Tablo Duzenleyici")
+                Text(L10n.pair("Tablo Duzenleyici", "Table Editor"))
                     .font(.system(size: 22, weight: .bold, design: .rounded))
 
-                Text("OCR ile cikan tabloyu hucre bazinda duzelt, sonra Office uyumlu sekilde yeniden kopyala.")
+                Text(L10n.pair("OCR ile cikan tabloyu hucre bazinda duzelt, sonra Office uyumlu sekilde yeniden kopyala.", "Fix the OCR table cell by cell, then copy it again in an Office-friendly format."))
                     .font(.system(size: 12.5, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2040,22 +2144,22 @@ struct TableReviewView: View {
     private var tableToolbar: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
-                tableReviewBadge("\(document.rowCount) Satir", tint: .accentCool)
-                tableReviewBadge("\(document.columnCount) Sutun", tint: .accentMint)
+                tableReviewBadge(L10n.usesEnglish ? "\(document.rowCount) Rows" : "\(document.rowCount) Satir", tint: .accentCool)
+                tableReviewBadge(L10n.usesEnglish ? "\(document.columnCount) Columns" : "\(document.columnCount) Sutun", tint: .accentMint)
                 Spacer()
             }
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
-                    tableReviewToolButton(title: "Satir Ekle", icon: "plus", tint: .accentCool, action: addRow)
-                    tableReviewToolButton(title: "Sutun Ekle", icon: "rectangle.split.3x1", tint: .accentCool, action: addColumn)
-                    tableReviewToolButton(title: "Son Satiri Sil", icon: "minus", tint: .accentRose, action: removeLastRow)
+                    tableReviewToolButton(title: L10n.pair("Satir Ekle", "Add Row"), icon: "plus", tint: .accentCool, action: addRow)
+                    tableReviewToolButton(title: L10n.pair("Sutun Ekle", "Add Column"), icon: "rectangle.split.3x1", tint: .accentCool, action: addColumn)
+                    tableReviewToolButton(title: L10n.pair("Son Satiri Sil", "Remove Last Row"), icon: "minus", tint: .accentRose, action: removeLastRow)
                 }
 
                 HStack(spacing: 10) {
-                    tableReviewToolButton(title: "Son Sutunu Sil", icon: "rectangle.split.3x1.fill", tint: .accentRose, action: removeLastColumn)
-                    tableReviewToolButton(title: "Bos Kenarlari Temizle", icon: "wand.and.stars", tint: .accentWarm, action: trimEmptyEdges)
-                    tableReviewToolButton(title: "Sifirla", icon: "arrow.counterclockwise", tint: .accentNeutral, action: resetDocument)
+                    tableReviewToolButton(title: L10n.pair("Son Sutunu Sil", "Remove Last Column"), icon: "rectangle.split.3x1.fill", tint: .accentRose, action: removeLastColumn)
+                    tableReviewToolButton(title: L10n.pair("Bos Kenarlari Temizle", "Trim Empty Edges"), icon: "wand.and.stars", tint: .accentWarm, action: trimEmptyEdges)
+                    tableReviewToolButton(title: L10n.pair("Sifirla", "Reset"), icon: "arrow.counterclockwise", tint: .accentNeutral, action: resetDocument)
                 }
             }
         }
@@ -2106,7 +2210,7 @@ struct TableReviewView: View {
 
     private func tableCell(rowIndex: Int, columnIndex: Int) -> some View {
         TextField(
-            rowIndex == 0 ? "Baslik" : "Hucre",
+            rowIndex == 0 ? L10n.pair("Baslik", "Header") : L10n.pair("Hucre", "Cell"),
             text: cellBinding(row: rowIndex, column: columnIndex),
             axis: .vertical
         )
@@ -2139,7 +2243,7 @@ struct TableReviewView: View {
 
             if let preset = currentPreset {
                 tableReviewPrimaryButton(
-                    title: "\(preset.title) ile Kopyala",
+                    title: L10n.usesEnglish ? "Copy as \(preset.title)" : "\(preset.title) ile Kopyala",
                     icon: "doc.on.doc",
                     tint: .accentNeutral
                 ) {
@@ -2148,7 +2252,7 @@ struct TableReviewView: View {
             }
 
             tableReviewPrimaryButton(
-                title: "Office Olarak Kopyala",
+                title: L10n.pair("Office Olarak Kopyala", "Copy as Office"),
                 icon: "tablecells",
                 tint: .accentCool
             ) {
@@ -2156,7 +2260,7 @@ struct TableReviewView: View {
             }
 
             tableReviewPrimaryButton(
-                title: "Kapat",
+                title: L10n.pair("Kapat", "Close"),
                 icon: "xmark",
                 tint: .accentRose
             ) {
@@ -2175,17 +2279,17 @@ struct TableReviewView: View {
                 .font(.system(size: 26, weight: .semibold))
                 .foregroundStyle(Color.secondary)
 
-            Text("Duzeltilecek aktif bir tablo secili degil.")
+            Text(L10n.pair("Duzeltilecek aktif bir tablo secili degil.", "No active table is selected for review."))
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
 
-            Text("Menu bar'dan son tabloyu ya da Gecmis sekmesindeki bir tablo kaydini acabilirsin.")
+            Text(L10n.pair("Menu bar'dan son tabloyu ya da Gecmis sekmesindeki bir tablo kaydini acabilirsin.", "Open the latest table from the menu bar or a table entry from the History tab."))
                 .font(.system(size: 12.5, weight: .medium, design: .rounded))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 360)
 
             tableReviewPrimaryButton(
-                title: "Kapat",
+                title: L10n.pair("Kapat", "Close"),
                 icon: "xmark",
                 tint: .accentNeutral
             ) {
@@ -2219,7 +2323,7 @@ struct TableReviewView: View {
     private func addRow() {
         document.appendRow()
         feedback = InlineFeedback(
-            message: "Yeni satir eklendi.",
+            message: L10n.pair("Yeni satir eklendi.", "A new row was added."),
             tint: .accentCool
         )
     }
@@ -2227,7 +2331,7 @@ struct TableReviewView: View {
     private func addColumn() {
         document.appendColumn()
         feedback = InlineFeedback(
-            message: "Yeni sutun eklendi.",
+            message: L10n.pair("Yeni sutun eklendi.", "A new column was added."),
             tint: .accentCool
         )
     }
@@ -2235,7 +2339,7 @@ struct TableReviewView: View {
     private func removeLastRow() {
         document.removeLastRow()
         feedback = InlineFeedback(
-            message: "Son satir kaldirildi.",
+            message: L10n.pair("Son satir kaldirildi.", "The last row was removed."),
             tint: .accentNeutral
         )
     }
@@ -2243,7 +2347,7 @@ struct TableReviewView: View {
     private func removeLastColumn() {
         document.removeLastColumn()
         feedback = InlineFeedback(
-            message: "Son sutun kaldirildi.",
+            message: L10n.pair("Son sutun kaldirildi.", "The last column was removed."),
             tint: .accentNeutral
         )
     }
@@ -2251,7 +2355,7 @@ struct TableReviewView: View {
     private func trimEmptyEdges() {
         document.trimEmptyEdges()
         feedback = InlineFeedback(
-            message: "Bos kenarlar temizlendi.",
+            message: L10n.pair("Bos kenarlar temizlendi.", "Empty edges were trimmed."),
             tint: .accentWarm
         )
     }
@@ -2263,7 +2367,7 @@ struct TableReviewView: View {
 
         document.reset(from: session.sourceText)
         feedback = InlineFeedback(
-            message: "Tablo ilk yakalanan haline dondu.",
+            message: L10n.pair("Tablo ilk yakalanan haline dondu.", "The table was reset to its original captured state."),
             tint: .accentNeutral
         )
     }
@@ -2276,7 +2380,7 @@ struct TableReviewView: View {
         let reviewedText = document.tsvText
         guard !reviewedText.isEmpty else {
             feedback = InlineFeedback(
-                message: "Kopyalanacak tablo verisi bos.",
+                message: L10n.pair("Kopyalanacak tablo verisi bos.", "There is no table data to copy."),
                 tint: .accentRose
             )
             return
@@ -2291,7 +2395,7 @@ struct TableReviewView: View {
             targetBundleIdentifier: appState.activeTargetBundleIdentifier
         ) else {
             feedback = InlineFeedback(
-                message: "Kopyalama servisi su anda hazir degil.",
+                message: L10n.pair("Kopyalama servisi su anda hazir degil.", "The copy service is not ready right now."),
                 tint: .accentRose
             )
             return
@@ -2300,12 +2404,12 @@ struct TableReviewView: View {
         switch result {
         case .success:
             feedback = InlineFeedback(
-                message: "\(preset.title) cikti panoya kopyalandi.",
+                message: L10n.usesEnglish ? "\(preset.title) output was copied to the clipboard." : "\(preset.title) cikti panoya kopyalandi.",
                 tint: .accentCool
             )
         case .failedWrite, .failedReadback:
             feedback = InlineFeedback(
-                message: "Duzenlenen tablo panoya yazilamadi.",
+                message: L10n.pair("Duzenlenen tablo panoya yazilamadi.", "The reviewed table could not be written to the clipboard."),
                 tint: .accentRose
             )
         }

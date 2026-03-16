@@ -8,9 +8,9 @@ enum LaunchAtLoginError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            return "Bu seçenek yalnızca kurulu ve imzalı uygulama kopyasında kullanılabilir."
+            return L10n.pair("Bu seçenek yalnızca kurulu ve imzalı uygulama kopyasında kullanılabilir.", "This option is only available in an installed and signed app copy.")
         case .updateFailed(let description):
-            return "Açılışta başlatma ayarı güncellenemedi: \(description)"
+            return L10n.format("Açılışta başlatma ayarı güncellenemedi: %@", "Launch at login could not be updated: %@", description)
         }
     }
 }
@@ -28,26 +28,26 @@ enum LaunchAtLoginState: Equatable, Sendable {
     var title: String {
         switch self {
         case .enabled:
-            return "Açık"
+            return L10n.pair("Açık", "On")
         case .disabled:
-            return "Kapalı"
+            return L10n.pair("Kapalı", "Off")
         case .requiresApproval:
-            return "Onay Bekliyor"
+            return L10n.pair("Onay Bekliyor", "Approval Needed")
         case .unavailable:
-            return "Kullanılamıyor"
+            return L10n.pair("Kullanılamıyor", "Unavailable")
         }
     }
 
     var detail: String {
         switch self {
         case .enabled:
-            return "Uygulama bilgisayar açıldığında otomatik başlatılacak."
+            return L10n.pair("Uygulama bilgisayar açıldığında otomatik başlatılacak.", "The app will start automatically when your Mac turns on.")
         case .disabled:
-            return "İstersen uygulamayı oturum açılışında otomatik başlatabilirsin."
+            return L10n.pair("İstersen uygulamayı oturum açılışında otomatik başlatabilirsin.", "You can start the app automatically when you log in.")
         case .requiresApproval:
-            return "macOS ek onay bekliyor. Giriş Öğeleri bölümünden durumu kontrol etmen gerekebilir."
+            return L10n.pair("macOS ek onay bekliyor. Giriş Öğeleri bölümünden durumu kontrol etmen gerekebilir.", "macOS is waiting for an extra approval. You may need to check Login Items.")
         case .unavailable:
-            return "Bu özellik yalnızca kurulu ve imzalı uygulama kopyasında çalışır."
+            return L10n.pair("Bu özellik yalnızca kurulu ve imzalı uygulama kopyasında çalışır.", "This feature only works in an installed and signed app copy.")
         }
     }
 

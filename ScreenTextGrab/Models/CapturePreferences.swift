@@ -10,18 +10,18 @@ enum WatchCopyBehavior: String, CaseIterable, Codable, Equatable, Sendable, Iden
     var title: String {
         switch self {
         case .wholeResult:
-            return "Tam Sonuç"
+            return L10n.pair("Tam Sonuç", "Full Result")
         case .newLinesOnly:
-            return "Sadece Yeni Satırlar"
+            return L10n.pair("Sadece Yeni Satırlar", "New Lines Only")
         }
     }
 
     var detail: String {
         switch self {
         case .wholeResult:
-            return "İzlenen alan değiştiğinde tüm metni yeniden kopyalar."
+            return L10n.pair("İzlenen alan değiştiğinde tüm metni yeniden kopyalar.", "Copies the full text again whenever the watched region changes.")
         case .newLinesOnly:
-            return "Önceki sonuca göre sadece yeni gelen satırları kopyalar."
+            return L10n.pair("Önceki sonuca göre sadece yeni gelen satırları kopyalar.", "Copies only newly added lines compared with the previous result.")
         }
     }
 }
@@ -165,7 +165,7 @@ struct SavedCaptureRegion: Identifiable, Equatable, Codable, Sendable {
 
     var summary: String {
         let size = "\(Int(screenRect.width.rounded()))×\(Int(screenRect.height.rounded()))"
-        let sourceName = source?.displayName ?? "Genel"
+        let sourceName = source?.displayName ?? L10n.pair("Genel", "General")
         return "\(sourceName) • \(sessionConfiguration.captureMode.title) • \(sessionConfiguration.outputPreset.title) • \(size)"
     }
 
@@ -257,6 +257,64 @@ enum AppProfilePanelAutoSyncStore {
 
     static func save(_ isEnabled: Bool, defaults: UserDefaults = .standard) {
         defaults.set(isEnabled, forKey: key)
+    }
+}
+
+enum InterfaceLanguage: String, CaseIterable, Codable, Equatable, Sendable, Identifiable {
+    case system
+    case turkish
+    case english
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system:
+            return L10n.pair("Sistem", "System")
+        case .turkish:
+            return "Türkçe"
+        case .english:
+            return "English"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .system:
+            return L10n.pair("Arayüz dili macOS tercihini takip eder.", "The interface follows your macOS language.")
+        case .turkish:
+            return L10n.pair("Arayüz her zaman Türkçe görünür.", "The interface always appears in Turkish.")
+        case .english:
+            return L10n.pair("Arayüz her zaman English görünür.", "The interface always appears in English.")
+        }
+    }
+
+    var resolvedIdentifier: String? {
+        switch self {
+        case .system:
+            return nil
+        case .turkish:
+            return "tr"
+        case .english:
+            return "en"
+        }
+    }
+}
+
+enum InterfaceLanguageStore {
+    static let key = "screenTextGrab.interfaceLanguage"
+
+    static func load(defaults: UserDefaults = .standard) -> InterfaceLanguage {
+        guard let rawValue = defaults.string(forKey: key),
+              let language = InterfaceLanguage(rawValue: rawValue) else {
+            return .system
+        }
+
+        return language
+    }
+
+    static func save(_ language: InterfaceLanguage, defaults: UserDefaults = .standard) {
+        defaults.set(language.rawValue, forKey: key)
     }
 }
 
@@ -383,7 +441,7 @@ struct SavedSnippet: Identifiable, Equatable, Codable, Sendable {
     }
 
     var summary: String {
-        let sourceName = source?.displayName ?? "Genel"
+        let sourceName = source?.displayName ?? L10n.pair("Genel", "General")
         return "\(sourceName) • \(captureMode.title) • \(outputPreset.title)"
     }
 
@@ -471,7 +529,7 @@ struct SavedSnippetCollection: Identifiable, Equatable, Codable, Sendable {
         case (nil, false):
             return "\"\(searchQuery)\""
         case (nil, true):
-            return "Tum snippet'lar"
+            return L10n.pair("Tum snippet'lar", "All snippets")
         }
     }
 }

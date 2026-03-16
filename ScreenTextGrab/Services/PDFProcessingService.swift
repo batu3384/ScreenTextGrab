@@ -26,15 +26,15 @@ enum PDFProcessingError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .unreadableDocument:
-            return "PDF dosyası açılamadı."
+            return L10n.pair("PDF dosyası açılamadı.", "The PDF file could not be opened.")
         case .emptyDocument:
-            return "PDF içinde işlenecek sayfa bulunamadı."
+            return L10n.pair("PDF içinde işlenecek sayfa bulunamadı.", "No pages were found to process in the PDF.")
         case .pageUnavailable(let pageNumber):
-            return "PDF sayfası okunamadı: \(pageNumber)."
+            return L10n.format("PDF sayfası okunamadı: %d.", "The PDF page could not be read: %d.", pageNumber)
         case .pageRenderFailed(let pageNumber):
-            return "PDF sayfası görsele dönüştürülemedi: \(pageNumber)."
+            return L10n.format("PDF sayfası görsele dönüştürülemedi: %d.", "The PDF page could not be rendered: %d.", pageNumber)
         case .exportFailed(let reason):
-            return "Searchable PDF dışa aktarılamadı: \(reason)"
+            return L10n.format("Searchable PDF dışa aktarılamadı: %@", "Searchable PDF export failed: %@", reason)
         }
     }
 }
@@ -122,7 +122,7 @@ enum PDFProcessingService {
 
         guard let consumer = CGDataConsumer(url: destinationURL as CFURL),
               let context = CGContext(consumer: consumer, mediaBox: nil, nil) else {
-            throw PDFProcessingError.exportFailed("PDF hedef dosyası oluşturulamadı.")
+            throw PDFProcessingError.exportFailed(L10n.pair("PDF hedef dosyası oluşturulamadı.", "The destination PDF file could not be created."))
         }
 
         let pagesByIndex = Dictionary(uniqueKeysWithValues: recognizedPages.map { ($0.pageIndex, $0) })

@@ -11,15 +11,15 @@ enum ScreenPermissionState: Equatable, Sendable {
     var uiMessage: String {
         switch self {
         case .unknown:
-            return "İzin durumu bilinmiyor"
+            return L10n.pair("İzin durumu bilinmiyor", "Permission status is unknown")
         case .granted:
-            return "Ekran kaydı izni hazır"
+            return L10n.pair("Ekran kaydı izni hazır", "Screen recording access is ready")
         case .denied:
-            return "Ekran kaydı izni verilmemiş"
+            return L10n.pair("Ekran kaydı izni verilmemiş", "Screen recording access is not granted")
         case .requestInProgress:
-            return "İzin isteği bekleniyor"
+            return L10n.pair("İzin isteği bekleniyor", "Waiting for permission request")
         case .requiresRestart:
-            return "İzin verildi, uygulamayı yeniden başlatın"
+            return L10n.pair("İzin verildi, uygulamayı yeniden başlatın", "Access granted, restart the app")
         }
     }
 }
@@ -54,22 +54,22 @@ enum WatchState: Equatable, Sendable {
     var title: String {
         switch self {
         case .inactive:
-            return "Kapalı"
+            return L10n.pair("Kapalı", "Off")
         case .selecting:
-            return "Seçiliyor"
+            return L10n.pair("Seçiliyor", "Selecting")
         case .active:
-            return "Aktif"
+            return L10n.pair("Aktif", "Active")
         }
     }
 
     var detail: String {
         switch self {
         case .inactive:
-            return "Belirli bir alanı izler, yeni metin gelince otomatik kopyalar."
+            return L10n.pair("Belirli bir alanı izler, yeni metin gelince otomatik kopyalar.", "Watches a specific region and copies again when new text arrives.")
         case .selecting:
-            return "İzlenecek alanı seçmen bekleniyor."
+            return L10n.pair("İzlenecek alanı seçmen bekleniyor.", "Waiting for you to choose a region to watch.")
         case .active:
-            return "Seçilen alan düzenli taranıyor; değişiklik olursa pano güncellenir."
+            return L10n.pair("Seçilen alan düzenli taranıyor; değişiklik olursa pano güncellenir.", "The selected region is scanned regularly; the clipboard updates when content changes.")
         }
     }
 
@@ -85,18 +85,18 @@ enum SpeechPlaybackState: Equatable, Sendable {
     var title: String {
         switch self {
         case .idle:
-            return "Hazır"
+            return L10n.pair("Hazır", "Ready")
         case .speaking:
-            return "Okuyor"
+            return L10n.pair("Okuyor", "Speaking")
         }
     }
 
     var detail: String {
         switch self {
         case .idle:
-            return "Sesli okuma hazır."
+            return L10n.pair("Sesli okuma hazır.", "Speech playback is ready.")
         case .speaking:
-            return "Son yakalanan metin sesli okunuyor."
+            return L10n.pair("Son yakalanan metin sesli okunuyor.", "Reading the latest captured text aloud.")
         }
     }
 }
@@ -112,104 +112,104 @@ enum CaptureMode: String, CaseIterable, Codable, Equatable, Sendable, Identifiab
     var title: String {
         switch self {
         case .standard:
-            return "Standart"
+            return L10n.pair("Standart", "Standard")
         case .subtitle:
-            return "Altyazı"
+            return L10n.pair("Altyazı", "Subtitle")
         case .code:
-            return "Kod"
+            return L10n.pair("Kod", "Code")
         case .table:
-            return "Tablo"
+            return L10n.pair("Tablo", "Table")
         }
     }
 
     var shortTitle: String {
         switch self {
         case .standard:
-            return "Standart"
+            return L10n.pair("Standart", "Standard")
         case .subtitle:
-            return "Altyazı"
+            return L10n.pair("Altyazı", "Subtitle")
         case .code:
-            return "Kod"
+            return L10n.pair("Kod", "Code")
         case .table:
-            return "Tablo"
+            return L10n.pair("Tablo", "Table")
         }
     }
 
     var detail: String {
         switch self {
         case .standard:
-            return "Genel ekran metni, pencere içeriği ve belgeler için dengeli OCR."
+            return L10n.pair("Genel ekran metni, pencere içeriği ve belgeler için dengeli OCR.", "Balanced OCR for general screen text, window content, and documents.")
         case .subtitle:
-            return "Video, yayın ve canlı altyazılar için alt banda ve tekrar denemelere öncelik verir."
+            return L10n.pair("Video, yayın ve canlı altyazılar için alt banda ve tekrar denemelere öncelik verir.", "Prioritizes lower-band text and retries for videos, streams, and live subtitles.")
         case .code:
-            return "Kod blokları, terminal çıktıları ve monospaced metin için boşlukları daha korumacı işler."
+            return L10n.pair("Kod blokları, terminal çıktıları ve monospaced metin için boşlukları daha korumacı işler.", "Preserves spacing more carefully for code blocks, terminal output, and monospaced text.")
         case .table:
-            return "Tablo, fiyat listesi ve çok sütunlu içerikleri sekmeyle hizalanmış çıktıya dönüştürür."
+            return L10n.pair("Tablo, fiyat listesi ve çok sütunlu içerikleri sekmeyle hizalanmış çıktıya dönüştürür.", "Turns tables, price lists, and multi-column content into tab-aligned output.")
         }
     }
 
     var readyDescription: String {
         switch self {
         case .standard:
-            return "Seçim modunu aç ve algılanan metni panoya kopyala."
+            return L10n.pair("Seçim modunu aç ve algılanan metni panoya kopyala.", "Open selection mode and copy the detected text to the clipboard.")
         case .subtitle:
-            return "Alt yazı bandını seç; uygulama alt bölgeyi ve tekrar denemeleri önceliklendirir."
+            return L10n.pair("Alt yazı bandını seç; uygulama alt bölgeyi ve tekrar denemeleri önceliklendirir.", "Choose the subtitle band; the app prioritizes the lower region and retries.")
         case .code:
-            return "Kod veya terminal alanını seç; satır ve girinti yapısı daha dikkatli korunur."
+            return L10n.pair("Kod veya terminal alanını seç; satır ve girinti yapısı daha dikkatli korunur.", "Choose a code or terminal area; line breaks and indentation are preserved more carefully.")
         case .table:
-            return "Tablo alanını seç; sütunları koruyarak sekme ayrılmış çıktı üretir."
+            return L10n.pair("Tablo alanını seç; sütunları koruyarak sekme ayrılmış çıktı üretir.", "Choose a table region; it produces tab-separated output while preserving columns.")
         }
     }
 
     var selectionPrompt: String {
         switch self {
         case .standard:
-            return "Alan seçin (ESC = İptal)"
+            return L10n.pair("Alan seçin (ESC = İptal)", "Select a region (ESC = Cancel)")
         case .subtitle:
-            return "Altyazı bandını seçin (ESC = İptal)"
+            return L10n.pair("Altyazı bandını seçin (ESC = İptal)", "Select the subtitle band (ESC = Cancel)")
         case .code:
-            return "Kod alanını seçin (ESC = İptal)"
+            return L10n.pair("Kod alanını seçin (ESC = İptal)", "Select the code region (ESC = Cancel)")
         case .table:
-            return "Tablo alanını seçin (ESC = İptal)"
+            return L10n.pair("Tablo alanını seçin (ESC = İptal)", "Select the table region (ESC = Cancel)")
         }
     }
 
     var recognitionProgressTitle: String {
         switch self {
         case .standard:
-            return "Metin tanınıyor"
+            return L10n.pair("Metin tanınıyor", "Recognizing text")
         case .subtitle:
-            return "Altyazı tanınıyor"
+            return L10n.pair("Altyazı tanınıyor", "Recognizing subtitles")
         case .code:
-            return "Kod tanınıyor"
+            return L10n.pair("Kod tanınıyor", "Recognizing code")
         case .table:
-            return "Tablo tanınıyor"
+            return L10n.pair("Tablo tanınıyor", "Recognizing table")
         }
     }
 
     var retryProgressTitle: String {
         switch self {
         case .standard:
-            return "Video yazısı bekleniyor"
+            return L10n.pair("Video yazısı bekleniyor", "Waiting for video text")
         case .subtitle:
-            return "Altyazı yenileniyor"
+            return L10n.pair("Altyazı yenileniyor", "Refreshing subtitles")
         case .code:
-            return "Kod yeniden değerlendiriliyor"
+            return L10n.pair("Kod yeniden değerlendiriliyor", "Re-evaluating code")
         case .table:
-            return "Tablo yeniden değerlendiriliyor"
+            return L10n.pair("Tablo yeniden değerlendiriliyor", "Re-evaluating table")
         }
     }
 
     var emptyResultMessage: String {
         switch self {
         case .standard:
-            return "⚠️ Metin bulunamadı"
+            return L10n.pair("⚠️ Metin bulunamadı", "⚠️ No text found")
         case .subtitle:
-            return "⚠️ Altyazı bulunamadı"
+            return L10n.pair("⚠️ Altyazı bulunamadı", "⚠️ No subtitles found")
         case .code:
-            return "⚠️ Kod metni bulunamadı"
+            return L10n.pair("⚠️ Kod metni bulunamadı", "⚠️ No code text found")
         case .table:
-            return "⚠️ Tablo metni bulunamadı"
+            return L10n.pair("⚠️ Tablo metni bulunamadı", "⚠️ No table text found")
         }
     }
 
@@ -239,11 +239,11 @@ enum CaptureOutputPreset: String, CaseIterable, Codable, Equatable, Sendable, Id
     var title: String {
         switch self {
         case .smart:
-            return "Akıllı"
+            return L10n.pair("Akıllı", "Smart")
         case .plainText:
-            return "Düz Metin"
+            return L10n.pair("Düz Metin", "Plain Text")
         case .cleaned:
-            return "Temizlenmiş"
+            return L10n.pair("Temizlenmiş", "Cleaned")
         case .office:
             return "Office"
         case .markdown:
@@ -256,11 +256,11 @@ enum CaptureOutputPreset: String, CaseIterable, Codable, Equatable, Sendable, Id
     var shortTitle: String {
         switch self {
         case .smart:
-            return "Akıllı"
+            return L10n.pair("Akıllı", "Smart")
         case .plainText:
-            return "Düz"
+            return L10n.pair("Düz", "Plain")
         case .cleaned:
-            return "Temiz"
+            return L10n.pair("Temiz", "Clean")
         case .office:
             return "Office"
         case .markdown:
@@ -273,34 +273,34 @@ enum CaptureOutputPreset: String, CaseIterable, Codable, Equatable, Sendable, Id
     var summary: String {
         switch self {
         case .smart:
-            return "Moda göre en uygun sonuç"
+            return L10n.pair("Moda göre en uygun sonuç", "Best result for the current mode")
         case .plainText:
-            return "Yalın ve doğrudan metin"
+            return L10n.pair("Yalın ve doğrudan metin", "Simple, direct text")
         case .cleaned:
-            return "OCR gürültüsünü azaltır"
+            return L10n.pair("OCR gürültüsünü azaltır", "Reduces OCR noise")
         case .office:
-            return "Excel ve Word ile uyumlu"
+            return L10n.pair("Excel ve Word ile uyumlu", "Works well with Excel and Word")
         case .markdown:
-            return "Kod ve tablo için hazır"
+            return L10n.pair("Kod ve tablo için hazır", "Ready for code and tables")
         case .json:
-            return "Otomasyon için yapılandırılmış"
+            return L10n.pair("Otomasyon için yapılandırılmış", "Structured for automation")
         }
     }
 
     var detail: String {
         switch self {
         case .smart:
-            return "Moda uygun doğal çıktıyı panoya kopyalar."
+            return L10n.pair("Moda uygun doğal çıktıyı panoya kopyalar.", "Copies the most natural output for the current mode.")
         case .plainText:
-            return "Biçimi azaltılmış, doğrudan yapıştırılabilir düz metin üretir."
+            return L10n.pair("Biçimi azaltılmış, doğrudan yapıştırılabilir düz metin üretir.", "Produces reduced-format plain text that can be pasted directly.")
         case .cleaned:
-            return "Gürültüyü temizler; özellikle altyazı ve dağınık OCR sonuçlarında faydalıdır."
+            return L10n.pair("Gürültüyü temizler; özellikle altyazı ve dağınık OCR sonuçlarında faydalıdır.", "Cleans up noise; especially useful for subtitle and messy OCR results.")
         case .office:
-            return "Excel ve Word için zengin yapıştırma verisi üretir."
+            return L10n.pair("Excel ve Word için zengin yapıştırma verisi üretir.", "Produces rich paste data for Excel and Word.")
         case .markdown:
-            return "Kod ve tablo gibi içerikleri Markdown uyumlu biçimde hazırlar."
+            return L10n.pair("Kod ve tablo gibi içerikleri Markdown uyumlu biçimde hazırlar.", "Formats content like code and tables for Markdown.")
         case .json:
-            return "Otomasyon ve entegrasyonlar için yapılandırılmış çıktı üretir."
+            return L10n.pair("Otomasyon ve entegrasyonlar için yapılandırılmış çıktı üretir.", "Produces structured output for automation and integrations.")
         }
     }
 }
@@ -339,23 +339,23 @@ enum CapturePipelineError: Error, LocalizedError, Equatable, Sendable {
     var errorDescription: String? {
         switch self {
         case .permissionDenied:
-            return "🔐 Ekran kaydı izni gerekli."
+            return L10n.pair("🔐 Ekran kaydı izni gerekli.", "🔐 Screen recording permission is required.")
         case .invalidSourceRect:
-            return "❌ Seçilen alan geçersiz."
+            return L10n.pair("❌ Seçilen alan geçersiz.", "❌ The selected region is invalid.")
         case .displayNotFound:
-            return "❌ Seçilen alan için ekran bulunamadı."
+            return L10n.pair("❌ Seçilen alan için ekran bulunamadı.", "❌ No display was found for the selected region.")
         case .noTextFound:
-            return "⚠️ Seçilen alanda metin bulunamadı."
+            return L10n.pair("⚠️ Seçilen alanda metin bulunamadı.", "⚠️ No text was found in the selected region.")
         case .captureFailed(_, _, let description):
-            return "❌ Ekran yakalama hatası: \(description)"
+            return L10n.format("❌ Ekran yakalama hatası: %@", "❌ Screen capture error: %@", description)
         case .ocrFailed(let description):
-            return "❌ OCR hatası: \(description)"
+            return L10n.format("❌ OCR hatası: %@", "❌ OCR error: %@", description)
         case .clipboardFailed(let result):
             switch result {
             case .failedWrite:
-                return "⚠️ Metin alındı ancak panoya yazılamadı."
+                return L10n.pair("⚠️ Metin alındı ancak panoya yazılamadı.", "⚠️ Text was captured but could not be written to the clipboard.")
             case .failedReadback:
-                return "⚠️ Pano doğrulaması başarısız oldu."
+                return L10n.pair("⚠️ Pano doğrulaması başarısız oldu.", "⚠️ Clipboard verification failed.")
             case .success:
                 return ""
             }
@@ -407,7 +407,7 @@ struct PermissionDiagnosticSnapshot: Equatable, Sendable {
     }
 
     var preflightLabel: String {
-        preflightGranted ? "Açık" : "Kapalı"
+        preflightGranted ? L10n.pair("Açık", "On") : L10n.pair("Kapalı", "Off")
     }
 
     var reportText: String {
@@ -487,19 +487,19 @@ enum OCRLanguagePreference: String, CaseIterable, Codable, Equatable, Sendable, 
     var title: String {
         switch self {
         case .turkish:
-            return "Türkçe"
+            return L10n.pair("Türkçe", "Turkish")
         case .english:
             return "English"
         case .german:
-            return "Deutsch"
+            return L10n.pair("Deutsch", "German")
         case .french:
-            return "Français"
+            return L10n.pair("Français", "French")
         case .spanish:
-            return "Español"
+            return L10n.pair("Español", "Spanish")
         case .italian:
-            return "Italiano"
+            return L10n.pair("Italiano", "Italian")
         case .portuguese:
-            return "Português"
+            return L10n.pair("Português", "Portuguese")
         }
     }
 
@@ -548,7 +548,7 @@ struct OCRLanguageSelection: Codable, Equatable, Sendable {
 
     var summary: String {
         if automaticDetection {
-            return "Otomatik algılama"
+            return L10n.pair("Otomatik algılama", "Automatic detection")
         }
 
         return languages.map(\.title).joined(separator: ", ")
@@ -664,9 +664,9 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
         var title: String {
             switch self {
             case .text:
-                return "Metin"
+                return L10n.pair("Metin", "Text")
             case .barcode:
-                return "Barkod"
+                return L10n.pair("Barkod", "Barcode")
             }
         }
     }
@@ -679,33 +679,33 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
         var title: String {
             switch self {
             case .low:
-                return "Düşük Güven"
+                return L10n.pair("Düşük Güven", "Low Confidence")
             case .medium:
-                return "Kontrol Et"
+                return L10n.pair("Kontrol Et", "Review")
             case .high:
-                return "Yüksek Güven"
+                return L10n.pair("Yüksek Güven", "High Confidence")
             }
         }
 
         var shortTitle: String {
             switch self {
             case .low:
-                return "Düşük"
+                return L10n.pair("Düşük", "Low")
             case .medium:
-                return "Orta"
+                return L10n.pair("Orta", "Medium")
             case .high:
-                return "Yüksek"
+                return L10n.pair("Yüksek", "High")
             }
         }
 
         var detail: String {
             switch self {
             case .low:
-                return "Son OCR çıktısı zayıf güvenle üretildi. Yapıştırmadan önce gözden geçirmek iyi olur."
+                return L10n.pair("Son OCR çıktısı zayıf güvenle üretildi. Yapıştırmadan önce gözden geçirmek iyi olur.", "The last OCR result was produced with low confidence. Review it before pasting.")
             case .medium:
-                return "Son OCR çıktısı kullanılabilir görünüyor ama kısa bir göz kontrolü faydalı olabilir."
+                return L10n.pair("Son OCR çıktısı kullanılabilir görünüyor ama kısa bir göz kontrolü faydalı olabilir.", "The last OCR result looks usable, but a quick review may help.")
             case .high:
-                return "Son OCR çıktısı yüksek güvenle üretildi."
+                return L10n.pair("Son OCR çıktısı yüksek güvenle üretildi.", "The last OCR result was produced with high confidence.")
             }
         }
     }
@@ -730,7 +730,7 @@ struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
                 return bundleIdentifier
             }
 
-            return "Bilinmeyen Kaynak"
+            return L10n.pair("Bilinmeyen Kaynak", "Unknown Source")
         }
 
         var displayContextName: String {
@@ -1252,13 +1252,13 @@ enum ClipboardHistoryExportFormat: String, CaseIterable, Identifiable, Codable, 
     var subtitle: String {
         switch self {
         case .text:
-            return "Okunabilir düz metin"
+            return L10n.pair("Okunabilir düz metin", "Readable plain text")
         case .markdown:
-            return "Başlıklı doküman"
+            return L10n.pair("Başlıklı doküman", "Structured document")
         case .json:
-            return "Yapılandırılmış veri"
+            return L10n.pair("Yapılandırılmış veri", "Structured data")
         case .csv:
-            return "Spreadsheet uyumlu"
+            return L10n.pair("Spreadsheet uyumlu", "Spreadsheet-friendly")
         }
     }
 
@@ -1814,7 +1814,7 @@ enum SmartActionBuilder {
                 actions.append(
                     SmartActionDescriptor(
                         kind: .copyAsPreset(.office),
-                        title: "Word'e Uygun",
+                        title: L10n.pair("Word'e Uygun", "Word Ready"),
                         icon: "doc.richtext",
                         target: "office-code"
                     )
@@ -1825,7 +1825,7 @@ enum SmartActionBuilder {
                 actions.append(
                     SmartActionDescriptor(
                         kind: .copyAsPreset(.office),
-                        title: "Excel'e Uygun",
+                        title: L10n.pair("Excel'e Uygun", "Excel Ready"),
                         icon: "tablecells",
                         target: "office-table"
                     )
@@ -1836,7 +1836,7 @@ enum SmartActionBuilder {
                 actions.append(
                     SmartActionDescriptor(
                         kind: .copyAsPreset(.markdown),
-                        title: "Markdown Tablo",
+                        title: L10n.pair("Markdown Tablo", "Markdown Table"),
                         icon: "tablecells",
                         target: "markdown-table"
                     )
@@ -1847,7 +1847,7 @@ enum SmartActionBuilder {
                 actions.append(
                     SmartActionDescriptor(
                         kind: .copyAsPreset(.json),
-                        title: "JSON Çıktı",
+                        title: L10n.pair("JSON Çıktı", "JSON Output"),
                         icon: "curlybraces",
                         target: "json-table"
                     )
@@ -1858,7 +1858,7 @@ enum SmartActionBuilder {
                 actions.append(
                     SmartActionDescriptor(
                         kind: .copyAsPreset(.cleaned),
-                        title: "Altyazıyı Temizle",
+                        title: L10n.pair("Altyazıyı Temizle", "Clean Subtitle"),
                         icon: "text.badge.checkmark",
                         target: "clean-subtitle"
                     )
@@ -1869,7 +1869,7 @@ enum SmartActionBuilder {
                 actions.append(
                     SmartActionDescriptor(
                         kind: .copyAsPreset(.office),
-                        title: "Word'e Uygun",
+                        title: L10n.pair("Word'e Uygun", "Word Ready"),
                         icon: "doc.richtext",
                         target: "office-subtitle"
                     )

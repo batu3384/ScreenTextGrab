@@ -19,13 +19,13 @@ struct ScreenTextGrabApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("Ayarlar", id: Self.settingsWindowID) {
+        Window(L10n.pair("Ayarlar", "Settings"), id: Self.settingsWindowID) {
             SettingsView()
                 .environmentObject(appDelegate.appState)
                 .frame(width: 620, height: 560)
         }
 
-        Window("Tablo Duzenleyici", id: Self.tableReviewWindowID) {
+        Window(L10n.pair("Tablo Duzenleyici", "Table Editor"), id: Self.tableReviewWindowID) {
             TableReviewView()
                 .environmentObject(appDelegate.appState)
                 .frame(minWidth: 860, idealWidth: 920, minHeight: 580, idealHeight: 640)
@@ -49,6 +49,7 @@ final class AppState: ObservableObject {
     @Published var speechState: SpeechPlaybackState
     @Published var ocrLanguageSelection: OCRLanguageSelection
     @Published var captureOutputPreset: CaptureOutputPreset
+    @Published var interfaceLanguage: InterfaceLanguage
     @Published var watchConfiguration: WatchConfiguration
     @Published var appProfiles: [AppCaptureProfile]
     @Published var appProfilePanelAutoSyncEnabled: Bool
@@ -86,7 +87,7 @@ final class AppState: ObservableObject {
         self.copyHistory = restoredHistory
         self.permissionState = .unknown
         self.captureState = .idle
-        self.statusMessage = "✅ Hazır — menüden yakala"
+        self.statusMessage = L10n.pair("✅ Hazır — menüden yakala", "✅ Ready — capture from the menu")
         self.lastError = nil
         self.diagnostics = []
         self.isHotkeyAvailable = false
@@ -103,6 +104,9 @@ final class AppState: ObservableObject {
         self.captureOutputPreset = persistsUserPreferences
             ? CaptureOutputPresetStore.load(defaults: defaults)
             : .smart
+        self.interfaceLanguage = persistsUserPreferences
+            ? InterfaceLanguageStore.load(defaults: defaults)
+            : .system
         self.watchConfiguration = persistsUserPreferences
             ? WatchConfigurationStore.load(defaults: defaults)
             : .defaultValue
@@ -147,8 +151,8 @@ final class AppState: ObservableObject {
 
     var readyStatusMessage: String {
         isHotkeyAvailable
-            ? "✅ Hazır — \(hotkeyDisplayLabel) ile yakala"
-            : "✅ Hazır — menüden yakala"
+            ? L10n.format("✅ Hazır — %@ ile yakala", "✅ Ready — capture with %@", hotkeyDisplayLabel)
+            : L10n.pair("✅ Hazır — menüden yakala", "✅ Ready — capture from the menu")
     }
 
     var availableSnippetTags: [String] {
@@ -309,6 +313,19 @@ final class AppState: ObservableObject {
     func setCaptureOutputPreset(_ preset: CaptureOutputPreset) {
         captureOutputPreset = preset
         persistCaptureOutputPresetIfNeeded()
+    }
+
+    func setInterfaceLanguage(_ language: InterfaceLanguage) {
+        interfaceLanguage = language
+        persistInterfaceLanguageIfNeeded()
+
+        guard watchState != .active,
+              watchState != .selecting,
+              captureState == .idle || captureState == .completed || captureState == .cancelled else {
+            return
+        }
+
+        statusMessage = readyStatusMessage
     }
 
     func setWatchCopyBehavior(_ behavior: WatchCopyBehavior) {
@@ -716,13 +733,13 @@ final class AppState: ObservableObject {
             "İzin: \(permissionState.uiMessage)",
             "Launch at Login: \(launchAtLoginState.title)",
             "Kısayol: \(hotkeyDisplayLabel)",
-            "Yakalama Modu: \(captureMode.title)",
+            "\(L10n.pair("Yakalama Modu", "Capture Mode")): \(captureMode.title)",
             "Çıktı Biçimi: \(captureOutputPreset.title)",
             "İzleme: \(watchState.title)",
             "İzleme Kuralı: \(watchConfiguration.summary)",
             "Sesli Okuma: \(speechState.title)",
             "OCR: \(ocrLanguageSelection.summary)",
-            "Geçmiş Sayısı: \(copyHistory.count)",
+            "\(L10n.pair("Geçmiş Sayısı", "History Count")): \(copyHistory.count)",
             "Uygulama Profilleri: \(appProfiles.count)",
             "Kayıtlı Bölgeler: \(savedCaptureRegions.count)",
             "Kayıtlı Snippet'lar: \(savedSnippets.count)"
@@ -790,6 +807,11 @@ final class AppState: ObservableObject {
     private func persistCaptureOutputPresetIfNeeded() {
         guard persistsUserPreferences else { return }
         CaptureOutputPresetStore.save(captureOutputPreset, defaults: defaults)
+    }
+
+    private func persistInterfaceLanguageIfNeeded() {
+        guard persistsUserPreferences else { return }
+        InterfaceLanguageStore.save(interfaceLanguage, defaults: defaults)
     }
 
     private func persistWatchConfigurationIfNeeded() {
@@ -1078,7 +1100,10 @@ private struct UITestConfiguration {
 private enum ScreenshotLaunchMode {
     case menuPanel
     case launchPanel
-    case settings
+    case settingsGeneral
+    case settingsOCR
+    case settingsDiagnostics
+    case settingsHistory
     case tableReview
 
     init?(arguments: [String]) {
@@ -1092,8 +1117,23 @@ private enum ScreenshotLaunchMode {
             return
         }
 
-        if arguments.contains("--screenshot-settings") {
-            self = .settings
+        if arguments.contains("--screenshot-settings-general") || arguments.contains("--screenshot-settings") {
+            self = .settingsGeneral
+            return
+        }
+
+        if arguments.contains("--screenshot-settings-ocr") {
+            self = .settingsOCR
+            return
+        }
+
+        if arguments.contains("--screenshot-settings-diagnostics") {
+            self = .settingsDiagnostics
+            return
+        }
+
+        if arguments.contains("--screenshot-settings-history") {
+            self = .settingsHistory
             return
         }
 
@@ -1782,6 +1822,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configurePreviewState() {
         let previewLaunchManager = PreviewLaunchAtLoginManager(state: .enabled)
         let bundle = Bundle.main
+        let sourceExcel = ClipboardHistoryEntry.SourceContext(
+            appName: "Microsoft Excel",
+            bundleIdentifier: "com.microsoft.Excel",
+            windowTitle: L10n.pair("Q2 Gelir Tablosu", "Q2 Revenue Table")
+        )
+        let sourceWord = ClipboardHistoryEntry.SourceContext(
+            appName: "Microsoft Word",
+            bundleIdentifier: "com.microsoft.Word",
+            windowTitle: "Teklif Taslagi"
+        )
+        let sourceSafari = ClipboardHistoryEntry.SourceContext(
+            appName: "Safari",
+            bundleIdentifier: "com.apple.Safari",
+            windowTitle: "Satis Paneli"
+        )
+        let sourceXcode = ClipboardHistoryEntry.SourceContext(
+            appName: "Xcode",
+            bundleIdentifier: "com.apple.dt.Xcode",
+            windowTitle: "OCRService.swift"
+        )
         let previewPermissionService = PreviewPermissionProvider(
             snapshot: PermissionDiagnosticSnapshot(
                 timestamp: Date(),
@@ -1792,7 +1852,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 lastConfirmedGrantAt: Date(),
                 lastProbeAt: Date(),
                 bundleIdentifier: bundle.bundleIdentifier ?? "dev.screentextgrab.app",
-                appPath: bundle.bundleURL.path,
+                appPath: "/Applications/ScreenTextGrab.app",
                 marketingVersion: (bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.0.3",
                 buildVersion: (bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String) ?? "4"
             )
@@ -1812,13 +1872,168 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appState.watchState = .inactive
         appState.speechState = .idle
         appState.ocrLanguageSelection = .defaultValue
-        appState.watchConfiguration = WatchConfiguration(copyBehavior: .wholeResult, regexFilter: "Fatura|Toplam")
+        appState.watchConfiguration = WatchConfiguration(
+            copyBehavior: .wholeResult,
+            regexFilter: L10n.pair("Fatura|Toplam", "Invoice|Total")
+        )
         appState.permissionDiagnosticsProvider = previewPermissionService
         appState.launchAtLoginManager = previewLaunchManager
+        appState.appProfilePanelAutoSyncEnabled = true
+        appState.savedCaptureRegionQuickStartEnabled = true
+        appState.savedSnippetCollectionAutoSyncEnabled = true
+        appState.historyExportFormat = .markdown
+        appState.activeSourceApp = sourceExcel
+        appState.appProfiles = [
+            AppCaptureProfile(
+                bundleIdentifier: "com.microsoft.Excel",
+                appName: "Microsoft Excel",
+                captureMode: .table,
+                outputPreset: .office,
+                ocrLanguageSelection: .defaultValue
+            ),
+            AppCaptureProfile(
+                bundleIdentifier: "com.apple.dt.Xcode",
+                appName: "Xcode",
+                captureMode: .code,
+                outputPreset: .markdown,
+                ocrLanguageSelection: .defaultValue
+            ),
+            AppCaptureProfile(
+                bundleIdentifier: "com.apple.Safari",
+                appName: "Safari",
+                captureMode: .standard,
+                outputPreset: .cleaned,
+                ocrLanguageSelection: .defaultValue
+            )
+        ]
+        appState.diagnostics = [
+            DiagnosticEntry(
+                timestamp: Date().addingTimeInterval(-240),
+                category: "permission",
+                message: L10n.pair("Screen Recording izni dogrulandi ve grant kaniti guncellendi.", "Screen Recording permission was verified and the grant evidence was refreshed."),
+                domain: "ScreenPermissionService",
+                code: 0,
+                severity: .info
+            ),
+            DiagnosticEntry(
+                timestamp: Date().addingTimeInterval(-540),
+                category: "automation",
+                message: L10n.pair("stg clipboard-image komutu sorunsuz tamamlandi.", "The stg clipboard-image command completed successfully."),
+                domain: "AutomationSupport",
+                code: 0,
+                severity: .info
+            ),
+            DiagnosticEntry(
+                timestamp: Date().addingTimeInterval(-1120),
+                category: "ocr",
+                message: L10n.pair("Dusuk guvenli satirlar tablo duzenleyici ile tekrar gozden gecirildi.", "Low-confidence rows were reviewed again in the table editor."),
+                domain: "OCRService",
+                code: 14,
+                severity: .warning
+            )
+        ]
 
         let sampleEntries = screenshotHistoryEntries()
         appState.copyHistory = sampleEntries
         appState.lastCopiedText = sampleEntries.first?.text ?? ""
+        appState.savedCaptureRegions = [
+            SavedCaptureRegion(
+                name: L10n.pair("Excel • Q2 Toplamlar", "Excel • Q2 Totals"),
+                screenRect: CGRect(x: 420, y: 220, width: 960, height: 420),
+                preferredDisplayID: nil,
+                source: sourceExcel,
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .table,
+                    outputPreset: .office,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Excel"
+                ),
+                updatedAt: Date().addingTimeInterval(-320)
+            ),
+            SavedCaptureRegion(
+                name: L10n.pair("Safari • Dashboard Ozet", "Safari • Dashboard Summary"),
+                screenRect: CGRect(x: 360, y: 180, width: 1040, height: 360),
+                preferredDisplayID: nil,
+                source: sourceSafari,
+                sessionConfiguration: CaptureSessionConfiguration(
+                    captureMode: .standard,
+                    outputPreset: .cleaned,
+                    ocrLanguageSelection: .defaultValue,
+                    profileName: "Safari"
+                ),
+                updatedAt: Date().addingTimeInterval(-780)
+            )
+        ]
+        appState.savedSnippets = [
+            SavedSnippet(
+                name: L10n.pair("Excel Ozet Tablosu", "Excel Summary Table"),
+                text: L10n.usesEnglish
+                    ? "Product\tPlan\tUnits\tTotal\nScreenTextGrab Pro\tAnnual\t12\t14,400 TRY"
+                    : "Urun\tPlan\tAdet\tToplam\nScreenTextGrab Pro\tYillik\t12\t14.400 TL",
+                rawText: L10n.usesEnglish
+                    ? "Product\tPlan\tUnits\tTotal\nScreenTextGrab Pro\tAnnual\t12\t14,400 TRY"
+                    : "Urun\tPlan\tAdet\tToplam\nScreenTextGrab Pro\tYillik\t12\t14.400 TL",
+                captureMode: .table,
+                outputPreset: .office,
+                contentKind: .text,
+                ocrConfidence: 0.93,
+                source: sourceExcel,
+                tags: L10n.usesEnglish ? ["report", "excel", "table"] : ["rapor", "excel", "tablo"],
+                updatedAt: Date().addingTimeInterval(-180)
+            ),
+            SavedSnippet(
+                name: L10n.pair("Word Aciklama Blogu", "Word Description Block"),
+                text: L10n.pair("OCR tamamlandi. Office uyumlu zengin cikti panoya hazirlandi.", "OCR completed. Office-friendly rich output has been prepared on the clipboard."),
+                rawText: nil,
+                captureMode: .standard,
+                outputPreset: .office,
+                contentKind: .text,
+                ocrConfidence: 0.88,
+                source: sourceWord,
+                tags: L10n.usesEnglish ? ["word", "description"] : ["word", "aciklama"],
+                updatedAt: Date().addingTimeInterval(-520)
+            ),
+            SavedSnippet(
+                name: L10n.pair("Xcode Log Filtre", "Xcode Log Filter"),
+                text: "error: permissionDenied\nwarning: retrying capture pipeline",
+                rawText: nil,
+                captureMode: .code,
+                outputPreset: .markdown,
+                contentKind: .text,
+                ocrConfidence: 0.79,
+                source: sourceXcode,
+                tags: L10n.usesEnglish ? ["xcode", "log", "code"] : ["xcode", "log", "kod"],
+                updatedAt: Date().addingTimeInterval(-940),
+                lastUsedAt: Date().addingTimeInterval(-120)
+            )
+        ]
+        appState.savedSnippetCollections = [
+            SavedSnippetCollection(
+                name: L10n.pair("Excel Raporlari", "Excel Reports"),
+                selectedTag: "excel",
+                searchQuery: L10n.pair("Toplam", "Total"),
+                updatedAt: Date().addingTimeInterval(-90)
+            ),
+            SavedSnippetCollection(
+                name: L10n.pair("Kod ve Log", "Code and Logs"),
+                selectedTag: L10n.pair("kod", "code"),
+                searchQuery: "error",
+                updatedAt: Date().addingTimeInterval(-610)
+            )
+        ]
+        appState.rememberCaptureSelection(
+            RecentCaptureSelection(
+            screenRect: CGRect(x: 420, y: 220, width: 960, height: 420),
+            preferredDisplayID: nil,
+            source: sourceExcel,
+            sessionConfiguration: CaptureSessionConfiguration(
+                captureMode: .table,
+                outputPreset: .office,
+                ocrLanguageSelection: .defaultValue,
+                profileName: "Excel"
+            )
+            )
+        )
         if let tableEntry = sampleEntries.first(where: { $0.captureMode == .table }) {
             appState.activeTableReview = TableReviewSession(
                 entry: tableEntry,
@@ -1830,7 +2045,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func configureMenuPanelPreviewState() {
         configurePreviewState()
-        appState.statusMessage = "Hazır"
+        appState.statusMessage = L10n.pair("Hazır", "Ready")
         appState.launchAtLoginState = .disabled
         appState.watchState = .inactive
         appState.hotkeyDisplayLabel = HotkeyConfiguration.defaultValue.displayLabel
@@ -1839,17 +2054,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func screenshotHistoryEntries() -> [ClipboardHistoryEntry] {
         [
             ClipboardHistoryEntry(
-                text: "Urun\tPlan\tAdet\tToplam\nScreenTextGrab Pro\tYillik\t12\t14.400 TL\nOCR Office Pack\tTakim\t3\t5.700 TL\nDestek\tPremium\t1\t1.250 TL\nGenel Toplam\t\t\t21.350 TL",
+                text: L10n.usesEnglish
+                    ? "Product\tPlan\tUnits\tTotal\nScreenTextGrab Pro\tAnnual\t12\t14,400 TRY\nOCR Office Pack\tTeam\t3\t5,700 TRY\nSupport\tPremium\t1\t1,250 TRY\nGrand Total\t\t\t21,350 TRY"
+                    : "Urun\tPlan\tAdet\tToplam\nScreenTextGrab Pro\tYillik\t12\t14.400 TL\nOCR Office Pack\tTakim\t3\t5.700 TL\nDestek\tPremium\t1\t1.250 TL\nGenel Toplam\t\t\t21.350 TL",
                 date: Date(),
                 captureMode: .table,
                 outputPreset: .office,
                 contentKind: .text,
-                rawText: "Urun\tPlan\tAdet\tToplam\nScreenTextGrab Pro\tYillik\t12\t14.400 TL\nOCR Office Pack\tTakim\t3\t5.700 TL\nDestek\tPremium\t1\t1.250 TL\nGenel Toplam\t\t\t21.350 TL",
+                rawText: L10n.usesEnglish
+                    ? "Product\tPlan\tUnits\tTotal\nScreenTextGrab Pro\tAnnual\t12\t14,400 TRY\nOCR Office Pack\tTeam\t3\t5,700 TRY\nSupport\tPremium\t1\t1,250 TRY\nGrand Total\t\t\t21,350 TRY"
+                    : "Urun\tPlan\tAdet\tToplam\nScreenTextGrab Pro\tYillik\t12\t14.400 TL\nOCR Office Pack\tTakim\t3\t5.700 TL\nDestek\tPremium\t1\t1.250 TL\nGenel Toplam\t\t\t21.350 TL",
                 source: .init(appName: "Microsoft Excel", bundleIdentifier: "com.microsoft.Excel"),
                 isPinned: true
             ),
             ClipboardHistoryEntry(
-                text: "OCR tamamlandi. Son pano cikisi Word uyumlu bicimde hazirlandi.",
+                text: L10n.pair("OCR tamamlandi. Son pano cikisi Word uyumlu bicimde hazirlandi.", "OCR completed. The latest clipboard output was prepared in a Word-friendly format."),
                 date: Date().addingTimeInterval(-320),
                 captureMode: .standard,
                 outputPreset: .office,
@@ -1864,9 +2083,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch mode {
         case .menuPanel:
             configureMenuPanelPreviewState()
+            let previewSize = NSSize(width: 404, height: 1420)
             showPreviewWindow(
                 title: "ScreenTextGrab",
-                size: NSSize(width: 404, height: 892),
+                size: previewSize,
                 styleMask: [.borderless],
                 isOpaque: false,
                 backgroundColor: .clear,
@@ -1876,23 +2096,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 MenuBarView()
                     .environmentObject(self.appState)
                     .padding(22)
+                    .frame(width: previewSize.width, height: previewSize.height, alignment: .top)
                     .background(Color(red: 0.03, green: 0.07, blue: 0.10))
-                    .frame(width: 404, height: 892, alignment: .top)
             }
         case .launchPanel:
             showLaunchPanel(force: true)
-        case .settings:
+        case .settingsGeneral:
             showPreviewWindow(
-                title: "Ayarlar",
+                title: L10n.pair("Ayarlar", "Settings"),
+                size: NSSize(width: 840, height: 980)
+            ) {
+                SettingsView(initialTab: .general)
+                    .environmentObject(self.appState)
+                    .frame(width: 840, height: 980)
+            }
+        case .settingsOCR:
+            showPreviewWindow(
+                title: L10n.pair("Ayarlar", "Settings"),
                 size: NSSize(width: 840, height: 760)
             ) {
-                SettingsView()
+                SettingsView(initialTab: .ocr)
                     .environmentObject(self.appState)
                     .frame(width: 840, height: 760)
             }
+        case .settingsDiagnostics:
+            showPreviewWindow(
+                title: L10n.pair("Ayarlar", "Settings"),
+                size: NSSize(width: 840, height: 880)
+            ) {
+                SettingsView(initialTab: .diagnostics)
+                    .environmentObject(self.appState)
+                    .frame(width: 840, height: 880)
+            }
+        case .settingsHistory:
+            appState.pendingSnippetCollectionSelectionName = L10n.pair("Excel Raporlari", "Excel Reports")
+            showPreviewWindow(
+                title: L10n.pair("Ayarlar", "Settings"),
+                size: NSSize(width: 840, height: 1260)
+            ) {
+                SettingsView(initialTab: .history)
+                    .environmentObject(self.appState)
+                    .frame(width: 840, height: 1260)
+            }
         case .tableReview:
             showPreviewWindow(
-                title: "Tablo Duzenleyici",
+                title: L10n.pair("Tablo Duzenleyici", "Table Editor"),
                 size: NSSize(width: 1020, height: 720)
             ) {
                 TableReviewView()
@@ -2027,7 +2275,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let commands = urls.compactMap(AutomationCommand.init(incomingURL:))
         guard !commands.isEmpty else {
             if !urls.isEmpty {
-                appState.statusMessage = "⚠️ Yalnızca görsel veya PDF dosyaları desteklenir."
+                appState.statusMessage = L10n.pair(
+                    "⚠️ Yalnızca görsel veya PDF dosyaları desteklenir.",
+                    "⚠️ Only image and PDF files are supported."
+                )
             }
             return
         }
@@ -2094,7 +2345,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             coordinator.captureSavedRegion(named: name, sessionOverrides: overrides.isEmpty ? nil : overrides)
         case .activeSnippet:
             guard let suggestion = appState.activeSavedSnippetSuggestion else {
-                appState.statusMessage = "⚠️ Aktif uygulama için kullanılabilir snippet bulunamadı."
+                appState.statusMessage = L10n.pair(
+                    "⚠️ Aktif uygulama için kullanılabilir snippet bulunamadı.",
+                    "⚠️ No available snippet was found for the active app."
+                )
                 return
             }
             _ = coordinator.copySavedSnippet(suggestion.snippet)
@@ -2103,7 +2357,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .snippetCollection(let name):
             NSApp.activate(ignoringOtherApps: true)
             if !appState.presentSettingsForSavedSnippetCollection(named: name) {
-                appState.statusMessage = "⚠️ Snippet koleksiyonu bulunamadı: \(name)"
+                appState.statusMessage = L10n.usesEnglish
+                    ? "⚠️ Saved snippet collection not found: \(name)"
+                    : "⚠️ Snippet koleksiyonu bulunamadı: \(name)"
             }
         case .clipboardImage(let overrides):
             coordinator.captureClipboardImage(sessionOverrides: overrides.isEmpty ? nil : overrides)
@@ -2146,8 +2402,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         .environmentObject(appState)
 
+        let launchPanelSize = NSSize(width: 496, height: 272)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 372, height: 248),
+            contentRect: NSRect(origin: .zero, size: launchPanelSize),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -2156,9 +2413,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.contentView = NSHostingView(
             rootView: rootView
-                .frame(width: 372, height: 248)
+                .frame(width: launchPanelSize.width, height: launchPanelSize.height)
         )
-        window.setContentSize(NSSize(width: 372, height: 248))
+        window.setContentSize(launchPanelSize)
         window.title = "ScreenTextGrab"
         window.isReleasedWhenClosed = false
         window.isMovableByWindowBackground = true
@@ -2242,7 +2499,10 @@ final class FinderImportServiceProvider: NSObject {
     ) {
         let urls = Self.readFileURLs(from: pasteboard)
         guard !urls.isEmpty else {
-            error.pointee = "Yalnızca görsel veya PDF dosyaları desteklenir." as NSString
+            error.pointee = L10n.pair(
+                "Yalnızca görsel veya PDF dosyaları desteklenir.",
+                "Only image and PDF files are supported."
+            ) as NSString
             return
         }
 
@@ -2453,35 +2713,83 @@ private struct LaunchPanelView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("ScreenTextGrab Hazır")
+                        Text(L10n.pair("ScreenTextGrab Hazır", "ScreenTextGrab Ready"))
                             .font(.system(size: 20, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                             .accessibilityIdentifier("launch-panel-title")
 
-                        Text("Uygulama menü çubuğunda çalışıyor.")
+                        Text(L10n.pair("Uygulama menü çubuğunda çalışıyor.", "The app is running in your menu bar."))
                             .font(.system(size: 12.5, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.white.opacity(0.72))
                     }
+
+                    Spacer()
+
+                    Menu {
+                        ForEach(InterfaceLanguage.allCases) { language in
+                            Button {
+                                appState.setInterfaceLanguage(language)
+                            } label: {
+                                HStack {
+                                    Text(language.title)
+                                    if language == appState.interfaceLanguage {
+                                        Spacer()
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "globe")
+                            Text(appState.interfaceLanguage.title)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white.opacity(0.12))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        )
+                    }
+                    .menuStyle(.borderlessButton)
+                    .accessibilityLabel(L10n.accessibilityInterfaceLanguage)
+                    .accessibilityIdentifier("launch-panel-language-menu")
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
                     hintRow(
                         icon: "menubar.rectangle",
-                        text: "Üst menüdeki ScreenTextGrab simgesinden hızlı ayarlara ve geçmişe ulaş.",
+                        text: L10n.pair(
+                            "Üst menüdeki ScreenTextGrab simgesinden hızlı ayarlara ve geçmişe ulaş.",
+                            "Open the ScreenTextGrab menu bar icon for quick controls and recent history."
+                        ),
                         accessibilityIdentifier: "launch-panel-menubar-hint"
                     )
                     hintRow(
                         icon: "keyboard",
                         text: appState.isHotkeyAvailable
-                            ? "\(appState.hotkeyDisplayLabel) ile doğrudan alan seçip metin yakalayabilirsin."
-                            : "Menüden kısayol ayarlayıp doğrudan yakalama başlatabilirsin.",
+                            ? L10n.usesEnglish
+                                ? "Use \(appState.hotkeyDisplayLabel) to select a region and capture text directly."
+                                : "\(appState.hotkeyDisplayLabel) ile doğrudan alan seçip metin yakalayabilirsin."
+                            : L10n.pair(
+                                "Menüden kısayol ayarlayıp doğrudan yakalama başlatabilirsin.",
+                                "Set a shortcut from the menu to start capture directly."
+                            ),
                         accessibilityIdentifier: "launch-panel-hotkey-hint"
                     )
                     hintRow(
                         icon: appState.permissionState == .granted ? "checkmark.shield" : "lock.display",
                         text: appState.permissionState == .granted
-                            ? "Ekran kaydı izni aktif, kullanıma hazır."
-                            : "İlk kullanımda ekran kaydı izni istenebilir.",
+                            ? L10n.pair("Ekran kaydı izni aktif, kullanıma hazır.", "Screen recording permission is active and ready.")
+                            : L10n.pair("İlk kullanımda ekran kaydı izni istenebilir.", "Screen recording permission may be requested on first use."),
                         accessibilityIdentifier: "launch-panel-permission-status-hint"
                     )
                 }
@@ -2507,7 +2815,7 @@ private struct LaunchPanelView: View {
 
                 HStack(spacing: 10) {
                     Button(action: onStartCapture) {
-                        Label("Metni Yakala", systemImage: "viewfinder")
+                        Label(L10n.pair("Metni Yakala", "Capture Text"), systemImage: "viewfinder")
                             .font(.system(size: 12.5, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 14)
@@ -2524,7 +2832,7 @@ private struct LaunchPanelView: View {
                     .accessibilityIdentifier("launch-panel-start-capture")
 
                     Button(action: onDismiss) {
-                        Text("Tamam")
+                        Text(L10n.pair("Tamam", "Done"))
                             .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 14)
@@ -2554,11 +2862,11 @@ private struct LaunchPanelView: View {
                                 .font(.system(size: 26, weight: .bold))
                                 .foregroundStyle(Color(red: 0.91, green: 0.73, blue: 0.46))
 
-                            Text("Görsel veya PDF bırak")
+                            Text(L10n.pair("Görsel veya PDF bırak", "Drop an Image or PDF"))
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white)
 
-                            Text("Görsel dosyaları OCR olarak açılır, PDF dosyaları içe alınır.")
+                            Text(L10n.pair("Görsel dosyaları OCR olarak açılır, PDF dosyaları içe alınır.", "Image files open in OCR mode and PDF files are imported directly."))
                                 .font(.system(size: 11.5, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.white.opacity(0.72))
                                 .multilineTextAlignment(.center)
@@ -2601,13 +2909,25 @@ private struct LaunchPanelView: View {
         case .granted:
             return nil
         case .denied:
-            return "Ekran kaydı izni kapalı. Sistem Ayarları > Gizlilik ve Güvenlik > Ekran Kaydı bölümünden ScreenTextGrab iznini aç."
+            return L10n.pair(
+                "Ekran kaydı izni kapalı. Sistem Ayarları > Gizlilik ve Güvenlik > Ekran Kaydı bölümünden ScreenTextGrab iznini aç.",
+                "Screen recording permission is off. Enable ScreenTextGrab in System Settings > Privacy & Security > Screen Recording."
+            )
         case .requiresRestart:
-            return "İzin verildi. Değişikliğin tam uygulanması için uygulamayı yeniden başlat."
+            return L10n.pair(
+                "İzin verildi. Değişikliğin tam uygulanması için uygulamayı yeniden başlat.",
+                "Permission was granted. Restart the app to apply the change completely."
+            )
         case .requestInProgress:
-            return "İzin isteği açık. macOS penceresinden erişimi onayladıktan sonra devam edebilirsin."
+            return L10n.pair(
+                "İzin isteği açık. macOS penceresinden erişimi onayladıktan sonra devam edebilirsin.",
+                "The permission prompt is open. Continue after approving access in the macOS dialog."
+            )
         case .unknown:
-            return "İzin durumu doğrulanamadı. Bir kez yakalama başlatınca macOS erişim penceresi gösterebilir."
+            return L10n.pair(
+                "İzin durumu doğrulanamadı. Bir kez yakalama başlatınca macOS erişim penceresi gösterebilir.",
+                "Permission status could not be verified. macOS may show the access dialog when you start capture."
+            )
         }
     }
 
