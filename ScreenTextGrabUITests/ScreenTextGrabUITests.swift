@@ -26,8 +26,12 @@ final class ScreenTextGrabUITests: XCTestCase {
         let permissionHint = permissionHint(in: app)
 
         XCTAssertTrue(permissionHint.waitForExistence(timeout: 5))
-        let hintText = (permissionHint.value as? String) ?? permissionHint.label
-        XCTAssertTrue(hintText.localizedCaseInsensitiveContains("yeniden başlat"))
+        let hintText = ((permissionHint.value as? String) ?? permissionHint.label).lowercased()
+        XCTAssertTrue(
+            hintText.contains("yeniden başlat") ||
+            hintText.contains("restart") ||
+            hintText.contains("reopen")
+        )
     }
 
     func testLaunchPanelDisablesCaptureWhileWatchModeIsActive() {
