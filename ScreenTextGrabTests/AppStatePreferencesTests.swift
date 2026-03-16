@@ -1714,8 +1714,10 @@ final class AppStatePreferencesTests: XCTestCase {
 
         let refreshed = appState.saveHistoryEntryAsSnippet(entry)
         var expectedTags: [String] = []
-        for tag in ["Rapor", "Kod", "Xcode", CaptureOutputPreset.markdown.title, CaptureMode.code.title] {
-            if expectedTags.contains(tag) == false {
+        for tag in ["Rapor", "Kod", CaptureMode.code.title, "Xcode", CaptureOutputPreset.markdown.title] {
+            if expectedTags.contains(where: {
+                $0.compare(tag, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+            }) == false {
                 expectedTags.append(tag)
             }
         }
