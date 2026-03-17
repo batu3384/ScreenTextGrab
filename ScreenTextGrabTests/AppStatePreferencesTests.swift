@@ -2170,7 +2170,7 @@ final class AppStatePreferencesTests: XCTestCase {
         )
     }
 
-    func testAutomationCommandResolveIncomingURLsRejectsMultipleImportedFiles() {
+    func testAutomationCommandResolveIncomingURLsAcceptsMultipleImportedFilesInOrder() {
         let urls = [
             URL(fileURLWithPath: "/tmp/example.png"),
             URL(fileURLWithPath: "/tmp/example.pdf")
@@ -2178,8 +2178,57 @@ final class AppStatePreferencesTests: XCTestCase {
 
         XCTAssertEqual(
             AutomationCommand.resolveIncomingURLs(urls),
-            .multipleFileImportsUnsupported
+            .commands([
+                .imageFile(URL(fileURLWithPath: "/tmp/example.png"), AutomationCaptureOverrides()),
+                .pdfFile(URL(fileURLWithPath: "/tmp/example.pdf"), AutomationCaptureOverrides())
+            ])
         )
+    }
+
+    func testAutomationCommandQueueSerializesImportedFileCommandsUntilCaptureCompletes() {
+        var queue = AutomationCommandQueue()
+        let imageCommand = AutomationCommand.imageFile(
+            URL(fileURLWithPath: "/tmp/example.png"),
+            AutomationCaptureOverrides()
+        )
+        let pdfCommand = AutomationCommand.pdfFile(
+            URL(fileURLWithPath: "/tmp/example.pdf"),
+            AutomationCaptureOverrides()
+        )
+
+        queue.enqueue([imageCommand, pdfCommand])
+
+        let first = queue.nextCommand(captureState: .idle)
+        XCTAssertEqual(first, imageCommand)
+
+        XCTAssertNil(queue.nextCommand(captureState: .preparing))
+
+        queue.captureStateDidChange(.completed)
+
+        let second = queue.nextCommand(captureState: .idle)
+        XCTAssertEqual(second, pdfCommand)
+        XCTAssertTrue(queue.isEmpty)
+    }
+
+    func testAutomationCommandQueueReleasesImportedFileGateWhenDispatchFailsImmediately() {
+        var queue = AutomationCommandQueue()
+        let imageCommand = AutomationCommand.imageFile(
+            URL(fileURLWithPath: "/tmp/example.png"),
+            AutomationCaptureOverrides()
+        )
+        let pdfCommand = AutomationCommand.pdfFile(
+            URL(fileURLWithPath: "/tmp/example.pdf"),
+            AutomationCaptureOverrides()
+        )
+
+        queue.enqueue([imageCommand, pdfCommand])
+
+        let first = queue.nextCommand(captureState: .idle)
+        XCTAssertEqual(first, imageCommand)
+        queue.markDispatchResult(for: imageCommand, startedBusyWork: false)
+
+        let second = queue.nextCommand(captureState: .idle)
+        XCTAssertEqual(second, pdfCommand)
     }
 
     func testFinderImportServiceProviderReadsFileURLsFromPasteboard() {

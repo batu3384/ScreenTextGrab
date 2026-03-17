@@ -1,5 +1,6 @@
 import ApplicationServices
 import AVFoundation
+import Combine
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -1445,7 +1446,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var finderImportServiceProvider: FinderImportServiceProvider?
     private var didBecomeActiveObserver: NSObjectProtocol?
     private var workspaceActivationObserver: NSObjectProtocol?
-    private var pendingAutomationCommands: [AutomationCommand] = []
+    private var captureStateObserver: AnyCancellable?
+    private var automationCommandQueue = AutomationCommandQueue()
     private var screenshotLaunchMode: ScreenshotLaunchMode? {
         ScreenshotLaunchMode(arguments: ProcessInfo.processInfo.arguments)
     }
@@ -1466,7 +1468,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if let automationCommand = AutomationCommand(arguments: ProcessInfo.processInfo.arguments) {
-            pendingAutomationCommands.append(automationCommand)
+            automationCommandQueue.enqueue([automationCommand])
         }
 
         NSApp.setActivationPolicy(.accessory)
@@ -1548,6 +1550,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ScreenTextGrabShortcutsProvider.updateAppShortcutParameters()
         }
 
+        captureStateObserver = appState.$captureState
+            .removeDuplicates()
+            .sink { [weak self] state in
+                guard let self else { return }
+                self.automationCommandQueue.captureStateDidChange(state)
+                guard !state.isBusy else { return }
+                Task { @MainActor [weak self] in
+                    self?.flushPendingAutomationCommands()
+                }
+            }
+
         configureFinderImportServices()
         flushPendingAutomationCommands()
 
@@ -1564,6 +1577,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let workspaceActivationObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(workspaceActivationObserver)
         }
+        captureStateObserver?.cancel()
     }
 
     private func enforceCanonicalInstallLocation() -> Bool {
@@ -2181,13 +2195,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     "⚠️ Only image and PDF files are supported."
                 )
             }
-        case .multipleFileImportsUnsupported:
-            appState.statusMessage = L10n.pair(
-                "⚠️ Aynı anda yalnızca tek bir görsel veya PDF içe aktarılabilir.",
-                "⚠️ Only one image or PDF can be imported at a time."
-            )
         case .commands(let commands):
-            pendingAutomationCommands.append(contentsOf: commands)
+            automationCommandQueue.enqueue(commands)
+            let importedFileCount = commands.filter(\.isImportedFileCommand).count
+            if importedFileCount > 1 {
+                appState.statusMessage = L10n.format(
+                    "📥 %d dosya sıraya alındı. İçe aktarma işlemi otomatik sırayla devam edecek.",
+                    "📥 %d files were queued. Imports will continue automatically one by one.",
+                    importedFileCount
+                )
+            }
             flushPendingAutomationCommands()
         }
     }
@@ -2214,15 +2231,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     private func flushPendingAutomationCommands() {
-        guard let coordinator = captureCoordinator, !pendingAutomationCommands.isEmpty else {
+        guard let coordinator = captureCoordinator else {
             return
         }
 
-        let commands = pendingAutomationCommands
-        pendingAutomationCommands.removeAll()
-
-        for command in commands {
+        while let command = automationCommandQueue.nextCommand(captureState: appState.captureState) {
             dispatchAutomationCommand(command, coordinator: coordinator)
+            let startedBusyWork = appState.captureState.isBusy
+            automationCommandQueue.markDispatchResult(for: command, startedBusyWork: startedBusyWork)
+
+            if startedBusyWork {
+                return
+            }
         }
     }
 
