@@ -1951,6 +1951,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appState.launchAtLoginState = .disabled
         appState.watchState = .inactive
         appState.hotkeyDisplayLabel = HotkeyConfiguration.defaultValue.displayLabel
+        appState.savedCaptureRegionQuickStartEnabled = false
+        appState.activeSourceApp = nil
     }
 
     private func screenshotHistoryEntries() -> [ClipboardHistoryEntry] {
@@ -2171,19 +2173,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     private func handleIncomingURLs(_ urls: [URL]) {
-        let commands = urls.compactMap(AutomationCommand.init(incomingURL:))
-        guard !commands.isEmpty else {
+        switch AutomationCommand.resolveIncomingURLs(urls) {
+        case .unsupported:
             if !urls.isEmpty {
                 appState.statusMessage = L10n.pair(
                     "⚠️ Yalnızca görsel veya PDF dosyaları desteklenir.",
                     "⚠️ Only image and PDF files are supported."
                 )
             }
-            return
+        case .multipleFileImportsUnsupported:
+            appState.statusMessage = L10n.pair(
+                "⚠️ Aynı anda yalnızca tek bir görsel veya PDF içe aktarılabilir.",
+                "⚠️ Only one image or PDF can be imported at a time."
+            )
+        case .commands(let commands):
+            pendingAutomationCommands.append(contentsOf: commands)
+            flushPendingAutomationCommands()
         }
-
-        pendingAutomationCommands.append(contentsOf: commands)
-        flushPendingAutomationCommands()
     }
 
     private func beginStartupExperience(
@@ -2357,7 +2363,7 @@ enum ImportedDocumentRouter {
             return nil
         }
 
-        let type = UTType(filenameExtension: standardizedURL.pathExtension.lowercased())
+        let type = resolvedType(for: standardizedURL)
         if type?.conforms(to: .pdf) == true {
             return .pdf(standardizedURL)
         }
@@ -2366,6 +2372,62 @@ enum ImportedDocumentRouter {
         }
 
         return nil
+    }
+
+    private static func resolvedType(for url: URL) -> UTType? {
+        let metadataType: UTType?
+        if let values = try? url.resourceValues(forKeys: [.contentTypeKey]) {
+            metadataType = values.contentType
+        } else {
+            metadataType = nil
+        }
+
+        if let metadataType,
+           metadataType.conforms(to: .pdf) || metadataType.conforms(to: .image) {
+            return metadataType
+        }
+
+        if let metadataType,
+           metadataType != .data,
+           metadataType != .content,
+           metadataType != .item {
+            return metadataType
+        }
+
+        if !url.pathExtension.isEmpty,
+           let extensionType = UTType(filenameExtension: url.pathExtension.lowercased()) {
+            return extensionType
+        }
+
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            return metadataType
+        }
+        defer { try? handle.close() }
+
+        guard let data = try? handle.read(upToCount: 16) else {
+            return metadataType
+        }
+
+        if data.starts(with: [0x25, 0x50, 0x44, 0x46, 0x2D]) {
+            return .pdf
+        }
+        if data.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+            return .png
+        }
+        if data.starts(with: [0xFF, 0xD8, 0xFF]) {
+            return .jpeg
+        }
+        if data.starts(with: [0x47, 0x49, 0x46, 0x38]) {
+            return .gif
+        }
+        if data.starts(with: [0x42, 0x4D]) {
+            return .bmp
+        }
+        if data.starts(with: [0x49, 0x49, 0x2A, 0x00]) || data.starts(with: [0x4D, 0x4D, 0x00, 0x2A]) {
+            return .tiff
+        }
+
+        return metadataType
     }
 }
 

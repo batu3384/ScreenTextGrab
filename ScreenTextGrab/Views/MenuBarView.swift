@@ -773,7 +773,7 @@ struct MenuBarView: View {
         .disabled(appState.updateState.isBusy || appState.updateManager == nil)
         .opacity(appState.updateManager == nil ? 0.62 : 1)
         .help(appState.updateState.helpText)
-        .accessibilityLabel(L10n.accessibilityCheckForUpdates)
+        .accessibilityLabel(appState.updateState.accessibilityLabel)
     }
 
     private func iconActionButton(
@@ -1050,6 +1050,21 @@ struct MenuBarView: View {
         switch appState.permissionState {
         case .granted:
             if appState.captureState == .idle || appState.captureState == .completed || appState.captureState == .cancelled {
+                if let region = primaryQuickStartRegion {
+                    switch appState.activeSavedCaptureRegionSuggestion?.matchKind {
+                    case .windowTitle(let windowTitle):
+                        return L10n.usesEnglish
+                            ? "\(region.name) is ready for “\(windowTitle)”. The main button runs this saved region directly."
+                            : "\"\(windowTitle)\" için \(region.name) hazır. Ana düğme bu kayıtlı bölgeyi doğrudan çalıştırır."
+                    case .application, .none:
+                        return L10n.format(
+                            "%@ hızlı başlangıç için hazır. Ana düğme bu kayıtlı bölgeyi doğrudan çalıştırır.",
+                            "%@ is ready for quick start. The main button runs this saved region directly.",
+                            region.name
+                        )
+                    }
+                }
+
                 return appState.isHotkeyAvailable
                     ? (
                         L10n.usesEnglish
@@ -1241,6 +1256,7 @@ struct MenuBarView: View {
 
     private var activeSavedRegionNotice: NoticeContent? {
         guard let suggestion = appState.activeSavedCaptureRegionSuggestion,
+              primaryQuickStartRegion == nil,
               appState.watchState == .inactive,
               appState.permissionState == .granted,
               !appState.captureState.isBusy else {

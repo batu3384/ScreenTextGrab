@@ -66,6 +66,15 @@ enum AutomationCommand: Equatable, Sendable {
     case pdfFile(URL, AutomationCaptureOverrides)
     case searchablePDF(URL, URL?, AutomationCaptureOverrides)
 
+    var isImportedFileCommand: Bool {
+        switch self {
+        case .imageFile, .pdfFile:
+            return true
+        default:
+            return false
+        }
+    }
+
     init?(arguments: [String]) {
         let normalizedArguments = Array(arguments.dropFirst())
         let wantsCapture = normalizedArguments.contains("--capture")
@@ -236,6 +245,20 @@ enum AutomationCommand: Equatable, Sendable {
         }
     }
 
+    static func resolveIncomingURLs(_ urls: [URL]) -> IncomingAutomationResolution {
+        let commands = urls.compactMap(AutomationCommand.init(incomingURL:))
+
+        guard !commands.isEmpty else {
+            return .unsupported
+        }
+
+        if commands.filter(\.isImportedFileCommand).count > 1 {
+            return .multipleFileImportsUnsupported
+        }
+
+        return .commands(commands)
+    }
+
     private static func action(from url: URL) -> String {
         if let host = url.host?.trimmingCharacters(in: .whitespacesAndNewlines),
            !host.isEmpty {
@@ -291,6 +314,12 @@ enum AutomationCommand: Equatable, Sendable {
             return nil
         }
     }
+}
+
+enum IncomingAutomationResolution: Equatable {
+    case commands([AutomationCommand])
+    case unsupported
+    case multipleFileImportsUnsupported
 }
 
 enum AutomationURLBuilder {

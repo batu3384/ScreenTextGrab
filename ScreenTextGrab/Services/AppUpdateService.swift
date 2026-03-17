@@ -98,6 +98,40 @@ enum AppUpdateState: Equatable {
             return message
         }
     }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .idle:
+            return L10n.accessibilityCheckForUpdates
+        case .checking:
+            return L10n.pair("Güncellemeler kontrol ediliyor", "Checking for updates")
+        case .downloading(let version, let progressPercent):
+            if let progressPercent {
+                return L10n.format(
+                    "%@ indiriliyor, %d%% tamamlandı",
+                    "Downloading %@, %d%% complete",
+                    version,
+                    progressPercent
+                )
+            }
+
+            return L10n.format(
+                "%@ indiriliyor",
+                "Downloading %@",
+                version
+            )
+        case .readyToInstall(let version):
+            return L10n.format(
+                "%@ yüklemeye hazır, yeniden başlat ve güncelle",
+                "%@ is ready, restart and update",
+                version
+            )
+        case .upToDate:
+            return L10n.pair("Uygulama güncel", "App is up to date")
+        case .failed:
+            return L10n.pair("Güncelleme yeniden denenebilir", "Retry update")
+        }
+    }
 }
 
 struct AppVersion: Comparable, Equatable {

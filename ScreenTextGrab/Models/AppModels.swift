@@ -279,7 +279,7 @@ enum CaptureOutputPreset: String, CaseIterable, Codable, Equatable, Sendable, Id
         case .cleaned:
             return L10n.pair("OCR gürültüsünü azaltır", "Reduces OCR noise")
         case .office:
-            return L10n.pair("Excel ve Word ile uyumlu", "Works well with Excel and Word")
+            return L10n.pair("Office ve tablo uygulamalarıyla uyumlu", "Works well with spreadsheet and word processor apps")
         case .markdown:
             return L10n.pair("Kod ve tablo için hazır", "Ready for code and tables")
         case .json:
@@ -296,7 +296,7 @@ enum CaptureOutputPreset: String, CaseIterable, Codable, Equatable, Sendable, Id
         case .cleaned:
             return L10n.pair("Gürültüyü temizler; özellikle altyazı ve dağınık OCR sonuçlarında faydalıdır.", "Cleans up noise; especially useful for subtitle and messy OCR results.")
         case .office:
-            return L10n.pair("Excel ve Word için zengin yapıştırma verisi üretir.", "Produces rich paste data for Excel and Word.")
+            return L10n.pair("Excel, Numbers, Word ve Pages için zengin yapıştırma verisi üretir.", "Produces rich paste data for Excel, Numbers, Word, and Pages.")
         case .markdown:
             return L10n.pair("Kod ve tablo gibi içerikleri Markdown uyumlu biçimde hazırlar.", "Formats content like code and tables for Markdown.")
         case .json:

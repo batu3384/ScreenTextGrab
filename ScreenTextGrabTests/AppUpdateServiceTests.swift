@@ -47,4 +47,20 @@ final class AppUpdateServiceTests: XCTestCase {
             L10n.actionRestartToUpdate
         )
     }
+
+    func testUpdateStateAccessibilityLabelsFollowVisibleState() {
+        XCTAssertEqual(AppUpdateState.idle.accessibilityLabel, L10n.accessibilityCheckForUpdates)
+        XCTAssertEqual(
+            AppUpdateState.checking.accessibilityLabel,
+            L10n.pair("Güncellemeler kontrol ediliyor", "Checking for updates")
+        )
+        XCTAssertEqual(
+            AppUpdateState.downloading(version: "1.0.4", progressPercent: 57).accessibilityLabel,
+            L10n.format("%@ indiriliyor, %d%% tamamlandı", "Downloading %@, %d%% complete", "1.0.4", 57)
+        )
+        XCTAssertEqual(
+            AppUpdateState.readyToInstall(version: "1.0.4").accessibilityLabel,
+            L10n.format("%@ yüklemeye hazır, yeniden başlat ve güncelle", "%@ is ready, restart and update", "1.0.4")
+        )
+    }
 }
