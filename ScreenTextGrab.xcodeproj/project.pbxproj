@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		18147C048AF3F74A586F1729 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 4C43ED14956C5C6A0899475C /* InfoPlist.strings */; };
 		185FEBB3AF5E75C578BD3658 /* CaptureOutputFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10988DE9D519FB7C12E21441 /* CaptureOutputFormatter.swift */; };
 		19631CE8D3FDCF60066B7116 /* SelectionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 691E0B85C0EB91A1D64E46BB /* SelectionOverlay.swift */; };
 		2290E0C8538BBF615847D375 /* LaunchAtLoginServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51EAB51912760565BC654DF4 /* LaunchAtLoginServiceTests.swift */; };
@@ -41,6 +42,7 @@
 		E74F01E9696AFA0BD4D2D8F6 /* CapturePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C13B3F98484393217058119 /* CapturePreferences.swift */; };
 		E980588F83694317D8CA6F8C /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 3B0B266DE7620D34BBF81065 /* Localizable.strings */; };
 		E9E8E5B8E34F0820AADB68CB /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A81722B125426EBF76936C64 /* LaunchAtLoginService.swift */; };
+		EDD48DD57E2C15D0DD1E6AC6 /* ServicesMenu.strings in Resources */ = {isa = PBXBuildFile; fileRef = 9AD9726ECDB5A2895BDE6FE2 /* ServicesMenu.strings */; };
 		F03566383783B15B01FFF4DE /* CaptureOutputFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E54F75C3EE2CBFF07CC7223 /* CaptureOutputFormatterTests.swift */; };
 		F12DB13B34B4AAF60E9900A8 /* CaptureCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6325F6636FC5677505AA2C6 /* CaptureCoordinatorTests.swift */; };
 		F88F93E2CD1B3E457EE10118 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36FBCB6ED2013B9BDFF7B34D /* Logging.swift */; };
@@ -78,6 +80,7 @@
 		36FBCB6ED2013B9BDFF7B34D /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
 		3AA320529CFEA82E1C22DBF8 /* AppState+ContextSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+ContextSuggestions.swift"; sourceTree = "<group>"; };
 		3E54F75C3EE2CBFF07CC7223 /* CaptureOutputFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureOutputFormatterTests.swift; sourceTree = "<group>"; };
+		41672890A634930C78431882 /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/ServicesMenu.strings; sourceTree = "<group>"; };
 		439AB8319D466E099CE36AB3 /* AppModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModels.swift; sourceTree = "<group>"; };
 		455984721CAF976508C28F5B /* ScreenTextGrab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScreenTextGrab.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		45ED1A4C0E3AFB208B888E85 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
@@ -87,6 +90,7 @@
 		5587443DE37934A6C44C0D8A /* AutomationSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationSupport.swift; sourceTree = "<group>"; };
 		57637AC54FF6F7DF88F515FC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5D5BE4199EDB2D68BF621F22 /* WatchTextFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchTextFilterTests.swift; sourceTree = "<group>"; };
+		6098A20DF9212D7BE6242F84 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		60A7302D5F692E7C7CEC0F50 /* ScreenPermissionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenPermissionServiceTests.swift; sourceTree = "<group>"; };
 		60ECF18625B72ECFD2D918F0 /* ScreenTextGrabUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenTextGrabUITests.swift; sourceTree = "<group>"; };
 		6347794F3E2FA318922C231A /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -102,10 +106,12 @@
 		A81722B125426EBF76936C64 /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
 		A8891012CC830AA36376ECC6 /* ScreenTextGrabTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ScreenTextGrabTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AFDDE27870842EC2C0972037 /* AppUpdateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateService.swift; sourceTree = "<group>"; };
+		B8D0F46AF45AA5E034B3CF9A /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/ServicesMenu.strings; sourceTree = "<group>"; };
 		C2EFE7EDBD48BF5FCEF8F8EB /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		C5DDC62ED04B7F343130D5E3 /* AppUpdateServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateServiceTests.swift; sourceTree = "<group>"; };
 		D837B65BF51EB3E7DBE4DAF0 /* AutomationIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationIntents.swift; sourceTree = "<group>"; };
 		DA00A3409351D42C19881235 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		DBF095C2EBFEEA6F1A870EE4 /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		DDA101828FA23B1C6A17F33A /* OCRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRService.swift; sourceTree = "<group>"; };
 		EBEF558C0B53262FBA630D96 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F6B811E93E42BDCF8E6BBDEF /* ScreenTextGrabApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenTextGrabApp.swift; sourceTree = "<group>"; };
@@ -198,7 +204,9 @@
 		A5573E5EEA16B6EA458FF403 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				4C43ED14956C5C6A0899475C /* InfoPlist.strings */,
 				3B0B266DE7620D34BBF81065 /* Localizable.strings */,
+				9AD9726ECDB5A2895BDE6FE2 /* ServicesMenu.strings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -312,7 +320,6 @@
 				};
 			};
 			buildConfigurationList = 373B41B85DE3B8194F7EF2C7 /* Build configuration list for PBXProject "ScreenTextGrab" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -323,6 +330,7 @@
 			mainGroup = 8AB026D43D76F140A30256A3;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			productRefGroup = D4DBE3345338D089D28B3EF8 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -339,7 +347,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				4FC1394D39DF39D813007D36 /* Assets.xcassets in Resources */,
+				18147C048AF3F74A586F1729 /* InfoPlist.strings in Resources */,
 				E980588F83694317D8CA6F8C /* Localizable.strings in Resources */,
+				EDD48DD57E2C15D0DD1E6AC6 /* ServicesMenu.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -426,6 +436,24 @@
 				6347794F3E2FA318922C231A /* tr */,
 			);
 			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		4C43ED14956C5C6A0899475C /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				6098A20DF9212D7BE6242F84 /* en */,
+				DBF095C2EBFEEA6F1A870EE4 /* tr */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+		9AD9726ECDB5A2895BDE6FE2 /* ServicesMenu.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				B8D0F46AF45AA5E034B3CF9A /* en */,
+				41672890A634930C78431882 /* tr */,
+			);
+			name = ServicesMenu.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */
@@ -592,12 +620,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ScreenTextGrab/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.screentextgrab.app;
 				PRODUCT_NAME = ScreenTextGrab;
 				SDKROOT = macosx;
@@ -648,12 +676,12 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ScreenTextGrab/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.screentextgrab.app;
 				PRODUCT_NAME = ScreenTextGrab;
 				SDKROOT = macosx;

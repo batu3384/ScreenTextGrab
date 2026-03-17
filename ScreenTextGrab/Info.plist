@@ -30,7 +30,7 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>ScreenTextGrab ile OCR</string>
+				<string>OCR with ScreenTextGrab</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>importSelectedFiles</string>
@@ -91,6 +91,6 @@
     <key>STGUpdateLatestReleaseAPIURL</key>
     <string>https://api.github.com/repos/batu3384/ScreenTextGrab/releases/latest</string>
     <key>NSScreenCaptureUsageDescription</key>
-    <string>ScreenTextGrab ekranınızdan metin okuyabilmek için ekran kaydı iznine ihtiyaç duyar.</string>
+    <string>ScreenTextGrab needs Screen Recording permission to read text from your screen.</string>
 </dict>
 </plist>

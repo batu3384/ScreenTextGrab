@@ -22,7 +22,7 @@ xcodegen generate --spec project.yml
 - To build, notarize, verify, and publish the GitHub release in one local command:
 
 ```bash
-./scripts/publish_release.sh v1.0.1 --draft
+./scripts/publish_release.sh vX.Y.Z --draft
 ```
 
 - The script uses Xcode's `developer-id` export flow. Make sure the selected Apple Developer team in Xcode has access to create or use Developer ID signing assets.

@@ -117,7 +117,7 @@ Options:
 - `Import > Read Image File`
 - drag the image onto the menu panel
 - `Open With > ScreenTextGrab` in Finder
-- Finder Services: `OCR with ScreenTextGrab`
+- the Finder Services OCR action
 
 Terminal:
 
@@ -239,7 +239,10 @@ Available entry points:
 - searchable PDF export
 - drag and drop onto the menu panel
 - Finder `Open With > ScreenTextGrab`
-- Finder Services: `OCR with ScreenTextGrab`
+- the Finder Services OCR action
+
+If multiple supported files are sent to the app at once, ScreenTextGrab queues
+them and imports them one by one.
 
 ## Automation
 

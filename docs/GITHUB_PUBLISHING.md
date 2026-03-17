@@ -93,16 +93,16 @@ APP_PATH=dist/.app-bundles.noindex/ScreenTextGrab.app ./scripts/verify_release.s
 Create the GitHub release from terminal:
 
 ```bash
-gh release create v1.0.1 \
+gh release create vX.Y.Z \
   dist/ScreenTextGrab.zip \
-  --title "ScreenTextGrab v1.0.1" \
+  --title "ScreenTextGrab vX.Y.Z" \
   --notes-file RELEASE_NOTES.md
 ```
 
 Or use the new wrapper script:
 
 ```bash
-./scripts/publish_release.sh v1.0.1 --draft
+./scripts/publish_release.sh vX.Y.Z --draft
 ```
 
 On a properly configured release Mac, the wrapper can also reuse the current
@@ -113,7 +113,7 @@ variables are required for local publishing.
 
 The repository now includes [`.github/workflows/release.yml`](../.github/workflows/release.yml).
 
-- `git push origin v1.0.1` will trigger a signed release build on GitHub Actions
+- `git push origin vX.Y.Z` will trigger a signed release build on GitHub Actions
 - `workflow_dispatch` can publish a release manually without creating the tag first
 - if notarization is enabled, the workflow also runs notarization and public verification
 - the workflow uploads `dist/ScreenTextGrab.zip` both as an artifact and as the GitHub release asset

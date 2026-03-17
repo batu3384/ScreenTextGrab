@@ -1,46 +1,35 @@
-# ScreenTextGrab 1.0.1 Release Notes
+# ScreenTextGrab 1.1.0 Release Notes
 
 ## Summary
 
-ScreenTextGrab 1.0.1 turns the app from a basic menu bar OCR utility into a broader capture workflow tool for macOS. The release focuses on faster day-to-day use, better installation behavior, clearer permissions, and stronger capture outputs for subtitles, code, tables, and barcodes.
+ScreenTextGrab 1.1.0 turns the post-release polish work into a full product
+update: the app interface is now bilingual, the menu bar panel is cleaner, the
+release surface is better aligned with the shipped behavior, and local image/PDF
+imports behave more reliably.
 
-## What's New
+## Highlights
 
-### Faster everyday workflow
-- Capture from the menu bar or a configurable global shortcut.
-- Choose whether the app launches automatically at login.
-- Use watch mode to keep monitoring a region and copy updates only when the text changes.
-
-### Better OCR output
-- Pick a capture mode for standard text, subtitles, code, or tables.
-- Use OCR language preferences with auto-detection support.
-- Fall back to QR and barcode detection when text recognition is not the right fit.
-
-### Smarter follow-up actions
-- Open captured links directly.
-- Start an email or phone action when the result contains contact details.
-- Run quick web search, translation, or text-to-speech actions from the latest result.
-
-### Stronger app behavior
-- Improved Screen Recording permission handling after first grant.
-- Better login-item state reporting and installed-app detection.
-- Refined launch behavior for menu bar use versus foreground onboarding.
-- Updated icon set and refreshed visual theme.
+- Added in-app interface language switching for English and Turkish.
+- Added a menu bar updater flow with check, download progress, and
+  `Restart & Update`.
+- Improved menu panel density, wording, and screenshot/documentation accuracy.
+- Queued multi-file Finder and import automation requests instead of handling
+  only the first supported file.
+- Localized Finder Services resources for both shipped interface languages.
 
 ## User Impact
 
-- Less friction after first-time setup.
-- More reliable results on subtitles, code snippets, and tables.
-- Better fit for repeated workflows instead of one-off OCR only.
-- Cleaner project packaging and release tooling for ongoing maintenance.
-
-## Upgrade Notes
-
-- If you are moving from an older differently signed local build, macOS may require a one-time refresh of Screen Recording permission.
-- For public distribution outside direct local installs, complete notarization after running the signed release build.
+- The app feels more productized on first launch and inside the menu bar.
+- Users can keep the UI in English or Turkish without changing the system
+  language.
+- Imported images and PDFs behave more predictably when multiple files are sent
+  to the app at once.
+- The local release ZIP stays compatible with the one-command installer and the
+  built-in update mechanism.
 
 ## Validation Snapshot
 
-- Repository audit passes.
-- Build-for-testing succeeds for the app, unit tests, and UI tests.
-- Release packaging, signing, and verification scripts are included in `scripts/`.
+- Release ships as tag `v1.1.0`.
+- Public artifact remains `ScreenTextGrab.zip`.
+- Signed build, notarization, stapler validation, Gatekeeper validation, unit
+  tests, UI tests, and repository audit all passed for this release.
