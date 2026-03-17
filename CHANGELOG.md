@@ -27,17 +27,11 @@ All notable released changes to ScreenTextGrab are documented here.
 - Saved-region Smart Start messaging no longer duplicates the same suggestion
   in multiple places inside the menu panel.
 
-### Release
-- Published as tag `v1.1.0`.
-
 ## 1.0.3 - 2026-03-15
 
 ### Fixed
 - Corrected the GitHub release workflow paths used for release verification.
 - Synced the shipped app version and build number with the public release.
-
-### Release
-- Published as tag `v1.0.3`.
 
 ## 1.0.2 - 2026-03-15
 
@@ -70,6 +64,3 @@ All notable released changes to ScreenTextGrab are documented here.
 - Global hotkey registration failures with weak user feedback.
 - Menu panel overflow and unreadable capture-mode controls.
 - Release builds incorrectly carrying development entitlements.
-
-### Release
-- Published as tag `v1.0.2`.
