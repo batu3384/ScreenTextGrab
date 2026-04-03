@@ -46,7 +46,6 @@ final class ScreenTextGrabUITests: XCTestCase {
         app.launchArguments = [argument]
         app.launch()
         XCTAssertTrue(waitForLaunch(of: app, timeout: 10))
-        app.activate()
         return app
     }
 
@@ -59,7 +58,6 @@ final class ScreenTextGrabUITests: XCTestCase {
                 return window
             }
 
-            app.activate()
             RunLoop.current.run(until: Date().addingTimeInterval(0.35))
         }
 

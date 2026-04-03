@@ -742,7 +742,9 @@ final class CaptureCoordinatorTests: XCTestCase {
             environment: Self.emptyEnvironment
         )
 
-        try? await Task.sleep(nanoseconds: 25_000_000)
+        await waitForWatchStateUpdate(timeoutNanoseconds: 500_000_000) {
+            clipboard.copiedTexts.count >= 2 && appState.copyHistory.count >= 2
+        }
         coordinator.stopWatching()
 
         XCTAssertEqual(appState.copyHistory.map(\.text).prefix(2), ["ikinci satir", "ilk satir"])
@@ -795,7 +797,9 @@ final class CaptureCoordinatorTests: XCTestCase {
             environment: Self.emptyEnvironment
         )
 
-        try? await Task.sleep(nanoseconds: 8_000_000)
+        await waitForWatchStateUpdate(timeoutNanoseconds: 500_000_000) {
+            clipboard.copiedTexts.count >= 2
+        }
         coordinator.stopWatching()
 
         XCTAssertEqual(Array(clipboard.copiedTexts.prefix(2)), ["satir 1", "satir 2"])
