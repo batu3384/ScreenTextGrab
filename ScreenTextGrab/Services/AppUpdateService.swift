@@ -15,45 +15,11 @@ enum AppUpdateState: Equatable {
     case failed(message: String)
 
     var buttonTitle: String {
-        switch self {
-        case .idle:
-            return L10n.actionCheckForUpdates
-        case .checking:
-            return L10n.actionCheckingForUpdates
-        case .downloading(_, let progressPercent):
-            guard let progressPercent else {
-                return L10n.actionDownloadingUpdate
-            }
-
-            return L10n.format(
-                "İndiriliyor %d%%",
-                "Downloading %d%%",
-                progressPercent
-            )
-        case .readyToInstall:
-            return L10n.actionRestartToUpdate
-        case .upToDate:
-            return L10n.actionUpToDate
-        case .failed:
-            return L10n.actionRetryUpdate
-        }
+        AppUpdatePresentationModel(state: self).title
     }
 
     var buttonIcon: String {
-        switch self {
-        case .idle:
-            return "arrow.down.circle"
-        case .checking:
-            return "arrow.triangle.2.circlepath"
-        case .downloading:
-            return "arrow.down.circle.fill"
-        case .readyToInstall:
-            return "arrow.clockwise.circle.fill"
-        case .upToDate:
-            return "checkmark.circle.fill"
-        case .failed:
-            return "exclamationmark.triangle.fill"
-        }
+        AppUpdatePresentationModel(state: self).iconName
     }
 
     var isBusy: Bool {
@@ -66,71 +32,11 @@ enum AppUpdateState: Equatable {
     }
 
     var helpText: String {
-        switch self {
-        case .idle:
-            return L10n.pair(
-                "GitHub sürümlerini kontrol eder ve yeni bir paket varsa indirir.",
-                "Checks GitHub releases and downloads a new package when one is available."
-            )
-        case .checking:
-            return L10n.pair(
-                "Yeni sürüm olup olmadığı kontrol ediliyor.",
-                "Checking whether a newer release is available."
-            )
-        case .downloading(let version, _):
-            return L10n.format(
-                "%@ sürümü indiriliyor.",
-                "Downloading version %@.",
-                version
-            )
-        case .readyToInstall(let version):
-            return L10n.format(
-                "%@ indirildi. Kurulumu tamamlamak için uygulamayı yeniden başlat.",
-                "%@ is ready. Restart the app to finish installing the update.",
-                version
-            )
-        case .upToDate:
-            return L10n.pair(
-                "Bu cihazdaki sürüm zaten güncel.",
-                "This device is already running the latest version."
-            )
-        case .failed(let message):
-            return message
-        }
+        AppUpdatePresentationModel(state: self).helpText
     }
 
     var accessibilityLabel: String {
-        switch self {
-        case .idle:
-            return L10n.accessibilityCheckForUpdates
-        case .checking:
-            return L10n.pair("Güncellemeler kontrol ediliyor", "Checking for updates")
-        case .downloading(let version, let progressPercent):
-            if let progressPercent {
-                return L10n.format(
-                    "%@ indiriliyor, %d%% tamamlandı",
-                    "Downloading %@, %d%% complete",
-                    version,
-                    progressPercent
-                )
-            }
-
-            return L10n.format(
-                "%@ indiriliyor",
-                "Downloading %@",
-                version
-            )
-        case .readyToInstall(let version):
-            return L10n.format(
-                "%@ yüklemeye hazır, yeniden başlat ve güncelle",
-                "%@ is ready, restart and update",
-                version
-            )
-        case .upToDate:
-            return L10n.pair("Uygulama güncel", "App is up to date")
-        case .failed:
-            return L10n.pair("Güncelleme yeniden denenebilir", "Retry update")
-        }
+        AppUpdatePresentationModel(state: self).accessibilityLabel
     }
 }
 

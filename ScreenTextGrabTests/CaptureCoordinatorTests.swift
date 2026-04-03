@@ -1256,6 +1256,43 @@ final class CaptureCoordinatorTests: XCTestCase {
         XCTAssertTrue(PDFDocument(url: destinationURL)?.string?.contains("Aranabilir PDF") == true)
     }
 
+    func testRetryHeuristicsSkipStrongSubtitleSelection() {
+        let selection = CaptureOCRSelection(
+            candidate: CaptureCandidate(
+                strategy: .screenshotKitGlobalRect,
+                image: Self.makeImage(),
+                debugInfo: "subtitle"
+            ),
+            ocrResult: OCRResult(
+                blocks: [OCRTextBlock(text: "Strong subtitle line", confidence: 0.96, boundingBox: .zero)],
+                captureDate: Date(),
+                sourceRect: .zero
+            ),
+            text: "Strong subtitle line",
+            score: 210,
+            attemptLabel: "initial",
+            kind: .text
+        )
+
+        XCTAssertFalse(
+            CaptureRecognitionHeuristics.shouldRetryTextRecognition(
+                for: CGRect(x: 0, y: 0, width: 640, height: 120),
+                currentBest: selection,
+                captureMode: .subtitle
+            )
+        )
+    }
+
+    func testRetryHeuristicsAllowWideStandardSelectionWithoutBestResult() {
+        XCTAssertTrue(
+            CaptureRecognitionHeuristics.shouldRetryTextRecognition(
+                for: CGRect(x: 0, y: 0, width: 640, height: 150),
+                currentBest: nil,
+                captureMode: .standard
+            )
+        )
+    }
+
     private static func makeImage() -> CGImage {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bytesPerPixel = 4

@@ -107,6 +107,14 @@ xcodebuild test \
 ./scripts/cleanup_app_copies.sh
 ```
 
+- Refresh product screenshots when the UI changed materially:
+
+```bash
+./scripts/capture_preview_screenshots.sh
+```
+
+- Run the visual and workflow checklist in `docs/MANUAL_SMOKE_MATRIX.md`
+
 ## Signing Verification
 Run:
 

@@ -83,148 +83,31 @@ struct MenuBarView: View {
     }
 
     private var quickSettingsPanel: some View {
-        card {
-            VStack(alignment: .leading, spacing: isCompactPanel ? 10 : 12) {
-                HStack(spacing: 8) {
-                    Text(L10n.controlsTitle)
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-
-                    Spacer()
-
-                    statusBadge(text: appState.captureMode.title, tint: .accentMint)
-                }
-
-                VStack(alignment: .leading, spacing: isCompactPanel ? 8 : 10) {
-                    Text(L10n.pair("Yakalama Modu", "Capture Mode"))
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-
-                    LazyVGrid(
-                        columns: [
-                            GridItem(.flexible(), spacing: 8),
-                            GridItem(.flexible(), spacing: 8)
-                        ],
-                        spacing: 8
-                    ) {
-                        ForEach(CaptureMode.allCases) { mode in
-                            captureModeToggle(mode)
-                        }
-                    }
-                }
-
-                quickSettingRow(
-                    title: L10n.pair("Çıktı Biçimi", "Output Format"),
-                    detail: L10n.pair("Panoya kopyalanacak biçimi belirle.", "Choose the format copied to the clipboard.")
-                ) {
-                    Menu {
-                        ForEach(CaptureOutputPreset.allCases) { preset in
-                            Button {
-                                setCaptureOutputPreset(preset)
-                            } label: {
-                                HStack {
-                                    Text(preset.title)
-                                    if preset == appState.captureOutputPreset {
-                                        Spacer()
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: outputPresetIcon(for: appState.captureOutputPreset))
-                                .font(.system(size: 10.5, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.9))
-
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(appState.captureOutputPreset.title)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-
-                                Text(appState.captureOutputPreset.summary)
-                                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                                    .foregroundStyle(Color.white.opacity(0.68))
-                                    .lineLimit(2)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.65))
-                        }
-                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .frame(minWidth: isCompactPanel ? 146 : 160, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.controlFillStrong)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(Color.accentCool.opacity(0.08))
-                                )
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.controlStroke, lineWidth: 1)
-                        )
-                    }
-                    .menuStyle(.borderlessButton)
-                }
-
-                Rectangle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(height: 1)
-
-                watchRow
-
-                if let captureModeFeedback {
-                    feedbackText(captureModeFeedback.message, tint: captureModeFeedback.tint)
-                }
-
-                if let outputPresetFeedback {
-                    feedbackText(outputPresetFeedback.message, tint: outputPresetFeedback.tint)
-                }
-
-                if shouldShowSmartActionsPanel {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(height: 1)
-
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(L10n.pair("Hızlı İşlem", "Quick Actions"))
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-
-                        HStack(spacing: 8) {
-                            ForEach(Array(smartActions.prefix(2))) { action in
-                                compactInlineButton(
-                                    title: action.title,
-                                    icon: action.icon,
-                                    tint: .accentNeutral,
-                                    action: { performSmartAction(action) }
-                                )
-                            }
-
-                            if canOfferSpeechAction {
-                                compactInlineButton(
-                                    title: appState.speechState == .speaking ? L10n.pair("Durdur", "Stop") : L10n.pair("Sesli Oku", "Read Aloud"),
-                                    icon: appState.speechState == .speaking ? "stop.fill" : "speaker.wave.2.fill",
-                                    tint: appState.speechState == .speaking ? .accentRose : .accentMint,
-                                    action: toggleSpeechPlayback
-                                )
-                            }
-                        }
-
-                        if let smartActionFeedback {
-                            feedbackText(smartActionFeedback.message, tint: smartActionFeedback.tint)
-                        }
-                    }
-                }
-            }
-        }
+        MenuBarQuickSettingsSection(
+            isCompact: isCompactPanel,
+            captureMode: appState.captureMode,
+            outputPreset: appState.captureOutputPreset,
+            watchStatusTitle: watchStatusTitle,
+            watchSummary: watchSummary,
+            watchActionTitle: watchActionTitle,
+            watchActionIcon: watchActionIcon,
+            watchTint: watchTint,
+            smartActions: smartActions,
+            canOfferSpeechAction: canOfferSpeechAction,
+            speechState: appState.speechState,
+            captureModeFeedback: captureModeFeedback,
+            outputPresetFeedback: outputPresetFeedback,
+            smartActionFeedback: smartActionFeedback,
+            onSelectCaptureMode: setCaptureMode,
+            onSelectOutputPreset: setCaptureOutputPreset,
+            onToggleWatch: toggleWatching,
+            onPerformSmartAction: performSmartAction,
+            onToggleSpeech: toggleSpeechPlayback,
+            captureModeTint: captureModeTint(for:),
+            captureModeIcon: captureModeIcon(for:),
+            captureModeSummary: captureModeSummary(for:),
+            outputPresetIcon: outputPresetIcon(for:)
+        )
     }
 
     private var background: some View {
@@ -258,148 +141,40 @@ struct MenuBarView: View {
     }
 
     private var header: some View {
-        HStack(spacing: isCompactPanel ? 10 : 12) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .interpolation(.high)
-                .frame(width: isCompactPanel ? 38 : 42, height: isCompactPanel ? 38 : 42)
-                .clipShape(RoundedRectangle(cornerRadius: isCompactPanel ? 11 : 12, style: .continuous))
-                .shadow(color: .black.opacity(0.18), radius: 8, y: 5)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("ScreenTextGrab")
-                    .font(.system(size: isCompactPanel ? 15 : 16.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-
-                Text(headerLine)
-                    .font(.system(size: isCompactPanel ? 10 : 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.68))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-
-            Spacer()
-
-            HStack(spacing: 7) {
-                updateActionButton
-
-                iconActionButton(
-                    systemName: "power",
-                    tint: .accentRose,
-                    accessibilityLabel: L10n.accessibilityQuitApp,
-                    action: quitApp
-                )
-            }
-        }
+        MenuBarHeaderSection(
+            isCompact: isCompactPanel,
+            headerLine: headerLine,
+            updatePresentation: updatePresentation,
+            onUpdate: performUpdateAction,
+            onQuit: quitApp
+        )
     }
 
     private var statusPanel: some View {
-        card {
-            VStack(alignment: .leading, spacing: isCompactPanel ? 6 : 8) {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(statusTint)
-                        .frame(width: 8, height: 8)
-
-                    Text(statusTitle)
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-
-                    Spacer()
-
-                    if let confidenceBadge {
-                        statusBadge(text: confidenceBadge.text, tint: confidenceBadge.tint)
-                    }
-
-                    statusBadge(text: permissionBadge, tint: permissionTint)
-                }
-
-                Text(statusDescription)
-                    .font(.system(size: isCompactPanel ? 11 : 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.72))
-                    .lineLimit(isCompactPanel ? 2 : 3)
-            }
-        }
+        MenuBarStatusSection(
+            isCompact: isCompactPanel,
+            statusTint: statusTint,
+            statusTitle: statusTitle,
+            statusDescription: statusDescription,
+            confidenceBadge: confidenceBadge,
+            permissionBadge: permissionBadge,
+            permissionTint: permissionTint
+        )
     }
 
     private var primaryAction: some View {
-        Button(action: startCapture) {
-            HStack(spacing: 12) {
-                Image(systemName: primaryActionIcon)
-                    .font(.system(size: isCompactPanel ? 15 : 17, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: isCompactPanel ? 32 : 36, height: isCompactPanel ? 32 : 36)
-                    .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: isCompactPanel ? 10 : 12, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(primaryActionTitle)
-                        .font(.system(size: isCompactPanel ? 14 : 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-
-                    Text(primarySubtitle)
-                        .font(.system(size: isCompactPanel ? 10.5 : 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.78))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer()
-            }
-            .padding(isCompactPanel ? 12 : 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                LinearGradient(
-                    colors: canStartCapture ? [.accentAmber, .accentCoral] : [Color.controlFillStrong, Color.controlFill],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(canStartCapture ? Color.white.opacity(0.14) : Color.controlStroke, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: canStartCapture ? Color.black.opacity(0.18) : .clear, radius: 12, y: 8)
-        }
-        .buttonStyle(.plain)
-        .disabled(!canStartCapture)
-        .opacity(canStartCapture ? 1 : 0.76)
+        MenuBarPrimaryActionSection(
+            isCompact: isCompactPanel,
+            canStartCapture: canStartCapture,
+            icon: primaryActionIcon,
+            title: primaryActionTitle,
+            subtitle: primarySubtitle,
+            action: startCapture
+        )
     }
 
     private func noticePanel(_ notice: NoticeContent) -> some View {
-        card {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: notice.icon)
-                        .font(.system(size: isCompactPanel ? 12 : 13, weight: .bold))
-                        .foregroundStyle(notice.tint)
-                        .padding(.top, 1)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(notice.title)
-                            .font(.system(size: isCompactPanel ? 11 : 11.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-
-                        Text(notice.message)
-                            .font(.system(size: isCompactPanel ? 10 : 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color.white.opacity(0.66))
-                            .lineLimit(isCompactPanel ? 2 : 3)
-                    }
-                }
-
-                if let actionTitle = notice.actionTitle,
-                   let action = notice.action {
-                    compactInlineButton(
-                        title: actionTitle,
-                        icon: "sparkles",
-                        tint: notice.tint,
-                        action: action
-                    )
-                }
-            }
-        }
+        MenuBarNoticeSection(isCompact: isCompactPanel, notice: notice)
     }
 
     private var actions: some View {
@@ -424,31 +199,7 @@ struct MenuBarView: View {
     }
 
     private var importDropOverlay: some View {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(Color.black.opacity(0.54))
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(Color.accentMint.opacity(0.7), style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
-            )
-            .overlay {
-                VStack(spacing: 10) {
-                    Image(systemName: "doc.badge.plus")
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(Color.accentMint)
-
-                    Text(L10n.pair("Görsel veya PDF bırak", "Drop an Image or PDF"))
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-
-                    Text(L10n.pair("Görsel dosyası OCR’a gider, PDF dosyası doğrudan içe alınır.", "Image files go through OCR, and PDF files are imported directly."))
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.72))
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 220)
-                }
-                .padding(18)
-            }
-            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        MenuBarImportDropOverlay()
     }
 
     private var smartActions: [SmartActionDescriptor] {
@@ -740,70 +491,6 @@ struct MenuBarView: View {
         .accessibilityLabel(title)
     }
 
-    private var updateActionButton: some View {
-        Button(action: performUpdateAction) {
-            HStack(spacing: 6) {
-                Image(systemName: appState.updateState.buttonIcon)
-                    .font(.system(size: isCompactPanel ? 9 : 10, weight: .bold))
-
-                Text(updateButtonTitle)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.84)
-            }
-            .font(.system(size: isCompactPanel ? 8.9 : 9.8, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, isCompactPanel ? 10 : 11)
-            .padding(.vertical, isCompactPanel ? 6 : 7)
-            .frame(width: updateButtonWidth, height: isCompactPanel ? 32 : 34)
-            .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(Color.controlFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .fill(updateButtonTint.opacity(updateButtonBackgroundOpacity))
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .stroke(updateButtonTint.opacity(0.48), lineWidth: 1)
-            )
-            .shadow(color: updateButtonTint.opacity(appState.updateManager == nil ? 0 : 0.16), radius: 8, y: 3)
-        }
-        .buttonStyle(.plain)
-        .disabled(appState.updateState.isBusy || appState.updateManager == nil)
-        .opacity(appState.updateManager == nil ? 0.62 : 1)
-        .help(appState.updateState.helpText)
-        .accessibilityLabel(appState.updateState.accessibilityLabel)
-    }
-
-    private func iconActionButton(
-        systemName: String,
-        tint: Color,
-        accessibilityLabel: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: isCompactPanel ? 30 : 32, height: isCompactPanel ? 30 : 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.controlFill)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(tint.opacity(0.12))
-                        )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.controlStrokeStrong, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityLabel)
-    }
-
     private func feedbackText(_ message: String, tint: Color) -> some View {
         Text(message)
             .font(.system(size: isCompactPanel ? 10 : 10.5, weight: .semibold, design: .rounded))
@@ -874,39 +561,12 @@ struct MenuBarView: View {
         }
     }
 
-    private var updateButtonTitle: String {
-        switch appState.updateState {
-        case .idle:
-            return L10n.pair("Kontrol Et", "Check")
-        case .checking:
-            return L10n.pair("Kontrol...", "Checking...")
-        case .downloading(_, let progressPercent):
-            guard let progressPercent else {
-                return L10n.pair("İndiriliyor", "Downloading")
-            }
-            return "\(progressPercent)%"
-        case .readyToInstall:
-            return L10n.pair("Yeniden Başlat", "Restart & Update")
-        case .upToDate:
-            return L10n.pair("Güncel", "Up to Date")
-        case .failed:
-            return L10n.pair("Tekrar Dene", "Retry")
-        }
-    }
-
-    private var updateButtonWidth: CGFloat {
-        switch appState.updateState {
-        case .idle, .upToDate:
-            return isCompactPanel ? 92 : 100
-        case .checking:
-            return isCompactPanel ? 106 : 118
-        case .downloading:
-            return isCompactPanel ? 88 : 96
-        case .readyToInstall:
-            return isCompactPanel ? 118 : 138
-        case .failed:
-            return isCompactPanel ? 102 : 112
-        }
+    private var updatePresentation: MenuBarUpdatePresentation {
+        MenuBarUpdatePresentation(
+            state: appState.updateState,
+            isCompact: isCompactPanel,
+            isAvailable: appState.updateManager != nil
+        )
     }
 
     private func captureModeIcon(for mode: CaptureMode) -> String {
@@ -1553,40 +1213,6 @@ struct MenuBarView: View {
         appState.launchAtLoginManager?.openLoginItemsSettings()
     }
 
-    private var updateButtonTint: Color {
-        switch appState.updateState {
-        case .idle:
-            return .accentMint
-        case .checking:
-            return .accentCool
-        case .downloading:
-            return .accentAmber
-        case .readyToInstall:
-            return .accentCool
-        case .upToDate:
-            return .accentMint
-        case .failed:
-            return .accentRose
-        }
-    }
-
-    private var updateButtonBackgroundOpacity: Double {
-        switch appState.updateState {
-        case .idle:
-            return 0.22
-        case .checking:
-            return 0.18
-        case .downloading:
-            return 0.2
-        case .readyToInstall:
-            return 0.24
-        case .upToDate:
-            return 0.16
-        case .failed:
-            return 0.2
-        }
-    }
-
     private func performUpdateAction() {
         appState.updateManager?.performPrimaryUpdateAction()
     }
@@ -1932,467 +1558,11 @@ enum SettingsTab: String, Hashable {
     case history
 }
 
-struct TableReviewView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var appState: AppState
-
-    @State private var document = TableReviewDocument(rows: [[""]])
-    @State private var feedback: InlineFeedback?
-
-    private let cellWidth: CGFloat = 176
-
-    private var session: TableReviewSession? {
-        appState.activeTableReview
-    }
-
-    private var currentPreset: CaptureOutputPreset? {
-        guard let session else {
-            return nil
-        }
-
-        return session.entry.outputPreset == .office ? nil : session.entry.outputPreset
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            header
-
-            Divider()
-
-            if let session {
-                content(for: session)
-            } else {
-                emptyState
-            }
-        }
-        .background(
-            LinearGradient(
-                colors: [Color.surfaceTop.opacity(0.10), Color.surfaceBottom.opacity(0.08)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .onAppear(perform: loadCurrentSession)
-        .onChange(of: appState.activeTableReview?.id, initial: false) {
-            loadCurrentSession()
-        }
-        .onDisappear {
-            appState.clearTableReview()
-        }
-    }
-
-    private var header: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .interpolation(.high)
-                .frame(width: 50, height: 50)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(L10n.pair("Tablo Duzenleyici", "Table Editor"))
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-
-                Text(L10n.pair("OCR ile cikan tabloyu hucre bazinda duzelt, sonra Office uyumlu sekilde yeniden kopyala.", "Fix the OCR table cell by cell, then copy it again in an Office-friendly format."))
-                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 16)
-
-            if let session {
-                VStack(alignment: .trailing, spacing: 8) {
-                    tableReviewBadge(session.entry.captureMode.title, tint: .accentWarm)
-                    tableReviewBadge(session.entry.outputPreset.title, tint: .accentMint)
-
-                    if let source = session.entry.source?.displayName {
-                        tableReviewBadge(source, tint: .accentNeutral)
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 18)
-        .background(Color(NSColor.windowBackgroundColor).opacity(0.96))
-    }
-
-    private func content(for session: TableReviewSession) -> some View {
-        VStack(spacing: 0) {
-            tableToolbar
-
-            Divider()
-
-            tableGrid
-
-            Divider()
-
-            tableFooter
-        }
-    }
-
-    private var tableToolbar: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 10) {
-                tableReviewBadge(L10n.usesEnglish ? "\(document.rowCount) Rows" : "\(document.rowCount) Satir", tint: .accentCool)
-                tableReviewBadge(L10n.usesEnglish ? "\(document.columnCount) Columns" : "\(document.columnCount) Sutun", tint: .accentMint)
-                Spacer()
-            }
-
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
-                    tableReviewToolButton(title: L10n.pair("Satir Ekle", "Add Row"), icon: "plus", tint: .accentCool, action: addRow)
-                    tableReviewToolButton(title: L10n.pair("Sutun Ekle", "Add Column"), icon: "rectangle.split.3x1", tint: .accentCool, action: addColumn)
-                    tableReviewToolButton(title: L10n.pair("Son Satiri Sil", "Remove Last Row"), icon: "minus", tint: .accentRose, action: removeLastRow)
-                }
-
-                HStack(spacing: 10) {
-                    tableReviewToolButton(title: L10n.pair("Son Sutunu Sil", "Remove Last Column"), icon: "rectangle.split.3x1.fill", tint: .accentRose, action: removeLastColumn)
-                    tableReviewToolButton(title: L10n.pair("Bos Kenarlari Temizle", "Trim Empty Edges"), icon: "wand.and.stars", tint: .accentWarm, action: trimEmptyEdges)
-                    tableReviewToolButton(title: L10n.pair("Sifirla", "Reset"), icon: "arrow.counterclockwise", tint: .accentNeutral, action: resetDocument)
-                }
-            }
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 18)
-        .padding(.bottom, 14)
-    }
-
-    private var tableGrid: some View {
-        ScrollView([.horizontal, .vertical]) {
-            Grid(alignment: .topLeading, horizontalSpacing: 10, verticalSpacing: 10) {
-                tableHeaderRow
-
-                ForEach(0..<document.rowCount, id: \.self) { rowIndex in
-                    tableDataRow(rowIndex)
-                }
-            }
-            .padding(24)
-        }
-    }
-
-    private var tableHeaderRow: some View {
-        GridRow {
-            Text("")
-                .frame(width: 48)
-
-            ForEach(0..<document.columnCount, id: \.self) { columnIndex in
-                Text("S\(columnIndex + 1)")
-                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .frame(width: cellWidth, alignment: .leading)
-            }
-        }
-    }
-
-    private func tableDataRow(_ rowIndex: Int) -> some View {
-        GridRow {
-            Text("\(rowIndex + 1)")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
-                .frame(width: 48, alignment: .leading)
-
-            ForEach(0..<document.columnCount, id: \.self) { columnIndex in
-                tableCell(rowIndex: rowIndex, columnIndex: columnIndex)
-            }
-        }
-    }
-
-    private func tableCell(rowIndex: Int, columnIndex: Int) -> some View {
-        TextField(
-            rowIndex == 0 ? L10n.pair("Baslik", "Header") : L10n.pair("Hucre", "Cell"),
-            text: cellBinding(row: rowIndex, column: columnIndex),
-            axis: .vertical
-        )
-        .textFieldStyle(.plain)
-        .font(.system(size: 12.5, weight: rowIndex == 0 ? .semibold : .medium, design: .rounded))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(width: cellWidth, alignment: .topLeading)
-        .frame(minHeight: rowIndex == 0 ? 52 : 46, alignment: .topLeading)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(NSColor.controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(rowIndex == 0 ? Color.accentCool.opacity(0.26) : Color.black.opacity(0.08), lineWidth: 1)
-        )
-    }
-
-    private var tableFooter: some View {
-        HStack(alignment: .center, spacing: 12) {
-            if let feedback {
-                Text(feedback.message)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(feedback.tint)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 12)
-
-            if let preset = currentPreset {
-                tableReviewPrimaryButton(
-                    title: L10n.usesEnglish ? "Copy as \(preset.title)" : "\(preset.title) ile Kopyala",
-                    icon: "doc.on.doc",
-                    tint: .accentNeutral
-                ) {
-                    copyReviewedTable(as: preset)
-                }
-            }
-
-            tableReviewPrimaryButton(
-                title: L10n.pair("Office Olarak Kopyala", "Copy as Office"),
-                icon: "tablecells",
-                tint: .accentCool
-            ) {
-                copyReviewedTable(as: .office)
-            }
-
-            tableReviewPrimaryButton(
-                title: L10n.pair("Kapat", "Close"),
-                icon: "xmark",
-                tint: .accentRose
-            ) {
-                closeWindow()
-            }
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 18)
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 14) {
-            Spacer()
-
-            Image(systemName: "tablecells")
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(Color.secondary)
-
-            Text(L10n.pair("Duzeltilecek aktif bir tablo secili degil.", "No active table is selected for review."))
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-
-            Text(L10n.pair("Menu bar'dan son tabloyu ya da Gecmis sekmesindeki bir tablo kaydini acabilirsin.", "Open the latest table from the menu bar or a table entry from the History tab."))
-                .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 360)
-
-            tableReviewPrimaryButton(
-                title: L10n.pair("Kapat", "Close"),
-                icon: "xmark",
-                tint: .accentNeutral
-            ) {
-                closeWindow()
-            }
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(24)
-    }
-
-    private func loadCurrentSession() {
-        guard let session else {
-            document = TableReviewDocument(rows: [[""]])
-            feedback = nil
-            return
-        }
-
-        document = TableReviewDocument(sourceText: session.sourceText)
-        feedback = nil
-    }
-
-    private func cellBinding(row: Int, column: Int) -> Binding<String> {
-        Binding(
-            get: { document.cellValue(row: row, column: column) },
-            set: { document.setCell(row: row, column: column, value: $0) }
-        )
-    }
-
-    private func addRow() {
-        document.appendRow()
-        feedback = InlineFeedback(
-            message: L10n.pair("Yeni satir eklendi.", "A new row was added."),
-            tint: .accentCool
-        )
-    }
-
-    private func addColumn() {
-        document.appendColumn()
-        feedback = InlineFeedback(
-            message: L10n.pair("Yeni sutun eklendi.", "A new column was added."),
-            tint: .accentCool
-        )
-    }
-
-    private func removeLastRow() {
-        document.removeLastRow()
-        feedback = InlineFeedback(
-            message: L10n.pair("Son satir kaldirildi.", "The last row was removed."),
-            tint: .accentNeutral
-        )
-    }
-
-    private func removeLastColumn() {
-        document.removeLastColumn()
-        feedback = InlineFeedback(
-            message: L10n.pair("Son sutun kaldirildi.", "The last column was removed."),
-            tint: .accentNeutral
-        )
-    }
-
-    private func trimEmptyEdges() {
-        document.trimEmptyEdges()
-        feedback = InlineFeedback(
-            message: L10n.pair("Bos kenarlar temizlendi.", "Empty edges were trimmed."),
-            tint: .accentWarm
-        )
-    }
-
-    private func resetDocument() {
-        guard let session else {
-            return
-        }
-
-        document.reset(from: session.sourceText)
-        feedback = InlineFeedback(
-            message: L10n.pair("Tablo ilk yakalanan haline dondu.", "The table was reset to its original captured state."),
-            tint: .accentNeutral
-        )
-    }
-
-    private func copyReviewedTable(as preset: CaptureOutputPreset) {
-        guard let session else {
-            return
-        }
-
-        let reviewedText = document.tsvText
-        guard !reviewedText.isEmpty else {
-            feedback = InlineFeedback(
-                message: L10n.pair("Kopyalanacak tablo verisi bos.", "There is no table data to copy."),
-                tint: .accentRose
-            )
-            return
-        }
-
-        guard let result = appState.coordinator?.copyCapturedText(
-            rawText: reviewedText,
-            captureMode: .table,
-            contentKind: session.entry.contentKind,
-            source: session.entry.source,
-            outputPreset: preset,
-            targetBundleIdentifier: appState.activeTargetBundleIdentifier
-        ) else {
-            feedback = InlineFeedback(
-                message: L10n.pair("Kopyalama servisi su anda hazir degil.", "The copy service is not ready right now."),
-                tint: .accentRose
-            )
-            return
-        }
-
-        switch result {
-        case .success:
-            feedback = InlineFeedback(
-                message: L10n.usesEnglish ? "\(preset.title) output was copied to the clipboard." : "\(preset.title) cikti panoya kopyalandi.",
-                tint: .accentCool
-            )
-        case .failedWrite, .failedReadback:
-            feedback = InlineFeedback(
-                message: L10n.pair("Duzenlenen tablo panoya yazilamadi.", "The reviewed table could not be written to the clipboard."),
-                tint: .accentRose
-            )
-        }
-    }
-
-    private func closeWindow() {
-        appState.clearTableReview()
-        dismiss()
-    }
-
-    private func tableReviewBadge(_ text: String, tint: Color) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: .bold, design: .rounded))
-            .foregroundStyle(tint)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(tint.opacity(0.14), in: Capsule(style: .continuous))
-    }
-
-    private func tableReviewToolButton(title: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: icon)
-                Text(title)
-            }
-            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-            .foregroundStyle(Color.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(tint.opacity(0.12))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(tint.opacity(0.18), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func tableReviewPrimaryButton(title: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: icon)
-                Text(title)
-            }
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(tint.opacity(0.9))
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct NoticeContent {
+struct NoticeContent {
     let title: String
     let message: String
     let icon: String
     let tint: Color
     var actionTitle: String? = nil
     var action: (() -> Void)? = nil
-}
-
-struct HotkeyFeedback {
-    let message: String
-    let tint: Color
-}
-
-struct InlineFeedback {
-    let message: String
-    let tint: Color
-}
-
-extension Color {
-    static let surfaceTop = Color(red: 0.03, green: 0.07, blue: 0.11)
-    static let surfaceBottom = Color(red: 0.07, green: 0.12, blue: 0.18)
-    static let accentWarm = Color(red: 0.57, green: 0.73, blue: 0.86)
-    static let accentAmber = Color(red: 0.70, green: 0.85, blue: 0.95)
-    static let accentCoral = Color(red: 0.47, green: 0.76, blue: 0.90)
-    static let accentCool = Color(red: 0.52, green: 0.82, blue: 0.96)
-    static let accentMint = Color(red: 0.63, green: 0.90, blue: 0.93)
-    static let accentNeutral = Color(red: 0.86, green: 0.93, blue: 0.97)
-    static let accentRose = Color(red: 0.51, green: 0.66, blue: 0.80)
-    static let cardFill = Color(red: 0.10, green: 0.15, blue: 0.20).opacity(0.90)
-    static let cardStroke = Color.white.opacity(0.08)
-    static let controlFill = Color(red: 0.96, green: 0.99, blue: 1.0).opacity(0.055)
-    static let controlFillStrong = Color(red: 0.96, green: 0.99, blue: 1.0).opacity(0.082)
-    static let controlStroke = Color(red: 0.80, green: 0.90, blue: 0.98).opacity(0.12)
-    static let controlStrokeStrong = Color(red: 0.80, green: 0.90, blue: 0.98).opacity(0.18)
 }

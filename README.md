@@ -349,7 +349,13 @@ ScreenTextGrab does not upload screenshots or OCR results to a remote service. O
 
 - [Release downloads](https://github.com/batu3384/ScreenTextGrab/releases/latest)
 - [Contributing guide](CONTRIBUTING.md)
+- [Manual smoke matrix](docs/MANUAL_SMOKE_MATRIX.md)
 - [Security policy](SECURITY.md)
 - [Release checklist](RELEASE_CHECKLIST.md)
 - [GitHub publishing guide](docs/GITHUB_PUBLISHING.md)
 - [License](LICENSE)
+
+## UI Maintenance
+
+- Refresh README screenshots with `./scripts/capture_preview_screenshots.sh`
+- Run the release-facing visual and workflow checks in [docs/MANUAL_SMOKE_MATRIX.md](docs/MANUAL_SMOKE_MATRIX.md) after material UI changes

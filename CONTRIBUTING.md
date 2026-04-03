@@ -73,3 +73,5 @@ xcodebuild test \
 - Include test evidence
 - Call out permission, signing, or release-script changes clearly
 - Add screenshots when UI changes materially affect the user experience
+- Refresh product screenshots with `./scripts/capture_preview_screenshots.sh`
+- Run the visual/workflow checks in `docs/MANUAL_SMOKE_MATRIX.md` before sign-off

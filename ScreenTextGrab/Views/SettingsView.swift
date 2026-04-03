@@ -38,7 +38,7 @@ struct SettingsView: View {
         _selectedTab = State(initialValue: initialTab)
     }
 
-    private struct ProfileTarget: Identifiable {
+    struct ProfileTarget: Identifiable {
         let appName: String
         let bundleIdentifier: String
 
@@ -142,764 +142,183 @@ struct SettingsView: View {
     }
 
     private var generalTab: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                settingsCard(
-                    title: L10n.pair("Arayüz Dili", "Interface Language"),
-                    subtitle: appState.interfaceLanguage.detail
-                ) {
-                    Picker("", selection: interfaceLanguageBinding) {
-                        ForEach(InterfaceLanguage.allCases) { language in
-                            Text(language.title)
-                                .tag(language)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .accessibilityLabel(L10n.accessibilityInterfaceLanguage)
-
-                    Text(L10n.pair("Menü paneli ve ayarlar için sistemden bağımsız bir dil seçebilirsin.", "Choose a language for the menu panel and settings independently from macOS."))
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if let languageFeedback {
-                        feedbackLabel(languageFeedback.message, tint: languageFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: L10n.pair("Yakalama Modu", "Capture Mode"),
-                    subtitle: L10n.pair("Metin, altyazı, kod veya tablo odaklı yakalama arasında geçiş yap.", "Switch between text, subtitle, code, or table-focused capture.")
-                ) {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 148), spacing: 10)],
-                        alignment: .leading,
-                        spacing: 10
-                    ) {
-                        ForEach(CaptureMode.allCases) { mode in
-                            settingsCaptureModeButton(mode)
-                        }
-                    }
-
-                    Text(appState.captureMode.detail)
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    if let captureModeFeedback {
-                        feedbackLabel(captureModeFeedback.message, tint: captureModeFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: L10n.pair("Çıktı Biçimi", "Output Format"),
-                    subtitle: appState.captureOutputPreset.detail
-                ) {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 152), spacing: 12)],
-                        alignment: .leading,
-                        spacing: 12
-                    ) {
-                        ForEach(CaptureOutputPreset.allCases) { preset in
-                            outputPresetButton(preset)
-                        }
-                    }
-
-                    if let outputPresetFeedback {
-                        feedbackLabel(outputPresetFeedback.message, tint: outputPresetFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: L10n.pair("Global Kısayol", "Global Shortcut"),
-                    subtitle: isRecordingHotkey
-                        ? L10n.pair("Yeni kombinasyonu gir. Esc ile iptal edebilirsin.", "Enter the new combination. Press Esc to cancel.")
-                        : L10n.pair("Yakalamayı her yerden başlatmak için kullanılır.", "Use it to start capture from anywhere.")
-                ) {
-                    HStack(spacing: 10) {
-                        Button(action: toggleHotkeyRecording) {
-                            Text(isRecordingHotkey ? L10n.pair("Tuşa Bas...", "Press Keys...") : appState.hotkeyDisplayLabel)
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill((isRecordingHotkey ? Color.accentCool : Color.surfaceTop).opacity(isRecordingHotkey ? 0.85 : 0.82))
-                                )
-                        }
-                        .buttonStyle(.plain)
-
-                        settingsActionButton(
-                            title: isRecordingHotkey ? L10n.actionCancel : L10n.actionChange,
-                            icon: isRecordingHotkey ? "xmark" : "keyboard",
-                            tint: isRecordingHotkey ? .accentRose : .accentCool,
-                            action: toggleHotkeyRecording
-                        )
-
-                        settingsActionButton(
-                            title: L10n.actionDefault,
-                            icon: "arrow.counterclockwise",
-                            tint: .accentNeutral,
-                            action: resetHotkey
-                        )
-                    }
-
-                    if let hotkeyFeedback {
-                        feedbackLabel(hotkeyFeedback.message, tint: hotkeyFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: L10n.pair("Açılışta Başlat", "Launch at Login"),
-                    subtitle: appState.launchAtLoginState.detail
-                ) {
-                    HStack(spacing: 12) {
-                        statusPill(appState.launchAtLoginState.title, tint: launchAtLoginTint)
-                        Spacer()
-                        Toggle("", isOn: launchAtLoginBinding)
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                            .accessibilityLabel(L10n.accessibilityLaunchAtLoginToggle)
-                    }
-
-                    HStack(spacing: 10) {
-                        if appState.launchAtLoginState == .requiresApproval {
-                            settingsActionButton(
-                                title: L10n.actionLoginItems,
-                                icon: "person.crop.circle.badge.gearshape",
-                                tint: .accentWarm,
-                                action: openLoginItemsSettings
-                            )
-                        }
-
-                        settingsActionButton(
-                            title: L10n.actionRefresh,
-                            icon: "arrow.clockwise",
-                            tint: .accentNeutral,
-                            action: refreshLaunchAtLoginState
-                        )
-                    }
-
-                    if let launchAtLoginFeedback {
-                        feedbackLabel(launchAtLoginFeedback.message, tint: launchAtLoginFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: L10n.pair("İzleme Kuralları", "Watch Rules"),
-                    subtitle: appState.watchConfiguration.summary
-                ) {
-                    HStack(spacing: 10) {
-                        ForEach(WatchCopyBehavior.allCases) { behavior in
-                            watchBehaviorButton(behavior)
-                        }
-                    }
-
-                    TextField(L10n.pair("İsteğe bağlı regex filtresi", "Optional regex filter"), text: $watchRegexDraft)
-                        .textFieldStyle(.roundedBorder)
-
-                    HStack(spacing: 10) {
-                        settingsActionButton(
-                            title: L10n.pair("Regex'i Kaydet", "Save Regex"),
-                            icon: "checkmark.circle",
-                            tint: .accentCool,
-                            action: saveWatchRegex
-                        )
-
-                        settingsActionButton(
-                            title: L10n.pair("Temizle", "Clear"),
-                            icon: "eraser",
-                            tint: .accentNeutral,
-                            action: clearWatchRegex
-                        )
-                    }
-
-                    Text(L10n.pair("Regex doluysa izleme yalnızca eşleşen parçaları kopyalar.", "If the regex is filled in, watch mode copies only matching segments."))
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    if let watchFeedback {
-                        feedbackLabel(watchFeedback.message, tint: watchFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: L10n.pair("Ekran Kaydı İzni", "Screen Recording Permission"),
-                    subtitle: appState.permissionState.uiMessage
-                ) {
-                    HStack(spacing: 12) {
-                        statusPill(permissionTitle, tint: permissionTint)
-                        Spacer()
-                        Text(permissionDescription)
-                            .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.trailing)
-                    }
-
-                    HStack(spacing: 10) {
-                        if appState.permissionState == .denied || appState.permissionState == .unknown {
-                            settingsActionButton(
-                                title: L10n.actionRequestPermission,
-                                icon: "lock.open.display",
-                                tint: .accentWarm,
-                                action: requestPermission
-                            )
-                        }
-
-                        settingsActionButton(
-                            title: L10n.actionSystemSettings,
-                            icon: "gearshape.2",
-                            tint: .accentNeutral,
-                            action: openSystemSettings
-                        )
-
-                        settingsActionButton(
-                            title: L10n.actionRefresh,
-                            icon: "arrow.clockwise",
-                            tint: .accentCool,
-                            action: refreshPermission
-                        )
-
-                        settingsActionButton(
-                            title: L10n.actionDiagnostics,
-                            icon: "stethoscope",
-                            tint: .accentNeutral,
-                            action: { selectedTab = .diagnostics }
-                        )
-                    }
-                }
-
-                settingsCard(
-                    title: L10n.pair("Uygulama Profilleri", "App Profiles"),
-                    subtitle: appState.appProfiles.isEmpty
-                        ? L10n.pair("Henüz kayıtlı bir uygulama profili yok.", "No app profile has been saved yet.")
-                        : L10n.usesEnglish ? "\(appState.appProfiles.count) saved profiles." : "\(appState.appProfiles.count) profil kayıtlı."
-                ) {
-                    Menu {
-                        ForEach(profileTargets) { target in
-                            Button {
-                                saveProfile(for: target)
-                            } label: {
-                                Text(target.appName)
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus.circle")
-                            Text(L10n.pair("Çalışan Uygulamadan Profil Oluştur", "Create Profile from Running App"))
-                            Spacer()
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.accentMint.opacity(0.12))
-                        )
-                    }
-                    .menuStyle(.borderlessButton)
-                    .disabled(profileTargets.isEmpty)
-                    .opacity(profileTargets.isEmpty ? 0.55 : 1)
-
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(L10n.pair("Akıllı Panel Senkronu", "Smart Panel Sync"))
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-
-                            Text(L10n.pair("Aktif uygulama değiştiğinde kayıtlı profil varsa paneldeki mod, çıktı biçimi ve OCR dili onunla eşitlenir.", "When the active app changes, the panel syncs its mode, output format, and OCR language if a saved profile exists."))
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Spacer()
-
-                        Toggle("", isOn: appProfilePanelAutoSyncBinding)
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                    }
-
-                    Text(L10n.pair("Profil seçilen uygulama için mod, çıktı biçimi ve OCR dili override eder.", "A profile overrides the mode, output format, and OCR language for the selected app."))
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    if let profileFeedback {
-                        feedbackLabel(profileFeedback.message, tint: profileFeedback.tint)
-                    }
-
-                    if appState.appProfiles.isEmpty {
-                        Text(L10n.pair("Safari, Xcode veya terminal gibi uygulamalar için ayrı profiller kaydedebilirsin.", "You can save separate profiles for apps like Safari, Xcode, or Terminal."))
-                            .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        VStack(spacing: 10) {
-                            ForEach(appState.appProfiles) { profile in
-                                profileRow(profile)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.bottom, 8)
-        }
+        SettingsGeneralTabView(
+            interfaceLanguageBinding: interfaceLanguageBinding,
+            interfaceLanguageDetail: appState.interfaceLanguage.detail,
+            languageFeedback: languageFeedback,
+            captureModeDetail: appState.captureMode.detail,
+            captureModeFeedback: captureModeFeedback,
+            outputPresetDetail: appState.captureOutputPreset.detail,
+            outputPresetFeedback: outputPresetFeedback,
+            isRecordingHotkey: isRecordingHotkey,
+            hotkeyDisplayLabel: appState.hotkeyDisplayLabel,
+            hotkeyFeedback: hotkeyFeedback,
+            launchAtLoginTitle: appState.launchAtLoginState.title,
+            launchAtLoginDetail: appState.launchAtLoginState.detail,
+            launchAtLoginTint: launchAtLoginTint,
+            launchAtLoginBinding: launchAtLoginBinding,
+            launchAtLoginRequiresApproval: appState.launchAtLoginState == .requiresApproval,
+            launchAtLoginFeedback: launchAtLoginFeedback,
+            watchSummary: appState.watchConfiguration.summary,
+            watchRegexDraft: $watchRegexDraft,
+            watchFeedback: watchFeedback,
+            permissionSubtitle: appState.permissionState.uiMessage,
+            permissionTitle: permissionTitle,
+            permissionTint: permissionTint,
+            permissionDescription: permissionDescription,
+            showRequestPermissionAction: appState.permissionState == .denied || appState.permissionState == .unknown,
+            appProfileSummary: appState.appProfiles.isEmpty
+                ? L10n.pair("Henüz kayıtlı bir uygulama profili yok.", "No app profile has been saved yet.")
+                : L10n.usesEnglish ? "\(appState.appProfiles.count) saved profiles." : "\(appState.appProfiles.count) profil kayıtlı.",
+            appProfilePanelAutoSyncBinding: appProfilePanelAutoSyncBinding,
+            profileFeedback: profileFeedback,
+            emptyProfileMessage: L10n.pair("Safari, Xcode veya terminal gibi uygulamalar için ayrı profiller kaydedebilirsin.", "You can save separate profiles for apps like Safari, Xcode, or Terminal."),
+            captureModes: CaptureMode.allCases,
+            outputPresets: CaptureOutputPreset.allCases,
+            watchBehaviors: WatchCopyBehavior.allCases,
+            profileTargets: profileTargets,
+            appProfiles: appState.appProfiles,
+            renderCaptureModeButton: { mode in AnyView(settingsCaptureModeButton(mode)) },
+            renderOutputPresetButton: { preset in AnyView(outputPresetButton(preset)) },
+            renderWatchBehaviorButton: { behavior in AnyView(watchBehaviorButton(behavior)) },
+            renderProfileRow: { profile in AnyView(profileRow(profile)) },
+            renderLanguageFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) },
+            renderCaptureModeFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) },
+            renderOutputPresetFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) },
+            renderHotkeyFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) },
+            renderLaunchAtLoginFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) },
+            renderWatchFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) },
+            renderProfileFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) },
+            toggleHotkeyRecording: toggleHotkeyRecording,
+            resetHotkey: resetHotkey,
+            openLoginItemsSettings: openLoginItemsSettings,
+            refreshLaunchAtLoginState: refreshLaunchAtLoginState,
+            saveWatchRegex: saveWatchRegex,
+            clearWatchRegex: clearWatchRegex,
+            requestPermission: requestPermission,
+            openSystemSettings: openSystemSettings,
+            refreshPermission: refreshPermission,
+            openDiagnostics: { selectedTab = .diagnostics },
+            saveProfile: saveProfile(for:)
+        )
     }
 
     private var ocrTab: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                settingsCard(
-                    title: L10n.pair("Tanıma Modu", "Recognition Mode"),
-                    subtitle: L10n.pair("Otomatik algılamayı açabilir veya tercih ettiğin dilleri sabitleyebilirsin.", "Turn on automatic detection or pin the languages you prefer.")
-                ) {
-                    Toggle(L10n.ocrAutomaticLanguage, isOn: automaticDetectionBinding)
-                        .toggleStyle(.switch)
-                        .accessibilityLabel(L10n.accessibilityAutomaticLanguage)
-
-                    Text(appState.ocrLanguageSelection.automaticDetection
-                         ? L10n.pair("Vision dilini otomatik seçer. Çok dilli kullanım için uygundur.", "Vision chooses the language automatically. This is ideal for multilingual use.")
-                         : L10n.pair("Aşağıdaki diller öncelikli olarak kullanılacak.", "The languages below will be prioritized."))
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    if let ocrFeedback {
-                        feedbackLabel(ocrFeedback.message, tint: ocrFeedback.tint)
-                    }
-                }
-
-                settingsCard(
-                    title: L10n.pair("Desteklenen Diller", "Supported Languages"),
-                    subtitle: appState.ocrLanguageSelection.summary
-                ) {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 94), spacing: 10)],
-                        alignment: .leading,
-                        spacing: 10
-                    ) {
-                        ForEach(supportedOCRLanguages) { language in
-                            settingsLanguageToggle(language)
-                        }
-                    }
-                    .opacity(appState.ocrLanguageSelection.automaticDetection ? 0.56 : 1)
-                    .disabled(appState.ocrLanguageSelection.automaticDetection)
-                }
-            }
-            .padding(.bottom, 8)
-        }
+        SettingsOCRTabView(
+            automaticDetectionBinding: automaticDetectionBinding,
+            ocrSelectionSummary: appState.ocrLanguageSelection.summary,
+            automaticDetectionEnabled: appState.ocrLanguageSelection.automaticDetection,
+            supportedLanguages: supportedOCRLanguages,
+            ocrFeedback: ocrFeedback,
+            renderLanguageToggle: { language in AnyView(settingsLanguageToggle(language)) },
+            renderFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) }
+        )
     }
 
     private var historyTab: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                settingsCard(
-                    title: L10n.pair("Kayıtlı Bölgeler", "Saved Regions"),
-                    subtitle: appState.savedCaptureRegions.isEmpty
-                        ? L10n.pair("Son yakalanan alanları daha sonra tek tıkla tekrar kullanmak için kaydet.", "Save recently captured regions so you can reuse them with one click later.")
-                        : L10n.usesEnglish ? "\(appState.savedCaptureRegions.count) saved regions." : "\(appState.savedCaptureRegions.count) bölge kayıtlı."
-                ) {
-                    HStack(spacing: 10) {
-                        settingsActionButton(
-                            title: L10n.pair("Son Alanı Kaydet", "Save Last Region"),
-                            icon: "rectangle.badge.plus",
-                            tint: .accentMint,
-                            action: saveLastCaptureRegion
-                        )
-                        .disabled(appState.lastCaptureSelection == nil)
-                        .opacity(appState.lastCaptureSelection == nil ? 0.55 : 1)
-
-                        settingsActionButton(
-                            title: L10n.pair("Son Alanı Tekrar Yakala", "Repeat Last Region"),
-                            icon: "arrow.clockwise",
-                            tint: .accentCool,
-                            action: repeatLastCapture
-                        )
-                        .disabled(appState.lastCaptureSelection == nil)
-                        .opacity(appState.lastCaptureSelection == nil ? 0.55 : 1)
-                    }
-
-                    Text(L10n.pair("Kayıtlı bir bölgeyi daha sonra tek tıkla yeniden yakalayabilir, istersen son seçiminle güncelleyebilirsin.", "You can recapture a saved region later with one click, or refresh it with your latest selection."))
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(L10n.pair("Akıllı Başlangıç", "Smart Start"))
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-
-                            Text(L10n.pair("Aktif uygulama veya pencereyle eşleşen kayıtlı bölge varsa ana yakalama düğmesi onu çalıştırır.", "If a saved region matches the active app or window, the main capture button runs it directly."))
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Spacer()
-
-                        Toggle("", isOn: savedRegionQuickStartBinding)
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                    }
-
-                    if let savedRegionFeedback {
-                        feedbackLabel(savedRegionFeedback.message, tint: savedRegionFeedback.tint)
-                    }
-
-                    if appState.savedCaptureRegions.isEmpty {
-                        Text(L10n.pair("Bir alan yakaladıktan sonra burada kalıcı bölge olarak saklayabilirsin.", "After capturing a region, you can keep it here as a permanent saved region."))
-                            .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        VStack(spacing: 10) {
-                            ForEach(appState.savedCaptureRegions) { region in
-                                savedCaptureRegionRow(region)
-                            }
-                        }
-                    }
+        SettingsHistoryTabView(
+            savedRegionsSummary: appState.savedCaptureRegions.isEmpty
+                ? L10n.pair("Son yakalanan alanları daha sonra tek tıkla tekrar kullanmak için kaydet.", "Save recently captured regions so you can reuse them with one click later.")
+                : L10n.usesEnglish ? "\(appState.savedCaptureRegions.count) saved regions." : "\(appState.savedCaptureRegions.count) bölge kayıtlı.",
+            savedRegionQuickStartBinding: savedRegionQuickStartBinding,
+            savedRegionFeedback: savedRegionFeedback,
+            savedRegions: appState.savedCaptureRegions,
+            lastCaptureSelectionAvailable: appState.lastCaptureSelection != nil,
+            snippetsSummary: appState.savedSnippets.isEmpty
+                ? L10n.pair("Tekrar kullanacağın sonuçları ayrı bir snippet koleksiyonunda sakla.", "Save reusable results in a separate snippet collection.")
+                : L10n.usesEnglish ? "\(appState.savedSnippets.count) saved snippets. Filter them like a collection with tags and search." : "\(appState.savedSnippets.count) snippet kayıtlı. Etiket ve aramayla koleksiyon gibi filtreleyebilirsin.",
+            savedSnippetCollectionAutoSyncBinding: savedSnippetCollectionAutoSyncBinding,
+            snippetSearchQuery: Binding(
+                get: { snippetSearchQuery },
+                set: {
+                    snippetSearchQuery = $0
+                    syncSelectedSnippetCollection()
                 }
-
-                settingsCard(
-                    title: L10n.pair("Kayıtlı Snippet'lar", "Saved Snippets"),
-                    subtitle: appState.savedSnippets.isEmpty
-                        ? L10n.pair("Tekrar kullanacağın sonuçları ayrı bir snippet koleksiyonunda sakla.", "Save reusable results in a separate snippet collection.")
-                        : L10n.usesEnglish ? "\(appState.savedSnippets.count) saved snippets. Filter them like a collection with tags and search." : "\(appState.savedSnippets.count) snippet kayıtlı. Etiket ve aramayla koleksiyon gibi filtreleyebilirsin."
-                ) {
-                    HStack(spacing: 10) {
-                        settingsActionButton(
-                            title: L10n.pair("Son Sonucu Kaydet", "Save Latest Result"),
-                            icon: "bookmark.badge.plus",
-                            tint: .accentMint,
-                            action: saveLastCopiedSnippet
-                        )
-                        .disabled(appState.lastCopiedEntry == nil)
-                        .opacity(appState.lastCopiedEntry == nil ? 0.55 : 1)
-                    }
-
-                    Text(L10n.pair("Snippet'lar yakalama geçmişinden bağımsız olarak tek tıkla yeniden kopyalanır ve aynı çıktı biçimini korur.", "Snippets can be copied again with one click independently of capture history while preserving the same output format."))
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(L10n.pair("Akıllı Koleksiyon Senkronu", "Smart Collection Sync"))
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-
-                            Text(L10n.pair("Geçmiş sekmesi açıksa, aktif uygulamaya uyan kayıtlı snippet koleksiyonu otomatik uygulanır.", "If the History tab is open, the saved snippet collection matching the active app is applied automatically."))
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Spacer()
-
-                        Toggle("", isOn: savedSnippetCollectionAutoSyncBinding)
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                    }
-
-                    TextField(L10n.pair("Snippet ara", "Search snippets"), text: $snippetSearchQuery)
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: snippetSearchQuery) { _, _ in
-                            syncSelectedSnippetCollection()
-                        }
-
-                    HStack(spacing: 10) {
-                        settingsActionButton(
-                            title: L10n.pair("Filtreyi Kaydet", "Save Filter"),
-                            icon: "square.stack.badge.plus",
-                            tint: .accentAmber,
-                            action: beginSnippetCollectionEditing
-                        )
-                        .disabled(!hasActiveSnippetFilters)
-                        .opacity(hasActiveSnippetFilters ? 1 : 0.55)
-                    }
-
-                    if isEditingSnippetCollection {
-                        HStack(spacing: 10) {
-                            TextField(L10n.pair("Koleksiyon adı", "Collection name"), text: $snippetCollectionDraft)
-                                .textFieldStyle(.roundedBorder)
-                                .onSubmit {
-                                    commitSnippetCollectionDraft()
-                                }
-
-                            settingsActionButton(
-                                title: L10n.pair("Kaydet", "Save"),
-                                icon: "checkmark",
-                                tint: .accentMint,
-                                action: commitSnippetCollectionDraft
-                            )
-                            .disabled(snippetCollectionDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !hasActiveSnippetFilters)
-                            .opacity(
-                                snippetCollectionDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !hasActiveSnippetFilters
-                                    ? 0.55
-                                    : 1
-                            )
-
-                            settingsActionButton(
-                                title: L10n.pair("Vazgec", "Cancel"),
-                                icon: "xmark",
-                                tint: .accentNeutral,
-                                action: cancelSnippetCollectionEditing
-                            )
-                        }
-                    }
-
-                    if !appState.savedSnippetCollections.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(appState.savedSnippetCollections) { collection in
-                                    savedSnippetCollectionChip(collection)
-                                }
-                            }
-                            .padding(.vertical, 2)
-                        }
-                    }
-
-                    if !appState.availableSnippetTags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                snippetFilterChip(title: L10n.pair("Tümü", "All"), isSelected: selectedSnippetTag == nil) {
-                                    selectedSnippetTag = nil
-                                    syncSelectedSnippetCollection()
-                                }
-
-                                ForEach(appState.availableSnippetTags, id: \.self) { tag in
-                                    snippetFilterChip(title: tag, isSelected: selectedSnippetTag == tag) {
-                                        selectedSnippetTag = selectedSnippetTag == tag ? nil : tag
-                                        syncSelectedSnippetCollection()
-                                    }
-                                }
-                            }
-                            .padding(.vertical, 2)
-                        }
-                    }
-
-                    if let snippetFeedback {
-                        feedbackLabel(snippetFeedback.message, tint: snippetFeedback.tint)
-                    }
-
-                    if filteredSavedSnippets.isEmpty {
-                        Text(snippetEmptyStateMessage)
-                            .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        VStack(spacing: 10) {
-                            ForEach(filteredSavedSnippets) { snippet in
-                                savedSnippetRow(snippet)
-                            }
-                        }
-                    }
-                }
-
-                settingsCard(
-                    title: L10n.pair("Yakalama Geçmişi", "Capture History"),
-                    subtitle: appState.copyHistory.isEmpty
-                        ? L10n.pair("Henüz kaydedilmiş bir metin yok.", "No captured text has been saved yet.")
-                        : L10n.usesEnglish ? "Showing \(filteredHistoryEntries.count)/\(orderedHistoryEntries.count) items • \(appState.pinnedHistoryCount) pinned." : "\(filteredHistoryEntries.count)/\(orderedHistoryEntries.count) kayıt gösteriliyor • \(appState.pinnedHistoryCount) sabit."
-                ) {
-                    TextField(L10n.pair("Geçmişte ara", "Search history"), text: $historySearchQuery)
-                        .textFieldStyle(.roundedBorder)
-
-                    Toggle(L10n.pair("Yalnızca Sabitler", "Pinned Only"), isOn: $showPinnedOnlyHistory)
-                        .toggleStyle(.switch)
-                        .tint(.accentAmber)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(L10n.pair("Dışa Aktarma Biçimi", "Export Format"))
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.secondary)
-
-                        LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: 120), spacing: 10)],
-                            alignment: .leading,
-                            spacing: 10
-                        ) {
-                            ForEach(ClipboardHistoryExportFormat.allCases) { format in
-                                historyExportFormatButton(format)
-                            }
-                        }
-                    }
-
-                    HStack(spacing: 10) {
-                        settingsActionButton(
-                            title: L10n.actionExport,
-                            icon: "square.and.arrow.up",
-                            tint: .accentCool,
-                            action: exportHistory
-                        )
-                        .disabled(filteredHistoryEntries.isEmpty)
-                        .opacity(filteredHistoryEntries.isEmpty ? 0.55 : 1)
-
-                        settingsActionButton(
-                            title: L10n.actionClear,
-                            icon: "trash",
-                            tint: .accentRose,
-                            action: clearHistory
-                        )
-                        .disabled(appState.copyHistory.isEmpty)
-                        .opacity(appState.copyHistory.isEmpty ? 0.55 : 1)
-                    }
-
-                    if let historyFeedback {
-                        feedbackLabel(historyFeedback.message, tint: historyFeedback.tint)
-                    }
-
-                    if appState.copyHistory.isEmpty {
-                        historyEmptyState
-                    } else if filteredHistoryEntries.isEmpty {
-                        historySearchEmptyState
-                    } else {
-                        VStack(spacing: 10) {
-                            ForEach(filteredHistoryEntries) { entry in
-                                historyRow(entry)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.bottom, 8)
-        }
+            ),
+            selectedSnippetTag: selectedSnippetTag,
+            availableSnippetTags: appState.availableSnippetTags,
+            savedSnippetCollections: appState.savedSnippetCollections,
+            snippetFeedback: snippetFeedback,
+            filteredSavedSnippets: filteredSavedSnippets,
+            latestResultAvailable: appState.lastCopiedEntry != nil,
+            isEditingSnippetCollection: isEditingSnippetCollection,
+            snippetCollectionDraft: Binding(
+                get: { snippetCollectionDraft },
+                set: { snippetCollectionDraft = $0 }
+            ),
+            hasActiveSnippetFilters: hasActiveSnippetFilters,
+            snippetEmptyStateMessage: snippetEmptyStateMessage,
+            historySummary: appState.copyHistory.isEmpty
+                ? L10n.pair("Henüz kaydedilmiş bir metin yok.", "No captured text has been saved yet.")
+                : L10n.usesEnglish ? "Showing \(filteredHistoryEntries.count)/\(orderedHistoryEntries.count) items • \(appState.pinnedHistoryCount) pinned." : "\(filteredHistoryEntries.count)/\(orderedHistoryEntries.count) kayıt gösteriliyor • \(appState.pinnedHistoryCount) sabit.",
+            historySearchQuery: $historySearchQuery,
+            showPinnedOnlyHistory: $showPinnedOnlyHistory,
+            filteredHistoryEntries: filteredHistoryEntries,
+            orderedHistoryEntries: orderedHistoryEntries,
+            pinnedHistoryCount: appState.pinnedHistoryCount,
+            historyFeedback: historyFeedback,
+            copyHistory: appState.copyHistory,
+            historyExportFormats: ClipboardHistoryExportFormat.allCases,
+            renderSavedRegionRow: { region in AnyView(savedCaptureRegionRow(region)) },
+            renderSavedSnippetCollectionChip: { collection in AnyView(savedSnippetCollectionChip(collection)) },
+            renderSnippetFilterChip: { title, isSelected, action in
+                AnyView(snippetFilterChip(title: title, isSelected: isSelected, action: action))
+            },
+            renderSavedSnippetRow: { snippet in AnyView(savedSnippetRow(snippet)) },
+            renderHistoryExportFormatButton: { format in AnyView(historyExportFormatButton(format)) },
+            renderHistoryRow: { entry in AnyView(historyRow(entry)) },
+            renderSavedRegionFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) },
+            renderSnippetFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) },
+            renderHistoryFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) },
+            historyEmptyState: AnyView(historyEmptyState),
+            historySearchEmptyState: AnyView(historySearchEmptyState),
+            saveLastCaptureRegion: saveLastCaptureRegion,
+            repeatLastCapture: repeatLastCapture,
+            saveLastCopiedSnippet: saveLastCopiedSnippet,
+            beginSnippetCollectionEditing: beginSnippetCollectionEditing,
+            commitSnippetCollectionDraft: commitSnippetCollectionDraft,
+            cancelSnippetCollectionEditing: cancelSnippetCollectionEditing,
+            selectAllSnippetTags: {
+                selectedSnippetTag = nil
+                syncSelectedSnippetCollection()
+            },
+            toggleSnippetTagSelection: { tag in
+                selectedSnippetTag = selectedSnippetTag == tag ? nil : tag
+                syncSelectedSnippetCollection()
+            },
+            clearHistory: clearHistory,
+            exportHistory: exportHistory
+        )
     }
 
     private var diagnosticsTab: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                settingsCard(
-                    title: L10n.pair("İzin Tanısı", "Permission Diagnostics"),
-                    subtitle: permissionDiagnostics?.currentState.uiMessage ?? appState.permissionState.uiMessage
-                ) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if let permissionDiagnostics {
-                            diagnosticValueRow(L10n.pair("Durum", "Status"), value: permissionDiagnostics.currentState.uiMessage)
-                            diagnosticValueRow("Preflight", value: permissionDiagnostics.preflightLabel)
-                            diagnosticValueRow("Probe", value: permissionDiagnostics.probeState.uiMessage)
-                            diagnosticValueRow(
-                                L10n.pair("Yeniden Açma", "Reopen"),
-                                value: permissionDiagnostics.needsRestartAfterGrant ? L10n.pair("Gerekli", "Required") : L10n.pair("Gerekmiyor", "Not Needed")
-                            )
-                            diagnosticValueRow("Bundle ID", value: permissionDiagnostics.bundleIdentifier)
-                            diagnosticValueRow(L10n.pair("Sürüm", "Version"), value: permissionDiagnostics.versionLabel)
-                            diagnosticValueRow(L10n.pair("Uygulama", "App"), value: permissionDiagnostics.appPath)
-
-                            if let lastProbeAt = permissionDiagnostics.lastProbeAt {
-                                diagnosticValueRow(
-                                    L10n.pair("Son Probe", "Last Probe"),
-                                    value: lastProbeAt.formatted(.dateTime.day().month(.abbreviated).hour().minute().second())
-                                )
-                            }
-
-                            if let lastConfirmedGrantAt = permissionDiagnostics.lastConfirmedGrantAt {
-                                diagnosticValueRow(
-                                    L10n.pair("Son Grant Kanıtı", "Last Grant Evidence"),
-                                    value: lastConfirmedGrantAt.formatted(.dateTime.day().month(.abbreviated).hour().minute().second())
-                                )
-                            }
-                        } else {
-                            Text(L10n.pair("Henüz tanı verisi yüklenmedi. Yenile ile tekrar dene.", "No diagnostics have been loaded yet. Try Refresh again."))
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        HStack(spacing: 10) {
-                            settingsActionButton(
-                                title: L10n.actionRefresh,
-                                icon: "arrow.clockwise",
-                                tint: .accentCool,
-                                action: refreshPermissionDiagnostics
-                            )
-
-                            settingsActionButton(
-                                title: L10n.actionCopyDiagnostics,
-                                icon: "doc.on.doc",
-                                tint: .accentNeutral,
-                                action: copyPermissionDiagnostics
-                            )
-                        }
-
-                        HStack(spacing: 10) {
-                            settingsActionButton(
-                                title: L10n.actionSupportBundle,
-                                icon: "square.and.arrow.up",
-                                tint: .accentWarm,
-                                action: exportSupportBundle
-                            )
-
-                            settingsActionButton(
-                                title: L10n.actionSystemSettings,
-                                icon: "gearshape.2",
-                                tint: .accentNeutral,
-                                action: openSystemSettings
-                            )
-                        }
-
-                        if let diagnosticsFeedback {
-                            feedbackLabel(diagnosticsFeedback.message, tint: diagnosticsFeedback.tint)
-                        }
-                    }
-                }
-
-                settingsCard(
-                    title: L10n.pair("Uygulama Tanı Kayıtları", "App Diagnostic Logs"),
-                    subtitle: appState.diagnostics.isEmpty
-                        ? L10n.pair("Henüz kayıt yok.", "No logs yet.")
-                        : L10n.usesEnglish ? "\(appState.diagnostics.count) entries showing the latest warnings and errors." : "\(appState.diagnostics.count) kayıt son hata ve uyarıları gösteriyor."
-                ) {
-                    if appState.diagnostics.isEmpty {
-                        Text(L10n.pair("İzin, OCR, clipboard ve launch akışından gelen kayıtlar burada listelenecek.", "Entries from permission, OCR, clipboard, and launch flows will appear here."))
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        VStack(spacing: 10) {
-                            ForEach(appState.diagnostics.reversed()) { entry in
-                                diagnosticEntryRow(entry)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.bottom, 8)
-        }
+        SettingsDiagnosticsTabView(
+            permissionDiagnostics: permissionDiagnostics,
+            permissionStateMessage: appState.permissionState.uiMessage,
+            diagnosticsFeedback: diagnosticsFeedback,
+            diagnosticsEntries: appState.diagnostics,
+            renderDiagnosticValueRow: { title, value in AnyView(diagnosticValueRow(title, value: value)) },
+            renderDiagnosticEntryRow: { entry in AnyView(diagnosticEntryRow(entry)) },
+            renderDiagnosticsFeedback: { feedback in AnyView(feedbackLabel(feedback.message, tint: feedback.tint)) },
+            refreshPermissionDiagnostics: refreshPermissionDiagnostics,
+            copyPermissionDiagnostics: copyPermissionDiagnostics,
+            exportSupportBundle: exportSupportBundle,
+            openSystemSettings: openSystemSettings
+        )
     }
 
     private var historyEmptyState: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(Color(NSColor.controlBackgroundColor))
-            .overlay {
-                VStack(spacing: 8) {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
-
-                    Text(L10n.pair("İlk yakalamadan sonra son metinler burada listelenecek.", "Your recent text captures will appear here after the first capture."))
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(18)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 110)
+        SettingsEmptyStateCard(
+            systemName: "doc.text.magnifyingglass",
+            message: L10n.pair("İlk yakalamadan sonra son metinler burada listelenecek.", "Your recent text captures will appear here after the first capture.")
+        )
     }
 
     private var historySearchEmptyState: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(Color(NSColor.controlBackgroundColor))
-            .overlay {
-                VStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass.circle")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
-
-                    Text(L10n.pair("Aramanla eşleşen bir geçmiş kaydı bulunamadı.", "No history entry matched your search."))
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(18)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 110)
+        SettingsEmptyStateCard(
+            systemName: "magnifyingglass.circle",
+            message: L10n.pair("Aramanla eşleşen bir geçmiş kaydı bulunamadı.", "No history entry matched your search.")
+        )
     }
 
     private func historyRow(_ entry: ClipboardHistoryEntry) -> some View {
@@ -1540,83 +959,19 @@ struct SettingsView: View {
         subtitle: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-
-                Text(subtitle)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-
-            content()
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(NSColor.windowBackgroundColor).opacity(0.92))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
+        SettingsSectionCard(title: title, subtitle: subtitle, content: content)
     }
 
     private func settingsActionButton(title: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: icon)
-                Text(title)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.84)
-                    .layoutPriority(1)
-            }
-            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .frame(maxWidth: .infinity, minHeight: 36)
-            .foregroundStyle(Color.primary)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(tint.opacity(0.14))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(tint.opacity(0.16), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
+        SettingsActionButton(title: title, icon: icon, tint: tint, action: action)
     }
 
     private func historyMetaBadge(_ text: String, tint: Color) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .bold, design: .rounded))
-            .foregroundStyle(tint)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(tint.opacity(0.12), in: Capsule(style: .continuous))
+        SettingsMetaBadge(text: text, tint: tint)
     }
 
     private func snippetFilterChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(isSelected ? Color.surfaceTop : Color(NSColor.controlBackgroundColor))
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(isSelected ? Color.accentMint.opacity(0.62) : Color.black.opacity(0.08), lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
+        SettingsFilterChip(title: title, isSelected: isSelected, action: action)
     }
 
     private func savedSnippetCollectionChip(_ collection: SavedSnippetCollection) -> some View {
@@ -1762,19 +1117,11 @@ struct SettingsView: View {
     }
 
     private func statusPill(_ text: String, tint: Color) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: .bold, design: .rounded))
-            .foregroundStyle(tint)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(tint.opacity(0.14), in: Capsule(style: .continuous))
+        SettingsStatusPill(text: text, tint: tint)
     }
 
     private func feedbackLabel(_ message: String, tint: Color) -> some View {
-        Text(message)
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
-            .foregroundStyle(tint)
-            .fixedSize(horizontal: false, vertical: true)
+        SettingsFeedbackText(message: message, tint: tint)
     }
 
     private func settingsLanguageToggle(_ language: OCRLanguagePreference) -> some View {

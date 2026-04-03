@@ -63,4 +63,20 @@ final class AppUpdateServiceTests: XCTestCase {
             L10n.format("%@ yüklemeye hazır, yeniden başlat ve güncelle", "%@ is ready, restart and update", "1.0.4")
         )
     }
+
+    func testMenuBarUpdatePresentationMapsCompactAndRestartStates() {
+        let idle = MenuBarUpdatePresentation(state: .idle, isCompact: true, isAvailable: true)
+        XCTAssertEqual(idle.content.title, L10n.actionCheckForUpdates)
+        XCTAssertEqual(idle.width, 110)
+        XCTAssertTrue(idle.isAvailable)
+
+        let restart = MenuBarUpdatePresentation(
+            state: .readyToInstall(version: "1.0.4"),
+            isCompact: false,
+            isAvailable: true
+        )
+        XCTAssertEqual(restart.content.title, L10n.actionRestartToUpdate)
+        XCTAssertEqual(restart.width, 156)
+        XCTAssertFalse(restart.isBusy)
+    }
 }

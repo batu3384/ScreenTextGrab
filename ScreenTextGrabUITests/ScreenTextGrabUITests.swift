@@ -5,8 +5,23 @@ final class ScreenTextGrabUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testMenuPanelPreviewLaunches() {
+        let app = previewApp(argument: "--screenshot-menu-panel")
+        XCTAssertTrue(waitForPreviewWindow(in: app).exists)
+    }
+
     func testSettingsGeneralPreviewLaunches() {
         let app = previewApp(argument: "--screenshot-settings-general")
+        XCTAssertTrue(waitForPreviewWindow(in: app).exists)
+    }
+
+    func testSettingsOCRPreviewLaunches() {
+        let app = previewApp(argument: "--screenshot-settings-ocr")
+        XCTAssertTrue(waitForPreviewWindow(in: app).exists)
+    }
+
+    func testSettingsDiagnosticsPreviewLaunches() {
+        let app = previewApp(argument: "--screenshot-settings-diagnostics")
         XCTAssertTrue(waitForPreviewWindow(in: app).exists)
     }
 

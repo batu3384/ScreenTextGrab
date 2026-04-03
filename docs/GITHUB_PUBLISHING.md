@@ -7,7 +7,7 @@ This file is the public-release handoff for publishing `ScreenTextGrab` as a pol
 - Repository name: `ScreenTextGrab`
 - Visibility: `Public`
 - Short description:
-  `macOS menu bar OCR app for capturing on-screen text, code, subtitles, and tables with Office-compatible paste output.`
+  `Local-first macOS menu bar OCR app for screen text, images, PDFs, and reusable capture workflows.`
 - Suggested topics:
   `macos`, `swift`, `swiftui`, `ocr`, `vision`, `menubar`, `clipboard`, `screen-capture`, `productivity`, `office`
 
@@ -49,7 +49,7 @@ gh repo create ScreenTextGrab \
   --source=. \
   --remote=origin \
   --push \
-  --description "macOS menu bar OCR app for capturing on-screen text, code, subtitles, and tables with Office-compatible paste output."
+  --description "Local-first macOS menu bar OCR app for screen text, images, PDFs, and reusable capture workflows."
 ```
 
 If the GitHub repo already exists, just connect and push:
@@ -151,17 +151,19 @@ release asset when it exists, then falls back to a source install.
 
 ### Short pitch
 
-`Capture text from anywhere on macOS and paste it back as plain text, Markdown, JSON, or Office-ready content.`
+`Capture text from screens, images, and PDFs on macOS, then reuse it with snippets, saved regions, and Office-ready output.`
 
 ### One paragraph description
 
-`ScreenTextGrab is a local-first macOS menu bar OCR tool for grabbing text from any on-screen region. It supports standard text capture, subtitle-focused OCR, code-friendly output, and table extraction with Office-compatible clipboard formats. The app also includes capture history, launch-at-login support, a global shortcut, and a table review window for fixing OCR output before copying again.`
+`ScreenTextGrab is a local-first macOS menu bar OCR app for turning anything visual into usable text. It supports screen-region capture, clipboard images, local image files, and PDFs with purpose-built modes for standard text, subtitles, code, and tables. Results can be copied as plain text, cleaned text, Markdown, JSON, or Office-ready content for Excel, Numbers, Word, and Pages. The app also includes saved regions, snippets, snippet collections, app profiles, and a built-in table review flow for repeated work.`
 
 ## Pre-publish final checklist
 
 - `./scripts/repo_audit.sh`
 - unit tests
 - UI tests with ad-hoc signing flags
+- `./scripts/capture_preview_screenshots.sh` when the UI changed
+- `docs/MANUAL_SMOKE_MATRIX.md`
 - README screenshots render correctly
 - SECURITY and CONTRIBUTING are visible in repo root
 - Release scripts are documented
