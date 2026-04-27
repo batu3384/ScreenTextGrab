@@ -5,9 +5,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_SLUG="${SCREEN_TEXT_GRAB_REPOSITORY:-batu3384/ScreenTextGrab}"
 ASSET_NAME="${SCREEN_TEXT_GRAB_RELEASE_ASSET:-ScreenTextGrab.zip}"
 DOWNLOAD_URL="https://github.com/${REPO_SLUG}/releases/latest/download/${ASSET_NAME}"
+CHECKSUM_URL="${DOWNLOAD_URL}.sha256"
 INSTALL_PATH="/Applications/ScreenTextGrab.app"
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ScreenTextGrab-release-install.XXXXXX")"
 ZIP_PATH="${TMP_DIR}/${ASSET_NAME}"
+CHECKSUM_PATH="${TMP_DIR}/${ASSET_NAME}.sha256"
 EXTRACT_DIR="${TMP_DIR}/extract"
 RESET_SCREEN_CAPTURE=false
 LAUNCH_AFTER_INSTALL=true
@@ -57,6 +59,7 @@ require_command() {
 
 require_command curl
 require_command ditto
+require_command shasum
 
 echo "==> Downloading latest ScreenTextGrab release"
 if ! curl --fail --location --silent --show-error "${DOWNLOAD_URL}" --output "${ZIP_PATH}"; then
@@ -68,6 +71,16 @@ If you are installing from a local clone instead, run:
   ./scripts/install.sh --source
 EOF
   exit 1
+fi
+
+if curl --fail --location --silent --show-error "${CHECKSUM_URL}" --output "${CHECKSUM_PATH}"; then
+  echo "==> Verifying release checksum"
+  (
+    cd "${TMP_DIR}"
+    shasum -a 256 -c "$(basename "${CHECKSUM_PATH}")"
+  )
+else
+  echo "WARNING: release checksum asset was not available; continuing without checksum verification." >&2
 fi
 
 mkdir -p "${EXTRACT_DIR}"

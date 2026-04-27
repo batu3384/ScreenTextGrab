@@ -135,6 +135,7 @@ jobs:
           path: |
             dist/.app-bundles.noindex/ScreenTextGrab.app
             dist/ScreenTextGrab.zip
+            dist/ScreenTextGrab.zip.sha256
 
       - name: Publish GitHub release
         if: env.RELEASE_WORKFLOW_READY == 'true'
@@ -164,7 +165,7 @@ jobs:
 
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release edit "${RELEASE_TAG}" "${EDIT_ARGS[@]}"
-            gh release upload "${RELEASE_TAG}" dist/ScreenTextGrab.zip --clobber
+            gh release upload "${RELEASE_TAG}" dist/ScreenTextGrab.zip dist/ScreenTextGrab.zip.sha256 --clobber
           else
-            gh release create "${RELEASE_TAG}" dist/ScreenTextGrab.zip "${CREATE_ARGS[@]}"
+            gh release create "${RELEASE_TAG}" dist/ScreenTextGrab.zip dist/ScreenTextGrab.zip.sha256 "${CREATE_ARGS[@]}"
           fi

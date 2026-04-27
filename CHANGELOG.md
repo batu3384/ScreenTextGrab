@@ -6,6 +6,17 @@ All notable released changes to ScreenTextGrab are documented here.
 
 - No unreleased changes are recorded yet.
 
+## 1.1.1 - 2026-04-28
+
+### Fixed
+- Hardened the release pipeline so the public `ScreenTextGrab.zip` is rebuilt
+  after notarization and published with a SHA-256 checksum asset.
+- Strengthened update validation with release digest checks, extracted app code
+  signature verification, draft/prerelease rejection, and strict newer-version
+  enforcement.
+- Stabilized CI watch-mode and menu-bar preview UI tests by polling real state
+  and avoiding foreground activation for the LSUIElement app.
+
 ## 1.1.0 - 2026-03-18
 
 ### Added

@@ -5,7 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${DIST_DIR:-${ROOT_DIR}/dist}"
 DIST_APP_DIR="${DIST_APP_DIR:-${DIST_DIR}/.app-bundles.noindex}"
 APP_PATH="${APP_PATH:-${DIST_APP_DIR}/ScreenTextGrab.app}"
-ZIP_PATH="${ZIP_PATH:-${DIST_DIR}/ScreenTextGrab-notarization.zip}"
+NOTARY_ZIP_PATH="${ZIP_PATH:-${DIST_DIR}/ScreenTextGrab-notarization.zip}"
+PUBLIC_ZIP_PATH="${PUBLIC_ZIP_PATH:-${DIST_DIR}/ScreenTextGrab.zip}"
+CHECKSUM_PATH="${CHECKSUM_PATH:-${PUBLIC_ZIP_PATH}.sha256}"
 ARCHIVE_PATH="${ARCHIVE_PATH:-${ROOT_DIR}/.build/release/ScreenTextGrab.xcarchive}"
 NOTARY_PROFILE="${SCREEN_TEXT_GRAB_NOTARY_PROFILE:-}"
 APPLE_ID="${SCREEN_TEXT_GRAB_APPLE_ID:-}"
@@ -28,6 +30,7 @@ require_command xcrun
 require_command ditto
 require_command codesign
 require_command openssl
+require_command shasum
 
 detect_team_id() {
   local certificate_pem=""
@@ -65,8 +68,12 @@ fi
 
 APP_DIR="$(cd "$(dirname "${APP_PATH}")" && pwd -P)"
 APP_PATH="${APP_DIR}/$(basename "${APP_PATH}")"
-ZIP_DIR="$(cd "$(dirname "${ZIP_PATH}")" && pwd -P)"
-ZIP_PATH="${ZIP_DIR}/$(basename "${ZIP_PATH}")"
+NOTARY_ZIP_DIR="$(cd "$(dirname "${NOTARY_ZIP_PATH}")" && pwd -P)"
+NOTARY_ZIP_PATH="${NOTARY_ZIP_DIR}/$(basename "${NOTARY_ZIP_PATH}")"
+PUBLIC_ZIP_DIR="$(cd "$(dirname "${PUBLIC_ZIP_PATH}")" && pwd -P)"
+PUBLIC_ZIP_PATH="${PUBLIC_ZIP_DIR}/$(basename "${PUBLIC_ZIP_PATH}")"
+CHECKSUM_DIR="$(cd "$(dirname "${CHECKSUM_PATH}")" && pwd -P)"
+CHECKSUM_PATH="${CHECKSUM_DIR}/$(basename "${CHECKSUM_PATH}")"
 ARCHIVE_DIR="$(cd "$(dirname "${ARCHIVE_PATH}")" && pwd -P)"
 ARCHIVE_PATH="${ARCHIVE_DIR}/$(basename "${ARCHIVE_PATH}")"
 
@@ -105,19 +112,30 @@ if ! echo "${SIGNATURE_INFO}" | grep -F "Developer ID Application" >/dev/null 2>
   exit 1
 fi
 
+rebuild_public_zip() {
+  echo "==> Rebuilding public ZIP from notarized app"
+  rm -f "${PUBLIC_ZIP_PATH}" "${CHECKSUM_PATH}"
+  ditto -c -k --keepParent "${APP_PATH}" "${PUBLIC_ZIP_PATH}"
+  (
+    cd "$(dirname "${PUBLIC_ZIP_PATH}")"
+    shasum -a 256 "$(basename "${PUBLIC_ZIP_PATH}")"
+  ) > "${CHECKSUM_PATH}"
+}
+
 run_notarytool_flow() {
   echo "==> Preparing notarization ZIP"
-  rm -f "${ZIP_PATH}"
-  ditto -c -k --keepParent "${APP_PATH}" "${ZIP_PATH}"
+  rm -f "${NOTARY_ZIP_PATH}"
+  ditto -c -k --keepParent "${APP_PATH}" "${NOTARY_ZIP_PATH}"
 
   echo "==> Submitting to Apple notarization service"
-  xcrun notarytool submit "${ZIP_PATH}" \
+  xcrun notarytool submit "${NOTARY_ZIP_PATH}" \
     "${submit_args[@]}" \
     --wait
 
   echo "==> Stapling notarization ticket"
   xcrun stapler staple "${APP_PATH}"
   xcrun stapler validate "${APP_PATH}"
+  rebuild_public_zip
 }
 
 run_xcode_account_flow() {
@@ -187,9 +205,8 @@ PLIST
       fi
 
       ditto "${notarized_app_path}" "${APP_PATH}"
-      rm -f "${ZIP_PATH}"
-      ditto -c -k --keepParent "${APP_PATH}" "${ZIP_PATH}"
       xcrun stapler validate "${APP_PATH}"
+      rebuild_public_zip
       return 0
     fi
 
@@ -216,3 +233,5 @@ fi
 
 echo "==> Notarization completed"
 echo "Authentication: ${authentication_mode}"
+echo "ZIP: ${PUBLIC_ZIP_PATH}"
+echo "SHA-256: ${CHECKSUM_PATH}"

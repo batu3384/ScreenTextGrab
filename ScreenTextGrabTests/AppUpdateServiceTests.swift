@@ -35,6 +35,33 @@ final class AppUpdateServiceTests: XCTestCase {
         XCTAssertNil(release.primaryAsset(named: "missing.zip"))
     }
 
+    func testReleaseDecodesDigestAndPublicationState() throws {
+        let payload = """
+        {
+          "tag_name": "v1.1.1",
+          "html_url": "https://github.com/batu3384/ScreenTextGrab/releases/tag/v1.1.1",
+          "draft": false,
+          "prerelease": false,
+          "assets": [
+            {
+              "name": "ScreenTextGrab.zip",
+              "browser_download_url": "https://example.com/ScreenTextGrab.zip",
+              "size": 4096,
+              "digest": "sha256:0123456789abcdef"
+            }
+          ]
+        }
+        """
+
+        let release = try JSONDecoder().decode(GitHubReleaseInfo.self, from: Data(payload.utf8))
+        let asset = try XCTUnwrap(release.primaryAsset(named: "ScreenTextGrab.zip"))
+
+        XCTAssertEqual(release.normalizedVersion, "1.1.1")
+        XCTAssertEqual(release.draft, false)
+        XCTAssertEqual(release.prerelease, false)
+        XCTAssertEqual(asset.digest, "sha256:0123456789abcdef")
+    }
+
     func testUpdateStateTitlesCoverPrimaryButtonFlow() {
         XCTAssertEqual(AppUpdateState.idle.buttonTitle, L10n.actionCheckForUpdates)
         XCTAssertEqual(AppUpdateState.checking.buttonTitle, L10n.actionCheckingForUpdates)

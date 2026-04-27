@@ -46,6 +46,11 @@ Run this matrix after UI-affecting changes, release candidates, or screenshot re
    - downloading
    - ready to restart
    - failure
+3. Install the latest public release, then update to the candidate release and confirm:
+   - the newer version is detected
+   - the download reaches 100%
+   - `Restart & Update` relaunches the new app
+   - the app does not downgrade or reinstall the same version
 
 ## Settings
 
@@ -75,4 +80,10 @@ Run this matrix after UI-affecting changes, release candidates, or screenshot re
    - unit tests
    - UI tests
    - release build
-2. Refresh README screenshots with `scripts/capture_preview_screenshots.sh` after any material UI change.
+2. Verify the signed/notarized public artifact:
+   - `codesign --verify --deep --strict`
+   - `spctl -a -vv`
+   - `xcrun stapler validate`
+   - `shasum -a 256 -c dist/ScreenTextGrab.zip.sha256`
+3. Smoke fresh install from `dist/ScreenTextGrab.zip` on a clean macOS user account.
+4. Refresh README screenshots with `scripts/capture_preview_screenshots.sh` after any material UI change.

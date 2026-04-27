@@ -82,22 +82,28 @@ struct GitHubReleaseInfo: Decodable, Equatable {
         let name: String
         let browserDownloadURL: URL
         let size: Int?
+        let digest: String?
 
         private enum CodingKeys: String, CodingKey {
             case name
             case browserDownloadURL = "browser_download_url"
             case size
+            case digest
         }
     }
 
     let tagName: String
     let htmlURL: URL?
     let assets: [Asset]
+    let draft: Bool?
+    let prerelease: Bool?
 
     private enum CodingKeys: String, CodingKey {
         case tagName = "tag_name"
         case htmlURL = "html_url"
         case assets
+        case draft
+        case prerelease
     }
 
     var normalizedVersion: String {
@@ -193,6 +199,7 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
     private var preparedUpdateRootURL: URL?
     private var preparedAppURL: URL?
     private var latestRelease: GitHubReleaseInfo?
+    private var expectedDownloadDigest: String?
     private var transientResetTask: Task<Void, Never>?
 
     init?(appState: AppState, configuration: Configuration? = Configuration.current(), fileManager: FileManager = .default) {
@@ -226,6 +233,7 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
         preparedAppURL = nil
         preparedUpdateRootURL = nil
         latestRelease = nil
+        expectedDownloadDigest = nil
         appState?.updateUpdateState(.checking)
 
         var request = URLRequest(url: configuration.latestReleaseAPIURL)
@@ -247,6 +255,10 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
             let release = try JSONDecoder().decode(GitHubReleaseInfo.self, from: data)
             latestRelease = release
 
+            if release.draft == true || release.prerelease == true {
+                throw UpdateError.unsupportedReleaseState
+            }
+
             let latestVersion = AppVersion(release.tagName)
             guard latestVersion > configuration.currentVersion else {
                 presentUpToDateState()
@@ -266,6 +278,7 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
     @MainActor
     private func startDownload(asset: GitHubReleaseInfo.Asset, version: String) {
         downloadTask?.cancel()
+        expectedDownloadDigest = asset.digest
         appState?.updateUpdateState(.downloading(version: version, progressPercent: 0))
 
         var request = URLRequest(url: asset.browserDownloadURL)
@@ -306,6 +319,7 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
         appState?.updateUpdateState(.failed(message: wrappedError.localizedDescription))
         downloadTask = nil
         preparedAppURL = nil
+        expectedDownloadDigest = nil
     }
 
     @MainActor
@@ -322,6 +336,7 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
 
             try fileManager.createDirectory(at: extractionURL, withIntermediateDirectories: true)
             try fileManager.copyItem(at: temporaryURL, to: zipURL)
+            try verifyDownloadedArchiveDigest(at: zipURL, expectedDigest: expectedDownloadDigest)
             try runProcess(
                 executable: "/usr/bin/ditto",
                 arguments: ["-x", "-k", zipURL.path, extractionURL.path]
@@ -344,6 +359,7 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
             )
             appState?.updateUpdateState(.readyToInstall(version: version))
             downloadTask = nil
+            expectedDownloadDigest = nil
         } catch {
             fail(with: error)
         }
@@ -427,15 +443,53 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
             bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         )
 
-        guard downloadedVersion >= configuration.currentVersion else {
+        guard downloadedVersion > configuration.currentVersion else {
             throw UpdateError.olderDownloadedVersion
         }
+
+        try verifyCodeSignature(at: appURL)
 
         if let expectedTeamIdentifier = configuration.expectedTeamIdentifier,
            let downloadedTeamIdentifier = Configuration.codeSigningTeamIdentifier(for: appURL),
            downloadedTeamIdentifier != expectedTeamIdentifier {
             throw UpdateError.signingIdentityMismatch
         }
+    }
+
+    private func verifyDownloadedArchiveDigest(at zipURL: URL, expectedDigest: String?) throws {
+        guard let expectedDigest = expectedDigest?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(),
+            !expectedDigest.isEmpty
+        else {
+            return
+        }
+
+        let parts = expectedDigest.split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2, parts[0] == "sha256", !parts[1].isEmpty else {
+            throw UpdateError.unsupportedDigest(expectedDigest)
+        }
+
+        let output = try runProcessCapturingOutput(
+            executable: "/usr/bin/shasum",
+            arguments: ["-a", "256", zipURL.path]
+        )
+        let actualDigest = output
+            .split(whereSeparator: \.isWhitespace)
+            .first
+            .map(String.init)?
+            .lowercased()
+
+        guard actualDigest == parts[1] else {
+            throw UpdateError.digestMismatch
+        }
+    }
+
+    private func verifyCodeSignature(at appURL: URL) throws {
+        try runProcess(
+            executable: "/usr/bin/codesign",
+            arguments: ["--verify", "--deep", "--strict", "--verbose=2", appURL.path]
+        )
     }
 
     private func writeInstallerScript(preparedAppURL: URL, targetURL: URL) throws -> URL {
@@ -493,13 +547,18 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
     }
 
     private func runProcess(executable: String, arguments: [String]) throws {
+        _ = try runProcessCapturingOutput(executable: executable, arguments: arguments)
+    }
+
+    private func runProcessCapturingOutput(executable: String, arguments: [String]) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
 
         let stderr = Pipe()
+        let stdout = Pipe()
         process.standardError = stderr
-        process.standardOutput = Pipe()
+        process.standardOutput = stdout
 
         try process.run()
         process.waitUntilExit()
@@ -509,6 +568,9 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
             let message = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
             throw UpdateError.processFailed(message?.isEmpty == false ? message! : executable)
         }
+
+        let data = stdout.fileHandleForReading.readDataToEndOfFile()
+        return String(data: data, encoding: .utf8) ?? ""
     }
 
     private func shellEscaped(_ text: String) -> String {
@@ -559,8 +621,11 @@ extension AppUpdateService: URLSessionDownloadDelegate {
 
 private enum UpdateError: LocalizedError {
     case invalidResponse
+    case unsupportedReleaseState
     case serverStatus(Int)
     case missingReleaseAsset(String)
+    case unsupportedDigest(String)
+    case digestMismatch
     case extractedAppMissing
     case invalidDownloadedBundle
     case bundleIdentifierMismatch
@@ -574,6 +639,8 @@ private enum UpdateError: LocalizedError {
         switch self {
         case .invalidResponse:
             return L10n.pair("Güncelleme sunucusundan geçersiz bir yanıt alındı.", "The update server returned an invalid response.")
+        case .unsupportedReleaseState:
+            return L10n.pair("Son sürüm yayına hazır değil.", "The latest release is not ready for public installation.")
         case .serverStatus(let statusCode):
             return L10n.format(
                 "Güncelleme isteği başarısız oldu (%d).",
@@ -585,6 +652,17 @@ private enum UpdateError: LocalizedError {
                 "%@ paketi son sürümde bulunamadı.",
                 "The latest release does not contain %@.",
                 assetName
+            )
+        case .unsupportedDigest(let digest):
+            return L10n.format(
+                "Güncelleme paketi doğrulama bilgisi desteklenmiyor: %@",
+                "The update package digest is not supported: %@",
+                digest
+            )
+        case .digestMismatch:
+            return L10n.pair(
+                "İndirilen güncelleme paketi doğrulanamadı.",
+                "The downloaded update package could not be verified."
             )
         case .extractedAppMissing:
             return L10n.pair("İndirilen arşivin içinde uygulama bulunamadı.", "The downloaded archive did not contain an app bundle.")

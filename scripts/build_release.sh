@@ -31,6 +31,7 @@ require_command codesign
 require_command security
 require_command ditto
 require_command openssl
+require_command shasum
 
 detect_team_id() {
   local certificate_pem=""
@@ -139,7 +140,12 @@ fi
 
 echo "==> Building ZIP package"
 ditto -c -k --keepParent "${APP_PATH}" "${ZIP_PATH}"
+(
+  cd "$(dirname "${ZIP_PATH}")"
+  shasum -a 256 "$(basename "${ZIP_PATH}")"
+) > "${ZIP_PATH}.sha256"
 
 echo "==> Release bundle ready"
 echo "App: ${APP_PATH}"
 echo "ZIP: ${ZIP_PATH}"
+echo "SHA-256: ${ZIP_PATH}.sha256"

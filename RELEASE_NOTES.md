@@ -1,35 +1,36 @@
-# ScreenTextGrab 1.1.0 Release Notes
+# ScreenTextGrab 1.1.1 Release Notes
 
 ## Summary
 
-ScreenTextGrab 1.1.0 turns the post-release polish work into a full product
-update: the app interface is now bilingual, the menu bar panel is cleaner, the
-release surface is better aligned with the shipped behavior, and local image/PDF
-imports behave more reliably.
+ScreenTextGrab 1.1.1 is a release-hardening update for the renewed menu bar
+app. It keeps the existing feature set intact while tightening the public ZIP,
+notarization, update, and CI validation paths.
 
 ## Highlights
 
-- Added in-app interface language switching for English and Turkish.
-- Added a menu bar updater flow with check, download progress, and
-  `Restart & Update`.
-- Improved menu panel density, wording, and screenshot/documentation accuracy.
-- Queued multi-file Finder and import automation requests instead of handling
-  only the first supported file.
-- Localized Finder Services resources for both shipped interface languages.
+- Rebuilds the public `ScreenTextGrab.zip` after notarization so the GitHub
+  release asset matches the stapled app bundle.
+- Publishes `ScreenTextGrab.zip.sha256` alongside the app ZIP.
+- Strengthens the built-in updater with GitHub asset digest checks, code
+  signature verification, draft/prerelease rejection, and stricter
+  newer-version enforcement.
+- Stabilizes watch-mode and menu-bar preview UI tests for the LSUIElement app.
 
 ## User Impact
 
-- The app feels more productized on first launch and inside the menu bar.
-- Users can keep the UI in English or Turkish without changing the system
-  language.
-- Imported images and PDFs behave more predictably when multiple files are sent
-  to the app at once.
-- The local release ZIP stays compatible with the one-command installer and the
-  built-in update mechanism.
+- The downloadable release asset and the built-in updater now point at the same
+  signed/notarized app package.
+- Update failures are safer: mismatched, unsigned, same-version, or corrupted
+  downloaded apps are rejected before installation.
+- No workflows were removed. Screen capture, clipboard/image/PDF OCR,
+  searchable PDF export, snippets, saved regions, table review, and bilingual
+  UI behavior remain unchanged.
 
 ## Validation Snapshot
 
-- Release ships as tag `v1.1.0`.
-- Public artifact remains `ScreenTextGrab.zip`.
-- Signed build, notarization, stapler validation, Gatekeeper validation, unit
-  tests, UI tests, and repository audit all passed for this release.
+- Release version: `1.1.1`
+- Public artifact: `ScreenTextGrab.zip`
+- Checksum artifact: `ScreenTextGrab.zip.sha256`
+- Required release gate: signed build, notarization, stapler validation,
+  Gatekeeper validation, unit tests, UI tests, release build, repository audit,
+  and the manual smoke matrix.

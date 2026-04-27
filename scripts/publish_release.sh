@@ -6,6 +6,7 @@ DIST_DIR="${DIST_DIR:-${ROOT_DIR}/dist}"
 DIST_APP_DIR="${DIST_APP_DIR:-${DIST_DIR}/.app-bundles.noindex}"
 APP_PATH="${APP_PATH:-${DIST_APP_DIR}/ScreenTextGrab.app}"
 ZIP_PATH="${ZIP_PATH:-${DIST_DIR}/ScreenTextGrab.zip}"
+CHECKSUM_PATH="${CHECKSUM_PATH:-${ZIP_PATH}.sha256}"
 NOTES_FILE="${NOTES_FILE:-${ROOT_DIR}/RELEASE_NOTES.md}"
 TITLE=""
 DRAFT=false
@@ -88,6 +89,7 @@ require_command() {
 }
 
 require_command gh
+require_command shasum
 
 if [[ -z "${TAG}" ]]; then
   echo "Release tag is required." >&2
@@ -113,8 +115,15 @@ if [[ ! -f "${ZIP_PATH}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${CHECKSUM_PATH}" ]]; then
+  (
+    cd "$(dirname "${ZIP_PATH}")"
+    shasum -a 256 "$(basename "${ZIP_PATH}")"
+  ) > "${CHECKSUM_PATH}"
+fi
+
 if [[ "${SKIP_NOTARIZE}" != "true" ]]; then
-  "${ROOT_DIR}/scripts/notarize_release.sh"
+  PUBLIC_ZIP_PATH="${ZIP_PATH}" CHECKSUM_PATH="${CHECKSUM_PATH}" "${ROOT_DIR}/scripts/notarize_release.sh"
 fi
 
 if [[ "${SKIP_VERIFY}" != "true" ]]; then
@@ -140,9 +149,9 @@ if gh release view "${TAG}" >/dev/null 2>&1; then
     --title "${TITLE}" \
     --notes-file "${NOTES_FILE}" \
     "${release_args[@]}"
-  gh release upload "${TAG}" "${ZIP_PATH}" --clobber
+  gh release upload "${TAG}" "${ZIP_PATH}" "${CHECKSUM_PATH}" --clobber
 else
-  gh release create "${TAG}" "${ZIP_PATH}" \
+  gh release create "${TAG}" "${ZIP_PATH}" "${CHECKSUM_PATH}" \
     --title "${TITLE}" \
     --notes-file "${NOTES_FILE}" \
     "${release_args[@]}"

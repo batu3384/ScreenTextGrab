@@ -95,6 +95,7 @@ Create the GitHub release from terminal:
 ```bash
 gh release create vX.Y.Z \
   dist/ScreenTextGrab.zip \
+  dist/ScreenTextGrab.zip.sha256 \
   --title "ScreenTextGrab vX.Y.Z" \
   --notes-file RELEASE_NOTES.md
 ```
@@ -116,7 +117,9 @@ The repository now includes [`.github/workflows/release.yml`](../.github/workflo
 - `git push origin vX.Y.Z` will trigger a signed release build on GitHub Actions
 - `workflow_dispatch` can publish a release manually without creating the tag first
 - if notarization is enabled, the workflow also runs notarization and public verification
-- the workflow uploads `dist/ScreenTextGrab.zip` both as an artifact and as the GitHub release asset
+- the workflow uploads `dist/ScreenTextGrab.zip` and
+  `dist/ScreenTextGrab.zip.sha256` both as artifacts and as GitHub release
+  assets
 
 Required GitHub repository secrets:
 
@@ -133,7 +136,8 @@ Required for notarization in GitHub Actions:
 
 Keep the release asset name as `ScreenTextGrab.zip`. The public installer script
 [`scripts/install_release.sh`](../scripts/install_release.sh) downloads that
-exact asset from the latest GitHub release.
+exact asset from the latest GitHub release. Publish a matching
+`ScreenTextGrab.zip.sha256` checksum for auditability.
 
 The one-line public bootstrap installer
 [`scripts/bootstrap_install.sh`](../scripts/bootstrap_install.sh) prefers that
@@ -168,6 +172,8 @@ release asset when it exists, then falls back to a source install.
 - SECURITY and CONTRIBUTING are visible in repo root
 - Release scripts are documented
 - Public release is notarized before attaching the `.zip`
+- `ScreenTextGrab.zip` is rebuilt after notarization and matches
+  `ScreenTextGrab.zip.sha256`
 
 ## Notes
 

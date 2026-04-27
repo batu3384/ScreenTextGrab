@@ -12,7 +12,7 @@ It is built for:
 - spreadsheet-like tables
 - copied screenshots, image files, and PDFs
 
-OCR runs locally with Apple's Vision framework, so screenshots and recognized text stay on the device.
+OCR runs locally with Apple's Vision framework, so screenshots and recognized text stay on the device. If update checks are used, the app only queries GitHub release metadata and downloads the published app ZIP.
 
 The app UI supports both English and Turkish. You can keep it on `System` or switch it inside `Settings > General`. The screenshots below use the English UI for consistency.
 
@@ -27,7 +27,7 @@ Latest notarized release: [GitHub Releases](https://github.com/batu3384/ScreenTe
 | Outputs | `Smart`, `Plain Text`, `Cleaned`, `Office`, `Markdown`, `JSON` |
 | Reuse | Saved regions, app profiles, snippets, snippet collections |
 | Automation | `stg`, URL scheme, Shortcuts |
-| Privacy | Local OCR with Apple's Vision framework |
+| Privacy | Local OCR; update checks only contact GitHub release endpoints |
 
 ## Why ScreenTextGrab
 
@@ -338,7 +338,7 @@ The table review window lets you correct OCR output cell by cell before copying 
 
 ## Privacy
 
-ScreenTextGrab does not upload screenshots or OCR results to a remote service. OCR runs locally with Apple's Vision framework. The app requests Screen Recording permission because macOS requires it for region capture.
+ScreenTextGrab does not upload screenshots or OCR results to a remote service. OCR runs locally with Apple's Vision framework. The app requests Screen Recording permission because macOS requires it for region capture. When you check for updates, ScreenTextGrab contacts GitHub Releases to read version metadata and download the signed app ZIP; captured content is not included in that request.
 
 ## Requirements
 

@@ -25,6 +25,9 @@ xcodegen generate --spec project.yml
 ./scripts/publish_release.sh vX.Y.Z --draft
 ```
 
+- Always use a new tag for a new public binary. Do not silently replace the
+  asset attached to an already-published version.
+
 - The script uses Xcode's `developer-id` export flow. Make sure the selected Apple Developer team in Xcode has access to create or use Developer ID signing assets.
 
 - Submit the signed app for notarization and staple the ticket:
@@ -77,6 +80,13 @@ SCREEN_TEXT_GRAB_XCODE_NOTARY_TIMEOUT_SECONDS=3600 \
 
 ```bash
 APP_PATH=dist/.app-bundles.noindex/ScreenTextGrab.app ./scripts/verify_release.sh
+```
+
+- Confirm the public ZIP and checksum were rebuilt after notarization:
+
+```bash
+shasum -a 256 -c dist/ScreenTextGrab.zip.sha256
+unzip -l dist/ScreenTextGrab.zip | grep 'ScreenTextGrab.app'
 ```
 
 - For a local signed smoke build that is not Developer ID / notarized, run:
@@ -132,6 +142,7 @@ Expected:
 - Gatekeeper result is `accepted`
 - Stapler validation succeeds
 - no `NSAppleEventsUsageDescription` in the release bundle
+- `dist/ScreenTextGrab.zip.sha256` matches `dist/ScreenTextGrab.zip`
 
 ## Permission Smoke Test
 - Remove previous Screen Recording permission for the app from System Settings.
