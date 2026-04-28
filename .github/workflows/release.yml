@@ -54,16 +54,17 @@ jobs:
         run: |
           test -n "${RELEASE_TAG}" || { echo "Release tag is required." >&2; exit 1; }
           if [[ -z "${SCREEN_TEXT_GRAB_TEAM_ID}" || -z "${SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64}" || -z "${SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD}" || -z "${SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD}" ]]; then
-            echo "RELEASE_WORKFLOW_READY=false" >> "${GITHUB_ENV}"
-            echo "Skipping release packaging because signing secrets are not configured for this repository."
-            exit 0
+            echo "Missing required Developer ID signing secrets for public release packaging." >&2
+            echo "Required: SCREEN_TEXT_GRAB_TEAM_ID, SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_P12_BASE64, SCREEN_TEXT_GRAB_BUILD_CERTIFICATE_PASSWORD, SCREEN_TEXT_GRAB_KEYCHAIN_PASSWORD." >&2
+            exit 1
           fi
 
           echo "RELEASE_WORKFLOW_READY=true" >> "${GITHUB_ENV}"
 
           if [[ "${RELEASE_NOTARIZE}" == "true" && ( -z "${SCREEN_TEXT_GRAB_ASC_KEY_BASE64}" || -z "${SCREEN_TEXT_GRAB_ASC_KEY_ID}" ) ]]; then
-            echo "RELEASE_NOTARIZE=false" >> "${GITHUB_ENV}"
-            echo "Skipping notarization because App Store Connect secrets are not configured."
+            echo "Missing required App Store Connect notarization secrets for public release packaging." >&2
+            echo "Required when notarize=true: SCREEN_TEXT_GRAB_ASC_KEY_BASE64 and SCREEN_TEXT_GRAB_ASC_KEY_ID." >&2
+            exit 1
           fi
 
       - name: Install build dependencies

@@ -134,6 +134,10 @@ Required for notarization in GitHub Actions:
 - `SCREEN_TEXT_GRAB_ASC_KEY_ID`
 - `SCREEN_TEXT_GRAB_ASC_ISSUER_ID` if your App Store Connect key uses an issuer id
 
+The release workflow intentionally fails when required signing or notarization
+secrets are missing. A green Release workflow must mean that the signed ZIP,
+checksum, and notarization verification steps actually ran.
+
 Keep the release asset name as `ScreenTextGrab.zip`. The public installer script
 [`scripts/install_release.sh`](../scripts/install_release.sh) downloads that
 exact asset from the latest GitHub release. Publish a matching
