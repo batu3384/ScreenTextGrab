@@ -114,12 +114,15 @@ variables are required for local publishing.
 
 The repository now includes [`.github/workflows/release.yml`](../.github/workflows/release.yml).
 
-- `git push origin vX.Y.Z` will trigger a signed release build on GitHub Actions
 - `workflow_dispatch` can publish a release manually without creating the tag first
 - if notarization is enabled, the workflow also runs notarization and public verification
 - the workflow uploads `dist/ScreenTextGrab.zip` and
   `dist/ScreenTextGrab.zip.sha256` both as artifacts and as GitHub release
   assets
+
+Tag pushes do not automatically run the release workflow. This keeps local
+Developer ID publishing via `scripts/publish_release.sh` from creating a noisy
+GitHub Actions failure when repository signing secrets are intentionally absent.
 
 Required GitHub repository secrets:
 
