@@ -1,5 +1,7 @@
 import Foundation
 import CoreGraphics
+import CryptoKit
+import Security
 
 enum ScreenPermissionState: Equatable, Sendable {
     case unknown
@@ -1287,21 +1289,106 @@ enum ClipboardHistoryExportFormatStore {
 enum ClipboardHistoryStore {
     static let key = "screenTextGrab.copyHistory"
     static let maximumEntries = 25
+    private static let embeddedKeyMaterialKey = "screenTextGrab.copyHistory.aesKey"
+    private static let keychainService = "ScreenTextGrab.ClipboardHistory"
+    private static let keychainAccount = "aes-gcm-v1"
 
     static func load(defaults: UserDefaults = .standard) -> [ClipboardHistoryEntry] {
-        guard let data = defaults.data(forKey: key),
-              let history = try? JSONDecoder().decode([ClipboardHistoryEntry].self, from: data) else {
+        guard let data = defaults.data(forKey: key) else {
             return []
         }
-        return Array(history.prefix(maximumEntries))
+
+        if let plaintext = try? decrypt(data, defaults: defaults),
+           let history = try? JSONDecoder().decode([ClipboardHistoryEntry].self, from: plaintext) {
+            return Array(history.prefix(maximumEntries))
+        }
+
+        // Legacy plaintext UserDefaults payload — re-save encrypted.
+        if let history = try? JSONDecoder().decode([ClipboardHistoryEntry].self, from: data) {
+            let trimmed = Array(history.prefix(maximumEntries))
+            save(trimmed, defaults: defaults)
+            return trimmed
+        }
+
+        return []
     }
 
     static func save(_ history: [ClipboardHistoryEntry], defaults: UserDefaults = .standard) {
         let trimmed = Array(history.prefix(maximumEntries))
-        guard let data = try? JSONEncoder().encode(trimmed) else {
+        guard let plaintext = try? JSONEncoder().encode(trimmed),
+              let sealed = try? encrypt(plaintext, defaults: defaults) else {
             return
         }
-        defaults.set(data, forKey: key)
+        defaults.set(sealed, forKey: key)
+    }
+
+    private static func encrypt(_ plaintext: Data, defaults: UserDefaults) throws -> Data {
+        let sealed = try AES.GCM.seal(plaintext, using: symmetricKey(defaults: defaults))
+        guard let combined = sealed.combined else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        return combined
+    }
+
+    private static func decrypt(_ data: Data, defaults: UserDefaults) throws -> Data {
+        let box = try AES.GCM.SealedBox(combined: data)
+        return try AES.GCM.open(box, using: symmetricKey(defaults: defaults))
+    }
+
+    private static func symmetricKey(defaults: UserDefaults) throws -> SymmetricKey {
+        if ObjectIdentifier(defaults) != ObjectIdentifier(UserDefaults.standard) {
+            if let existing = defaults.data(forKey: embeddedKeyMaterialKey), existing.count == 32 {
+                return SymmetricKey(data: existing)
+            }
+            let material = randomKeyMaterial()
+            defaults.set(material, forKey: embeddedKeyMaterialKey)
+            return SymmetricKey(data: material)
+        }
+
+        if let existing = loadKeychainKeyMaterial() {
+            return SymmetricKey(data: existing)
+        }
+
+        let material = randomKeyMaterial()
+        storeKeychainKeyMaterial(material)
+        return SymmetricKey(data: material)
+    }
+
+    private static func randomKeyMaterial() -> Data {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        return Data(bytes)
+    }
+
+    private static func loadKeychainKeyMaterial() -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let data = item as? Data, data.count == 32 else {
+            return nil
+        }
+        return data
+    }
+
+    private static func storeKeychainKeyMaterial(_ material: Data) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount
+        ]
+        SecItemDelete(query as CFDictionary)
+
+        var addQuery = query
+        addQuery[kSecValueData as String] = material
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        SecItemAdd(addQuery as CFDictionary, nil)
     }
 
     static func export(_ history: [ClipboardHistoryEntry], format: ClipboardHistoryExportFormat, generatedAt: Date = Date()) -> String {

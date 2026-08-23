@@ -173,6 +173,46 @@ final class AppStatePreferencesTests: XCTestCase {
         XCTAssertEqual(highEntry.confidenceIndicator, .high)
     }
 
+    func testClipboardHistoryStoreEncryptsPersistedPayload() throws {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let entry = ClipboardHistoryEntry(
+            text: "gizli-metin",
+            date: Date(timeIntervalSince1970: 42),
+            captureMode: .standard
+        )
+        ClipboardHistoryStore.save([entry], defaults: defaults)
+
+        let raw = try XCTUnwrap(defaults.data(forKey: ClipboardHistoryStore.key))
+        XCTAssertNil(try? JSONDecoder().decode([ClipboardHistoryEntry].self, from: raw))
+        XCTAssertFalse(String(data: raw, encoding: .utf8)?.contains("gizli-metin") == true)
+
+        let loaded = ClipboardHistoryStore.load(defaults: defaults)
+        XCTAssertEqual(loaded.map(\.text), ["gizli-metin"])
+    }
+
+    func testPDFProcessingServiceRejectsUnsafeAutomationDestination() {
+        XCTAssertTrue(
+            PDFProcessingService.isSafeAutomationDestination(
+                URL(fileURLWithPath: "/tmp/example-searchable.pdf"),
+                sourceURL: URL(fileURLWithPath: "/tmp/example.pdf")
+            )
+        )
+        XCTAssertFalse(
+            PDFProcessingService.isSafeAutomationDestination(
+                URL(fileURLWithPath: "/etc/evil.pdf"),
+                sourceURL: URL(fileURLWithPath: "/tmp/example.pdf")
+            )
+        )
+        XCTAssertFalse(
+            PDFProcessingService.isSafeAutomationDestination(
+                URL(fileURLWithPath: "/tmp/example.pdf"),
+                sourceURL: URL(fileURLWithPath: "/tmp/example.pdf")
+            )
+        )
+    }
+
     func testClipboardHistoryStoreOrdersPinnedEntriesFirstForDisplay() {
         let now = Date()
         let history = [
@@ -2114,12 +2154,25 @@ final class AppStatePreferencesTests: XCTestCase {
             AutomationCommand(url: url!),
             .searchablePDF(
                 URL(fileURLWithPath: "/tmp/example.pdf"),
-                URL(fileURLWithPath: "/tmp/example-searchable.pdf"),
+                nil,
                 AutomationCaptureOverrides(
                     captureMode: .table
                 )
             )
         )
+    }
+
+    func testAutomationCommandRejectsUnsafeSearchablePDFDestination() {
+        let command = AutomationCommand(
+            arguments: [
+                "/Applications/ScreenTextGrab.app/Contents/MacOS/ScreenTextGrab",
+                "--pdf-searchable",
+                "--path", "/tmp/example.pdf",
+                "--destination", "/etc/passwd.pdf"
+            ]
+        )
+
+        XCTAssertNil(command)
     }
 
     func testImportedDocumentRouterResolvesImageFile() {
@@ -2178,10 +2231,13 @@ final class AppStatePreferencesTests: XCTestCase {
 
         XCTAssertEqual(
             AutomationCommand.resolveIncomingURLs(urls),
-            .commands([
-                .imageFile(URL(fileURLWithPath: "/tmp/example.png"), AutomationCaptureOverrides()),
-                .pdfFile(URL(fileURLWithPath: "/tmp/example.pdf"), AutomationCaptureOverrides())
-            ])
+            .commands(
+                [
+                    .imageFile(URL(fileURLWithPath: "/tmp/example.png"), AutomationCaptureOverrides()),
+                    .pdfFile(URL(fileURLWithPath: "/tmp/example.pdf"), AutomationCaptureOverrides())
+                ],
+                requiresURLSchemeAuthorization: false
+            )
         )
     }
 

@@ -150,10 +150,15 @@ enum AutomationCommand: Equatable, Sendable {
             guard let pathValue, !pathValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return nil
             }
+            let sourceURL = URL(fileURLWithPath: pathValue)
             let destinationURL = destinationValue.flatMap {
                 $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : URL(fileURLWithPath: $0)
             }
-            self = .searchablePDF(URL(fileURLWithPath: pathValue), destinationURL, overrides)
+            if let destinationURL,
+               !PDFProcessingService.isSafeAutomationDestination(destinationURL, sourceURL: sourceURL) {
+                return nil
+            }
+            self = .searchablePDF(sourceURL, destinationURL, overrides)
         default:
             return nil
         }
@@ -175,7 +180,6 @@ enum AutomationCommand: Equatable, Sendable {
             automaticDetectionValue: queryItems.firstValue(for: ["ocr-auto", "ocr_auto", "auto-language"])
         )
         let filePath = queryItems.firstValue(for: ["path", "file"])
-        let destinationPath = queryItems.firstValue(for: ["destination", "output-file", "output_file"])
         let regionName = queryItems.firstValue(for: ["name", "region"])
 
         switch action {
@@ -216,10 +220,8 @@ enum AutomationCommand: Equatable, Sendable {
             guard let filePath, !filePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return nil
             }
-            let destinationURL = destinationPath.flatMap {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : URL(fileURLWithPath: $0)
-            }
-            self = .searchablePDF(URL(fileURLWithPath: filePath), destinationURL, overrides)
+            // URL-scheme callers cannot choose an arbitrary write path.
+            self = .searchablePDF(URL(fileURLWithPath: filePath), nil, overrides)
         default:
             return nil
         }
@@ -252,7 +254,14 @@ enum AutomationCommand: Equatable, Sendable {
             return .unsupported
         }
 
-        return .commands(commands)
+        let includesURLScheme = urls.contains { url in
+            guard let scheme = url.scheme?.lowercased() else {
+                return false
+            }
+            return ["stg", "screentextgrab"].contains(scheme)
+        }
+
+        return .commands(commands, requiresURLSchemeAuthorization: includesURLScheme)
     }
 
     private static func action(from url: URL) -> String {
@@ -313,7 +322,7 @@ enum AutomationCommand: Equatable, Sendable {
 }
 
 enum IncomingAutomationResolution: Equatable {
-    case commands([AutomationCommand])
+    case commands([AutomationCommand], requiresURLSchemeAuthorization: Bool)
     case unsupported
 }
 

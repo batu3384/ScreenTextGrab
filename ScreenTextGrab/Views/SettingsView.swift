@@ -295,6 +295,10 @@ struct SettingsView: View {
         SettingsDiagnosticsTabView(
             permissionDiagnostics: permissionDiagnostics,
             permissionStateMessage: appState.permissionState.uiMessage,
+            urlSchemeAutomationBinding: Binding(
+                get: { appState.urlSchemeAutomationEnabled },
+                set: { appState.setURLSchemeAutomationEnabled($0) }
+            ),
             diagnosticsFeedback: diagnosticsFeedback,
             diagnosticsEntries: appState.diagnostics,
             renderDiagnosticValueRow: { title, value in AnyView(diagnosticValueRow(title, value: value)) },

@@ -18,6 +18,16 @@ final class OCRServiceTests: XCTestCase {
         XCTAssertEqual(guides[1], 160.5 / 240.0, accuracy: 0.03)
     }
 
+    func testCropBottomBandRectUsesLowerPortionOfFrame() {
+        let rect = OCRService.bottomBandCropRect(width: 100, height: 200, heightFraction: 0.5)
+
+        XCTAssertEqual(rect.minX, 0, accuracy: 0.01)
+        XCTAssertEqual(rect.width, 100, accuracy: 0.01)
+        XCTAssertEqual(rect.height, 100, accuracy: 0.01)
+        XCTAssertEqual(rect.minY, 100, accuracy: 0.01)
+        XCTAssertGreaterThan(rect.minY, 0)
+    }
+
     private func makeGridImage(
         width: Int,
         height: Int,

@@ -781,8 +781,7 @@ final class CaptureCoordinator: CaptureCoordinating {
                 captureMode: captureMode,
                 outputPreset: outputPreset,
                 source: source,
-                notificationDisplayFrame: preferredDisplay?.frame,
-                markPermissionGranted: true
+                notificationDisplayFrame: preferredDisplay?.frame
             )
         } catch {
             let pipelineError = Self.mapToPipelineError(error)
@@ -932,8 +931,7 @@ final class CaptureCoordinator: CaptureCoordinating {
                 captureMode: sessionConfiguration.captureMode,
                 outputPreset: sessionConfiguration.outputPreset,
                 source: source,
-                notificationDisplayFrame: nil,
-                markPermissionGranted: false
+                notificationDisplayFrame: nil
             )
         } catch {
             let pipelineError = Self.mapToPipelineError(error)
@@ -986,8 +984,7 @@ final class CaptureCoordinator: CaptureCoordinating {
                 captureMode: sessionConfiguration.captureMode,
                 outputPreset: sessionConfiguration.outputPreset,
                 source: nil,
-                notificationDisplayFrame: nil,
-                markPermissionGranted: false
+                notificationDisplayFrame: nil
             )
         } catch {
             let pipelineError = Self.mapToPipelineError(error)
@@ -1160,8 +1157,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         captureMode: CaptureMode,
         outputPreset: CaptureOutputPreset,
         source: ClipboardHistoryEntry.SourceContext?,
-        notificationDisplayFrame: CGRect?,
-        markPermissionGranted: Bool
+        notificationDisplayFrame: CGRect?
     ) throws {
         STGLog.capture.info(
             "Capture selected strategy=\(best.candidate.strategy.rawValue, privacy: .public) attempt=\(best.attemptLabel, privacy: .public) score=\(best.score) chars=\(best.text.count)"
@@ -1185,8 +1181,7 @@ final class CaptureCoordinator: CaptureCoordinating {
             outputPreset: outputPreset,
             ocrConfidence: best.ocrResult.averageConfidence,
             notificationDisplayFrame: notificationDisplayFrame,
-            successStatusMessage: CaptureRecognitionHeuristics.successStatusMessage(for: best),
-            markPermissionGranted: markPermissionGranted
+            successStatusMessage: CaptureRecognitionHeuristics.successStatusMessage(for: best)
         )
 
         switch clipboardResult {
@@ -1469,12 +1464,20 @@ final class CaptureCoordinator: CaptureCoordinating {
                             previousText: session.lastRawText,
                             configuration: appState.watchConfiguration
                         )
+                        if let payload, !payload.isEmpty {
+                            let copied = await handleWatchUpdate(
+                                best,
+                                rawText: payload,
+                                preferredDisplay: preferredDisplay
+                            )
+                            guard copied else {
+                                continue
+                            }
+                        }
+                        // Empty filtered payload: mark seen so we do not spin on the same frame.
                         session.lastRecognizedSignature = signature
                         session.lastRawText = best.text
                         currentWatchSession = session
-                        if let payload, !payload.isEmpty {
-                            await handleWatchUpdate(best, rawText: payload, preferredDisplay: preferredDisplay)
-                        }
                     }
                 }
             } catch {
@@ -1493,12 +1496,13 @@ final class CaptureCoordinator: CaptureCoordinating {
         }
     }
 
+    @discardableResult
     private func handleWatchUpdate(
         _ selection: CaptureOCRSelection,
         rawText: String,
         preferredDisplay: ScreenDescriptor?
-    ) async {
-        guard appState.watchState == .active else { return }
+    ) async -> Bool {
+        guard appState.watchState == .active else { return false }
 
         let clipboardResult = outputWriter.copyCapturedText(
             rawText: rawText,
@@ -1507,12 +1511,11 @@ final class CaptureCoordinator: CaptureCoordinating {
             source: currentWatchSession?.source,
             outputPreset: currentWatchSession?.outputPreset ?? appState.captureOutputPreset,
             notificationDisplayFrame: preferredDisplay?.frame,
-            successStatusMessage: "👁 \(CaptureRecognitionHeuristics.successStatusMessage(for: selection))",
-            markPermissionGranted: true
+            successStatusMessage: "👁 \(CaptureRecognitionHeuristics.successStatusMessage(for: selection))"
         )
         switch clipboardResult {
         case .success:
-            break
+            return true
         case .failedWrite, .failedReadback:
             appState.statusMessage = CapturePipelineError.clipboardFailed(result: clipboardResult).errorDescription ?? "⚠️ İzleme kopyalama hatası"
             appState.appendDiagnostic(
@@ -1522,6 +1525,7 @@ final class CaptureCoordinator: CaptureCoordinating {
                 code: nil,
                 severity: .warning
             )
+            return false
         }
     }
 
@@ -1615,6 +1619,14 @@ final class CaptureCoordinator: CaptureCoordinating {
             return pipelineError
         }
 
+        if let pdfError = error as? PDFProcessingError {
+            return .captureFailed(
+                domain: "PDFImport",
+                code: -20,
+                description: pdfError.errorDescription ?? "PDF processing failed."
+            )
+        }
+
         let nsError = error as NSError
 
         if nsError.domain == "com.apple.ScreenCaptureKit.SCStreamErrorDomain",
@@ -1635,12 +1647,24 @@ final class CaptureCoordinator: CaptureCoordinating {
 
     nonisolated
     private static func loadImageFile(at url: URL) throws -> CGImage {
+        try PDFProcessingService.validateImportFileSize(at: url)
+
         guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
             throw CapturePipelineError.captureFailed(
                 domain: "FileImport",
                 code: -11,
                 description: "Görsel dosyası açılamadı veya desteklenmiyor."
+            )
+        }
+
+        let pixelCount = image.width * image.height
+        // ponytail: ~40MP ceiling; raise if large-scan workflows need more
+        if pixelCount > 40_000_000 {
+            throw CapturePipelineError.captureFailed(
+                domain: "FileImport",
+                code: -12,
+                description: "Görsel çözünürlüğü çok yüksek. Daha küçük bir dosya kullanın."
             )
         }
 

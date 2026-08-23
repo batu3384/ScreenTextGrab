@@ -57,21 +57,57 @@ extension ClipboardProviding {
 final class ClipboardManager: ClipboardProviding {
     static let commaSeparatedValuesType = NSPasteboard.PasteboardType("public.comma-separated-values-text")
 
+    private struct PasteboardBackup {
+        let items: [[NSPasteboard.PasteboardType: Data]]
+
+        static func capture(from pasteboard: NSPasteboard) -> PasteboardBackup {
+            let items: [[NSPasteboard.PasteboardType: Data]] = (pasteboard.pasteboardItems ?? []).map { item in
+                var representations: [NSPasteboard.PasteboardType: Data] = [:]
+                for type in item.types {
+                    if let data = item.data(forType: type) {
+                        representations[type] = data
+                    }
+                }
+                return representations
+            }
+            return PasteboardBackup(items: items)
+        }
+
+        func restore(to pasteboard: NSPasteboard) {
+            pasteboard.clearContents()
+            guard !items.isEmpty else {
+                return
+            }
+
+            let restored = items.map { representations -> NSPasteboardItem in
+                let item = NSPasteboardItem()
+                for (type, data) in representations {
+                    item.setData(data, forType: type)
+                }
+                return item
+            }
+            _ = pasteboard.writeObjects(restored)
+        }
+    }
+
     func copyToClipboard(_ payload: ClipboardPayload) -> ClipboardWriteResult {
         let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-
+        let backup = PasteboardBackup.capture(from: pasteboard)
         let item = Self.pasteboardItem(for: payload)
+
+        pasteboard.clearContents()
         let writeSucceeded = pasteboard.writeObjects([item])
 
         guard writeSucceeded else {
             STGLog.clipboard.error("Pasteboard write failed")
+            backup.restore(to: pasteboard)
             return .failedWrite
         }
 
         guard let readback = Self.readbackString(from: pasteboard, payload: payload),
               Self.normalizedLineEndings(in: readback) == Self.normalizedLineEndings(in: Self.readbackExpectation(for: payload)) else {
             STGLog.clipboard.error("Pasteboard readback mismatch")
+            backup.restore(to: pasteboard)
             return .failedReadback
         }
 

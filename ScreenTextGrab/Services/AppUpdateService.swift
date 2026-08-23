@@ -462,7 +462,7 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
             .lowercased(),
             !expectedDigest.isEmpty
         else {
-            return
+            throw UpdateError.missingDigest
         }
 
         let parts = expectedDigest.split(separator: ":", maxSplits: 1).map(String.init)
@@ -624,6 +624,7 @@ private enum UpdateError: LocalizedError {
     case unsupportedReleaseState
     case serverStatus(Int)
     case missingReleaseAsset(String)
+    case missingDigest
     case unsupportedDigest(String)
     case digestMismatch
     case extractedAppMissing
@@ -652,6 +653,11 @@ private enum UpdateError: LocalizedError {
                 "%@ paketi son sürümde bulunamadı.",
                 "The latest release does not contain %@.",
                 assetName
+            )
+        case .missingDigest:
+            return L10n.pair(
+                "Güncelleme paketinde doğrulama özeti yok.",
+                "The update package is missing a verification digest."
             )
         case .unsupportedDigest(let digest):
             return L10n.format(

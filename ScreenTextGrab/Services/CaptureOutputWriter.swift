@@ -38,8 +38,7 @@ final class CaptureOutputWriter {
         targetBundleIdentifier: String? = nil,
         ocrConfidence: Float? = nil,
         notificationDisplayFrame: CGRect? = nil,
-        successStatusMessage: String? = nil,
-        markPermissionGranted: Bool = false
+        successStatusMessage: String? = nil
     ) -> ClipboardWriteResult {
         let payload = CaptureOutputFormatter.clipboardPayload(
             rawText: rawText,
@@ -68,9 +67,6 @@ final class CaptureOutputWriter {
                 source: source
             )
             clipboardService.showCopyNotification(text: formattedText, on: notificationDisplayFrame)
-            if markPermissionGranted {
-                appState.permissionState = .granted
-            }
             appState.statusMessage = successStatusMessage ?? "✅ \(outputPreset.title) çıktısı kopyalandı"
         case .failedWrite, .failedReadback:
             appState.statusMessage = CapturePipelineError.clipboardFailed(result: result).errorDescription ?? "⚠️ Kopyalama başarısız"

@@ -57,6 +57,7 @@ final class AppState: ObservableObject {
     @Published var savedSnippets: [SavedSnippet]
     @Published var savedSnippetCollections: [SavedSnippetCollection]
     @Published var savedSnippetCollectionAutoSyncEnabled: Bool
+    @Published var urlSchemeAutomationEnabled: Bool
     @Published var historyExportFormat: ClipboardHistoryExportFormat
     @Published var updateState: AppUpdateState
     @Published var settingsPresentationToken: UUID?
@@ -132,6 +133,9 @@ final class AppState: ObservableObject {
         self.savedSnippetCollectionAutoSyncEnabled = persistsUserPreferences
             ? SavedSnippetCollectionAutoSyncStore.load(defaults: defaults)
             : true
+        self.urlSchemeAutomationEnabled = persistsUserPreferences
+            ? URLSchemeAutomationStore.load(defaults: defaults)
+            : false
         self.historyExportFormat = persistsUserPreferences
             ? ClipboardHistoryExportFormatStore.load(defaults: defaults)
             : .markdown
@@ -476,6 +480,11 @@ final class AppState: ObservableObject {
         persistSavedSnippetCollectionAutoSyncIfNeeded()
     }
 
+    func setURLSchemeAutomationEnabled(_ isEnabled: Bool) {
+        urlSchemeAutomationEnabled = isEnabled
+        persistURLSchemeAutomationIfNeeded()
+    }
+
     @discardableResult
     func saveLastCopiedEntryAsSnippet() -> SavedSnippet? {
         guard let entry = lastCopiedEntry else {
@@ -701,6 +710,11 @@ final class AppState: ObservableObject {
     private func persistSavedSnippetCollectionAutoSyncIfNeeded() {
         guard persistsUserPreferences else { return }
         SavedSnippetCollectionAutoSyncStore.save(savedSnippetCollectionAutoSyncEnabled, defaults: defaults)
+    }
+
+    private func persistURLSchemeAutomationIfNeeded() {
+        guard persistsUserPreferences else { return }
+        URLSchemeAutomationStore.save(urlSchemeAutomationEnabled, defaults: defaults)
     }
 
     private func persistSavedSnippetsIfNeeded() {
@@ -1557,7 +1571,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     "⚠️ Only image and PDF files are supported."
                 )
             }
-        case .commands(let commands):
+        case .commands(let commands, let requiresURLSchemeAuthorization):
+            if requiresURLSchemeAuthorization,
+               !authorizeURLSchemeAutomationIfNeeded() {
+                return
+            }
+
             automationCommandQueue.enqueue(commands)
             let importedFileCount = commands.filter(\.isImportedFileCommand).count
             if importedFileCount > 1 {
@@ -1568,6 +1587,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             }
             flushPendingAutomationCommands()
+        }
+    }
+
+    @MainActor
+    private func authorizeURLSchemeAutomationIfNeeded() -> Bool {
+        if appState.urlSchemeAutomationEnabled || isRunningUnderTests {
+            return true
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = L10n.pair(
+            "URL otomasyonu isteği",
+            "URL automation request"
+        )
+        alert.informativeText = L10n.pair(
+            "Başka bir uygulama ScreenTextGrab'ı stg:// bağlantısıyla tetiklemek istiyor. Ekran yakalama, dosya OCR veya pano işlemleri çalışabilir.",
+            "Another app wants to trigger ScreenTextGrab via an stg:// link. This can run screen capture, file OCR, or clipboard actions."
+        )
+        alert.addButton(withTitle: L10n.pair("Bir kez izin ver", "Allow Once"))
+        alert.addButton(withTitle: L10n.pair("Her zaman izin ver", "Always Allow"))
+        alert.addButton(withTitle: L10n.pair("Reddet", "Deny"))
+
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            return true
+        case .alertSecondButtonReturn:
+            appState.setURLSchemeAutomationEnabled(true)
+            return true
+        default:
+            appState.statusMessage = L10n.pair(
+                "⚠️ URL otomasyonu reddedildi.",
+                "⚠️ URL automation was denied."
+            )
+            return false
         }
     }
 

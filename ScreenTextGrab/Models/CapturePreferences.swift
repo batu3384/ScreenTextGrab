@@ -212,6 +212,22 @@ enum SavedCaptureRegionStore {
     }
 }
 
+enum URLSchemeAutomationStore {
+    static let key = "screenTextGrab.urlSchemeAutomationEnabled"
+
+    static func load(defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.object(forKey: key) != nil else {
+            return false
+        }
+
+        return defaults.bool(forKey: key)
+    }
+
+    static func save(_ isEnabled: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(isEnabled, forKey: key)
+    }
+}
+
 enum SavedCaptureRegionQuickStartStore {
     static let key = "screenTextGrab.savedCaptureRegions.quickStartEnabled"
 

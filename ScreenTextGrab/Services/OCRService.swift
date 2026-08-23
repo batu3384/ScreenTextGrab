@@ -855,14 +855,24 @@ final class OCRService: OCRProviding, @unchecked Sendable {
         return supported
     }
 
-    private static func cropBottomBand(image: CGImage, heightFraction: CGFloat) -> CGImage? {
-        let cropHeight = max(CGFloat(image.height) * heightFraction, 64)
-        let cropRect = CGRect(
+    /// CGImage crop origin is top-left; subtitle bands live at the bottom of the frame.
+    static func bottomBandCropRect(width: Int, height: Int, heightFraction: CGFloat) -> CGRect {
+        let imageHeight = CGFloat(height)
+        let cropHeight = min(max(imageHeight * heightFraction, 64), imageHeight)
+        return CGRect(
             x: 0,
-            y: 0,
-            width: CGFloat(image.width),
-            height: min(cropHeight, CGFloat(image.height))
+            y: imageHeight - cropHeight,
+            width: CGFloat(width),
+            height: cropHeight
         ).integral
+    }
+
+    static func cropBottomBand(image: CGImage, heightFraction: CGFloat) -> CGImage? {
+        let cropRect = bottomBandCropRect(
+            width: image.width,
+            height: image.height,
+            heightFraction: heightFraction
+        )
 
         guard cropRect.width > 1, cropRect.height > 1 else {
             return nil

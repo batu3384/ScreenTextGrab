@@ -21,7 +21,10 @@ enum PDFProcessingError: LocalizedError, Sendable {
     case emptyDocument
     case pageUnavailable(Int)
     case pageRenderFailed(Int)
+    case tooManyPages(limit: Int, actual: Int)
+    case fileTooLarge(limitBytes: Int64)
     case exportFailed(String)
+    case unsafeDestination
 
     var errorDescription: String? {
         switch self {
@@ -33,20 +36,77 @@ enum PDFProcessingError: LocalizedError, Sendable {
             return L10n.format("PDF sayfası okunamadı: %d.", "The PDF page could not be read: %d.", pageNumber)
         case .pageRenderFailed(let pageNumber):
             return L10n.format("PDF sayfası görsele dönüştürülemedi: %d.", "The PDF page could not be rendered: %d.", pageNumber)
+        case .tooManyPages(let limit, let actual):
+            return L10n.format(
+                "PDF çok sayfalı (%d). En fazla %d sayfa işlenir.",
+                "The PDF has too many pages (%d). At most %d pages can be processed.",
+                actual,
+                limit
+            )
+        case .fileTooLarge(let limitBytes):
+            let limitMB = max(1, Int(limitBytes / (1024 * 1024)))
+            return L10n.format(
+                "Dosya çok büyük. En fazla %d MB desteklenir.",
+                "The file is too large. The maximum supported size is %d MB.",
+                limitMB
+            )
         case .exportFailed(let reason):
             return L10n.format("Searchable PDF dışa aktarılamadı: %@", "Searchable PDF export failed: %@", reason)
+        case .unsafeDestination:
+            return L10n.pair(
+                "Searchable PDF hedef yolu kaynak dosyanın klasörü dışında olamaz.",
+                "The searchable PDF destination must stay inside the source file's folder."
+            )
         }
     }
 }
 
 enum PDFProcessingService {
+    static let maxRenderablePages = 50
+    static let maxImportFileBytes: Int64 = 40 * 1024 * 1024
+
+    static func validateImportFileSize(at url: URL) throws {
+        let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+        guard values.isRegularFile == true else {
+            throw PDFProcessingError.unreadableDocument
+        }
+        if let fileSize = values.fileSize, Int64(fileSize) > maxImportFileBytes {
+            throw PDFProcessingError.fileTooLarge(limitBytes: maxImportFileBytes)
+        }
+    }
+
+    /// Automation may only write next to the source PDF (blocks arbitrary path overwrite).
+    static func isSafeAutomationDestination(_ destinationURL: URL, sourceURL: URL) -> Bool {
+        let destination = destinationURL.standardizedFileURL
+        let source = sourceURL.standardizedFileURL
+        guard destination.isFileURL, source.isFileURL else {
+            return false
+        }
+        guard destination.pathExtension.lowercased() == "pdf" else {
+            return false
+        }
+        guard destination != source else {
+            return false
+        }
+
+        let sourceDirectory = source.deletingLastPathComponent().standardizedFileURL
+        let destinationDirectory = destination.deletingLastPathComponent().standardizedFileURL
+        return destinationDirectory == sourceDirectory
+    }
+
     static func renderPages(from url: URL, maxDimension: CGFloat = 2_200) throws -> [ImportedPDFPage] {
+        try validateImportFileSize(at: url)
+
         guard let document = PDFDocument(url: url) else {
             throw PDFProcessingError.unreadableDocument
         }
 
         guard document.pageCount > 0 else {
             throw PDFProcessingError.emptyDocument
+        }
+
+        if document.pageCount > maxRenderablePages {
+            throw PDFProcessingError.tooManyPages(limit: maxRenderablePages, actual: document.pageCount)
         }
 
         return try (0..<document.pageCount).map { index in
