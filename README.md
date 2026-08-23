@@ -266,6 +266,8 @@ stg version
 
 ### URL scheme
 
+URL-scheme automation is gated. Enable it in `Settings > General > URL Automation`, or approve the session/always prompt when a link arrives. Finder file opens are not gated.
+
 ```bash
 open 'stg://capture?mode=table&output=office'
 open 'stg://repeat-last?mode=code&output=markdown'
@@ -276,8 +278,10 @@ open 'stg://snippet-collection?name=Excel%20Reports'
 open 'stg://clipboard-image?mode=standard&output=cleaned'
 open 'stg://image-file?path=/absolute/path/to/table.png&mode=table&output=office'
 open 'stg://pdf-file?path=/absolute/path/to/sample.pdf&mode=standard&output=cleaned'
-open 'stg://searchable-pdf?path=/absolute/path/to/sample.pdf&destination=/absolute/path/to/sample-searchable.pdf'
+open 'stg://searchable-pdf?path=/absolute/path/to/sample.pdf'
 ```
+
+`searchable-pdf` via URL writes next to the source file. CLI `--destination` is allowed only inside the source folder.
 
 Supported query parameters:
 

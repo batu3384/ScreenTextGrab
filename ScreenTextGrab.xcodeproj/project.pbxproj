@@ -29,8 +29,10 @@
 		4FC1394D39DF39D813007D36 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 57637AC54FF6F7DF88F515FC /* Assets.xcassets */; };
 		52742286512432CB963B4535 /* SmartActionBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D321869D6EA978FA499592B /* SmartActionBuilderTests.swift */; };
 		5516EA2011C36A84B01A8F93 /* MenuBarSharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A42EBA31F1FC0F31B7411C5E /* MenuBarSharedComponents.swift */; };
+		56807E5555FD1E6CA3D513B4 /* AppRuntimeSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E9AFE75AAC85E2BFB62F726 /* AppRuntimeSupport.swift */; };
 		5735BB99C69A848F872D7241 /* ScreenPermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2245A490EC99B2314C210B78 /* ScreenPermissionService.swift */; };
 		59BE0191B8A1A44F2989E5F7 /* AutomationSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5587443DE37934A6C44C0D8A /* AutomationSupport.swift */; };
+		5A08CE14896E7EA7583DA5F8 /* ClipboardHistoryPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7D00C5385AC369511834D2E /* ClipboardHistoryPersistence.swift */; };
 		5EBFDDC97CC150F8F964A08E /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439AB8319D466E099CE36AB3 /* AppModels.swift */; };
 		651642681DE4268C16B87036 /* ScreenTextGrabTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 454A7D4AF420C38A8E08BB3C /* ScreenTextGrabTheme.swift */; };
 		6697A066E4BB17C5FFD0DEED /* CaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82B6782199ECDF02ED5CE5C2 /* CaptureCoordinator.swift */; };
@@ -51,12 +53,14 @@
 		BBB0C137BB5A7BA62F118ACD /* SettingsSharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB660972152FE5DDE245A567 /* SettingsSharedComponents.swift */; };
 		BE47F64BDC947CE3A5C94B1C /* AutomationIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D837B65BF51EB3E7DBE4DAF0 /* AutomationIntents.swift */; };
 		BF4A03618D5EA64AA730EEE5 /* CaptureOutputWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C487F5F41364B29398DAB555 /* CaptureOutputWriter.swift */; };
+		C55CD8D260C863F7E95E8FAA /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 462981F0987880B788DF6721 /* AppState.swift */; };
 		C5EEAFBBAC5C93F93A6812EE /* AppUpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFDDE27870842EC2C0972037 /* AppUpdateService.swift */; };
 		C6AC1ECC9420596C8525BD47 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45ED1A4C0E3AFB208B888E85 /* Localization.swift */; };
 		CCFEF8DCADACF678F4DCF1FC /* ScreenEnvironmentSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A71D0480EAFC142281E21C3 /* ScreenEnvironmentSnapshot.swift */; };
 		D1E6329C78D23445AC17E542 /* OCRServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C93221DC54FDE315E087165 /* OCRServiceTests.swift */; };
 		D7571D6557E9E922DFD5A8F1 /* ContextSuggestionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BA9A0F1C889DC61411996AF /* ContextSuggestionService.swift */; };
 		E16DF7CFBBDC9568478D12CB /* AppDelegate+PreviewScreenshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA5DEBB0487A633AB7CD4D1 /* AppDelegate+PreviewScreenshots.swift */; };
+		E5A0881C3B893CAAD9AC8D58 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DB401F32577460A60EDF90E /* AppDelegate.swift */; };
 		E74F01E9696AFA0BD4D2D8F6 /* CapturePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C13B3F98484393217058119 /* CapturePreferences.swift */; };
 		E980588F83694317D8CA6F8C /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 3B0B266DE7620D34BBF81065 /* Localizable.strings */; };
 		E9E8E5B8E34F0820AADB68CB /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A81722B125426EBF76936C64 /* LaunchAtLoginService.swift */; };
@@ -98,6 +102,8 @@
 		2245A490EC99B2314C210B78 /* ScreenPermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenPermissionService.swift; sourceTree = "<group>"; };
 		2B300CE27C27FB0C0245ABB7 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		2C13B3F98484393217058119 /* CapturePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePreferences.swift; sourceTree = "<group>"; };
+		2DB401F32577460A60EDF90E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		2E9AFE75AAC85E2BFB62F726 /* AppRuntimeSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimeSupport.swift; sourceTree = "<group>"; };
 		2F480F910E933BE50F586804 /* OCRResultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRResultTests.swift; sourceTree = "<group>"; };
 		36FBCB6ED2013B9BDFF7B34D /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
 		3AA320529CFEA82E1C22DBF8 /* AppState+ContextSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+ContextSuggestions.swift"; sourceTree = "<group>"; };
@@ -107,6 +113,7 @@
 		454A7D4AF420C38A8E08BB3C /* ScreenTextGrabTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenTextGrabTheme.swift; sourceTree = "<group>"; };
 		455984721CAF976508C28F5B /* ScreenTextGrab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScreenTextGrab.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		45ED1A4C0E3AFB208B888E85 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
+		462981F0987880B788DF6721 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		49CD2A0473E299309820DD11 /* SavedWorkflowLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedWorkflowLibrary.swift; sourceTree = "<group>"; };
 		4B8D16BAD607F7A8A6DCC0AF /* ImportedDocumentRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportedDocumentRouter.swift; sourceTree = "<group>"; };
 		4FBC534BDAA8DA6ADC2D228F /* ClipboardManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardManager.swift; sourceTree = "<group>"; };
@@ -144,6 +151,7 @@
 		C2EFE7EDBD48BF5FCEF8F8EB /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		C487F5F41364B29398DAB555 /* CaptureOutputWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureOutputWriter.swift; sourceTree = "<group>"; };
 		C5DDC62ED04B7F343130D5E3 /* AppUpdateServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateServiceTests.swift; sourceTree = "<group>"; };
+		D7D00C5385AC369511834D2E /* ClipboardHistoryPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryPersistence.swift; sourceTree = "<group>"; };
 		D837B65BF51EB3E7DBE4DAF0 /* AutomationIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationIntents.swift; sourceTree = "<group>"; };
 		DA00A3409351D42C19881235 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DB352A575B68AF84F2876B0E /* MenuBarStatusIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarStatusIcon.swift; sourceTree = "<group>"; };
@@ -256,6 +264,7 @@
 				BDFC62C172C35CFADF023E2B /* AppUpdatePresentationModel.swift */,
 				10988DE9D519FB7C12E21441 /* CaptureOutputFormatter.swift */,
 				2C13B3F98484393217058119 /* CapturePreferences.swift */,
+				D7D00C5385AC369511834D2E /* ClipboardHistoryPersistence.swift */,
 				8CEEA251B568C9B80FDDC766 /* OCRResult.swift */,
 				49CD2A0473E299309820DD11 /* SavedWorkflowLibrary.swift */,
 				0851C720BFFA8BED4421718B /* WatchTextFilter.swift */,
@@ -296,7 +305,10 @@
 		EC7F00610887BEEA7DD5F2FC /* ScreenTextGrab */ = {
 			isa = PBXGroup;
 			children = (
+				2DB401F32577460A60EDF90E /* AppDelegate.swift */,
 				0CA5DEBB0487A633AB7CD4D1 /* AppDelegate+PreviewScreenshots.swift */,
+				2E9AFE75AAC85E2BFB62F726 /* AppRuntimeSupport.swift */,
+				462981F0987880B788DF6721 /* AppState.swift */,
 				3AA320529CFEA82E1C22DBF8 /* AppState+ContextSuggestions.swift */,
 				57637AC54FF6F7DF88F515FC /* Assets.xcassets */,
 				D837B65BF51EB3E7DBE4DAF0 /* AutomationIntents.swift */,
@@ -461,8 +473,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				E16DF7CFBBDC9568478D12CB /* AppDelegate+PreviewScreenshots.swift in Sources */,
+				E5A0881C3B893CAAD9AC8D58 /* AppDelegate.swift in Sources */,
 				5EBFDDC97CC150F8F964A08E /* AppModels.swift in Sources */,
+				56807E5555FD1E6CA3D513B4 /* AppRuntimeSupport.swift in Sources */,
 				674EE05BAF945CD57C6813F0 /* AppState+ContextSuggestions.swift in Sources */,
+				C55CD8D260C863F7E95E8FAA /* AppState.swift in Sources */,
 				34F49C5C3C9706ECFF20A711 /* AppUpdatePresentationModel.swift in Sources */,
 				C5EEAFBBAC5C93F93A6812EE /* AppUpdateService.swift in Sources */,
 				BE47F64BDC947CE3A5C94B1C /* AutomationIntents.swift in Sources */,
@@ -472,6 +487,7 @@
 				BF4A03618D5EA64AA730EEE5 /* CaptureOutputWriter.swift in Sources */,
 				E74F01E9696AFA0BD4D2D8F6 /* CapturePreferences.swift in Sources */,
 				738507FF18FDC84BD76B2938 /* CaptureRecognitionHeuristics.swift in Sources */,
+				5A08CE14896E7EA7583DA5F8 /* ClipboardHistoryPersistence.swift in Sources */,
 				753AB5317B389FEB28205D3C /* ClipboardManager.swift in Sources */,
 				D7571D6557E9E922DFD5A8F1 /* ContextSuggestionService.swift in Sources */,
 				8E392A63ADFCF77BC1C12CA3 /* HotkeyService.swift in Sources */,

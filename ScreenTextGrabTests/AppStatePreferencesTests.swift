@@ -213,6 +213,25 @@ final class AppStatePreferencesTests: XCTestCase {
         )
     }
 
+    func testClipboardHistoryStoreMigratesLegacyPlaintextPayload() throws {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let entry = ClipboardHistoryEntry(
+            text: "eski-duz-metin",
+            date: Date(timeIntervalSince1970: 99),
+            captureMode: .standard
+        )
+        let legacy = try JSONEncoder().encode([entry])
+        defaults.set(legacy, forKey: ClipboardHistoryStore.key)
+
+        let loaded = ClipboardHistoryStore.load(defaults: defaults)
+        XCTAssertEqual(loaded.map(\.text), ["eski-duz-metin"])
+
+        let raw = try XCTUnwrap(defaults.data(forKey: ClipboardHistoryStore.key))
+        XCTAssertNil(try? JSONDecoder().decode([ClipboardHistoryEntry].self, from: raw))
+    }
+
     func testClipboardHistoryStoreOrdersPinnedEntriesFirstForDisplay() {
         let now = Date()
         let history = [
@@ -2220,6 +2239,15 @@ final class AppStatePreferencesTests: XCTestCase {
         XCTAssertEqual(
             ImportedDocumentRouter.resolve(url),
             .pdf(url.standardizedFileURL)
+        )
+    }
+
+    func testAutomationCommandResolveIncomingURLsMarksURLSchemeAsRequiringAuthorization() {
+        let url = URL(string: "stg://capture?mode=standard")!
+
+        XCTAssertEqual(
+            AutomationCommand.resolveIncomingURLs([url]),
+            .commands([.capture(AutomationCaptureOverrides(captureMode: .standard))], requiresURLSchemeAuthorization: true)
         )
     }
 

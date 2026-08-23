@@ -17,6 +17,7 @@ struct SettingsGeneralTabView: View {
     let launchAtLoginBinding: Binding<Bool>
     let launchAtLoginRequiresApproval: Bool
     let launchAtLoginFeedback: InlineFeedback?
+    let urlSchemeAutomationBinding: Binding<Bool>
     let watchSummary: String
     let watchRegexDraft: Binding<String>
     let watchFeedback: InlineFeedback?
@@ -199,6 +200,29 @@ struct SettingsGeneralTabView: View {
                     if let launchAtLoginFeedback {
                         renderLaunchAtLoginFeedback(launchAtLoginFeedback)
                     }
+                }
+
+                SettingsSectionCard(
+                    title: L10n.pair("URL Otomasyonu", "URL Automation"),
+                    subtitle: L10n.pair(
+                        "stg:// bağlantılarının ekran yakalama ve dosya OCR tetiklemesine izin ver.",
+                        "Allow stg:// links to trigger screen capture and file OCR."
+                    )
+                ) {
+                    Toggle(
+                        L10n.pair("URL şeması otomasyonuna izin ver", "Allow URL-scheme automation"),
+                        isOn: urlSchemeAutomationBinding
+                    )
+                    .toggleStyle(.switch)
+                    .accessibilityLabel(L10n.pair("URL şeması otomasyonu", "URL-scheme automation"))
+
+                    Text(L10n.pair(
+                        "Kapalıyken her stg:// isteği oturum onayı ister. Finder dosyaları ve stg CLI etkilenmez.",
+                        "When off, each stg:// request asks for session approval. Finder file opens and the stg CLI are unaffected."
+                    ))
+                    .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
 
                 SettingsSectionCard(
@@ -728,7 +752,6 @@ struct SettingsHistoryTabView: View {
 struct SettingsDiagnosticsTabView: View {
     let permissionDiagnostics: PermissionDiagnosticSnapshot?
     let permissionStateMessage: String
-    let urlSchemeAutomationBinding: Binding<Bool>
     let diagnosticsFeedback: InlineFeedback?
     let diagnosticsEntries: [DiagnosticEntry]
     let renderDiagnosticValueRow: (String, String) -> AnyView
@@ -742,29 +765,6 @@ struct SettingsDiagnosticsTabView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                SettingsSectionCard(
-                    title: L10n.pair("URL Otomasyonu", "URL Automation"),
-                    subtitle: L10n.pair(
-                        "stg:// bağlantılarının ekran yakalama ve dosya OCR tetiklemesine izin ver.",
-                        "Allow stg:// links to trigger screen capture and file OCR."
-                    )
-                ) {
-                    Toggle(
-                        L10n.pair("URL şeması otomasyonuna izin ver", "Allow URL-scheme automation"),
-                        isOn: urlSchemeAutomationBinding
-                    )
-                    .toggleStyle(.switch)
-                    .accessibilityLabel(L10n.pair("URL şeması otomasyonu", "URL-scheme automation"))
-
-                    Text(L10n.pair(
-                        "Kapalıyken her stg:// isteği için onay istenir. Finder ile açılan dosyalar etkilenmez.",
-                        "When off, each stg:// request asks for confirmation. Files opened from Finder are unaffected."
-                    ))
-                    .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-
                 SettingsSectionCard(
                     title: L10n.pair("İzin Tanısı", "Permission Diagnostics"),
                     subtitle: permissionDiagnostics?.currentState.uiMessage ?? permissionStateMessage
