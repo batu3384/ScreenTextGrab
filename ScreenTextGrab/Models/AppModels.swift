@@ -1340,7 +1340,7 @@ enum ClipboardHistoryStore {
             if let existing = defaults.data(forKey: embeddedKeyMaterialKey), existing.count == 32 {
                 return SymmetricKey(data: existing)
             }
-            let material = randomKeyMaterial()
+            let material = try randomKeyMaterial()
             defaults.set(material, forKey: embeddedKeyMaterialKey)
             return SymmetricKey(data: material)
         }
@@ -1349,14 +1349,17 @@ enum ClipboardHistoryStore {
             return SymmetricKey(data: existing)
         }
 
-        let material = randomKeyMaterial()
-        storeKeychainKeyMaterial(material)
+        let material = try randomKeyMaterial()
+        try storeKeychainKeyMaterial(material)
         return SymmetricKey(data: material)
     }
 
-    private static func randomKeyMaterial() -> Data {
+    private static func randomKeyMaterial() throws -> Data {
         var bytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        guard status == errSecSuccess else {
+            throw CocoaError(.fileWriteUnknown)
+        }
         return Data(bytes)
     }
 
@@ -1377,7 +1380,7 @@ enum ClipboardHistoryStore {
         return data
     }
 
-    private static func storeKeychainKeyMaterial(_ material: Data) {
+    private static func storeKeychainKeyMaterial(_ material: Data) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
@@ -1388,7 +1391,10 @@ enum ClipboardHistoryStore {
         var addQuery = query
         addQuery[kSecValueData as String] = material
         addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(addQuery as CFDictionary, nil)
+        let status = SecItemAdd(addQuery as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw CocoaError(.fileWriteUnknown)
+        }
     }
 
     static func export(_ history: [ClipboardHistoryEntry], format: ClipboardHistoryExportFormat, generatedAt: Date = Date()) -> String {

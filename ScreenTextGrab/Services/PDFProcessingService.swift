@@ -77,8 +77,8 @@ enum PDFProcessingService {
 
     /// Automation may only write next to the source PDF (blocks arbitrary path overwrite).
     static func isSafeAutomationDestination(_ destinationURL: URL, sourceURL: URL) -> Bool {
-        let destination = destinationURL.standardizedFileURL
-        let source = sourceURL.standardizedFileURL
+        let destination = destinationURL.resolvingSymlinksInPath().standardizedFileURL
+        let source = sourceURL.resolvingSymlinksInPath().standardizedFileURL
         guard destination.isFileURL, source.isFileURL else {
             return false
         }
