@@ -43,6 +43,91 @@ struct OCRResult: Sendable {
         }
     }
 
+    /// Eş aralıklı (monospace) hizalı metin üretir.
+    /// Metin bloklarının boundingBox konumlarını kullanarak satırlara ayırır,
+    /// yatay konumu sabit sütun sayısına göre padding ile korur,
+    /// dikey boşlukları boş satırlarla ifade eder.
+    /// - Parameter columns: Çıktı toplam sütun sayısı (varsayılan 120).
+    ///   Yatay hizalama doğruluğunu kontrol eder.
+    func monospaceAlignedText(columns: Int = 120) -> String {
+        guard !blocks.isEmpty else {
+            return ""
+        }
+
+        let resolvedColumns = max(20, min(300, columns))
+
+        // y'ye göre sırala (büyük y = ekranın üstü, y yakınsa x'e göre)
+        let sorted = blocks.sorted { a, b in
+            if abs(a.boundingBox.midY - b.boundingBox.midY) < 0.02 {
+                return a.boundingBox.minX < b.boundingBox.minX
+            }
+            return a.boundingBox.midY > b.boundingBox.midY
+        }
+
+        // Satır kümeleme
+        var rows: [[OCRTextBlock]] = []
+        var currentRow: [OCRTextBlock] = []
+        for block in sorted {
+            if let first = currentRow.first {
+                if abs(block.boundingBox.midY - first.boundingBox.midY) < 0.02 {
+                    currentRow.append(block)
+                } else {
+                    rows.append(currentRow)
+                    currentRow = [block]
+                }
+            } else {
+                currentRow = [block]
+            }
+        }
+        if !currentRow.isEmpty {
+            rows.append(currentRow)
+        }
+
+        // Medyan satır yüksekliği — boş satır hesaplaması için
+        let rowHeights = rows
+            .compactMap { $0.first?.boundingBox.height }
+            .filter { $0 > 0 }
+            .sorted()
+        let medianRowHeight = rowHeights.isEmpty ? 0.02 : rowHeights[rowHeights.count / 2]
+
+        var output = ""
+        var lastRowTopY: CGFloat?
+
+        for row in rows {
+            let sortedRow = row.sorted { $0.boundingBox.minX < $1.boundingBox.minX }
+            let rowTopY = sortedRow.map { $0.boundingBox.maxY }.max() ?? 0
+
+            // Dikey boşluk → boş satır
+            if let ly = lastRowTopY {
+                let gap = ly - rowTopY
+                let blankLines = Int(gap / max(medianRowHeight * 1.5, 0.015))
+                if blankLines > 0 {
+                    output += String(repeating: "\n", count: min(blankLines, 6))
+                }
+            }
+
+            // Yatay: sütun konumuna padding ile hizala
+            var line = ""
+            for block in sortedRow {
+                let col = Int(block.boundingBox.minX * CGFloat(resolvedColumns))
+                if col > line.count {
+                    line += String(repeating: " ", count: col - line.count)
+                } else if !line.isEmpty {
+                    line += " "
+                }
+                line += block.text
+            }
+            output += line + "\n"
+            lastRowTopY = rowTopY
+        }
+
+        if output.hasSuffix("\n") {
+            output.removeLast()
+        }
+
+        return output
+    }
+
     private var standardFormattedText: String {
         groupedLines(lineThreshold: 0.03)
             .map { line in

@@ -187,4 +187,137 @@ final class OCRResultTests: XCTestCase {
             "Kategori\tOcak\tSubat\tMart\nIcekler\t12\t14\t16\nToplam\t\t\t42"
         )
     }
+
+    // MARK: - Monospace Alignment
+
+    func testMonospaceAlignedTextPreservesHorizontalPosition() {
+        let result = OCRResult(
+            blocks: [
+                OCRTextBlock(text: "Name", confidence: 0.95, boundingBox: CGRect(x: 0.10, y: 0.80, width: 0.08, height: 0.04)),
+                OCRTextBlock(text: "Value", confidence: 0.95, boundingBox: CGRect(x: 0.50, y: 0.80, width: 0.10, height: 0.04))
+            ],
+            captureDate: Date(),
+            sourceRect: .zero
+        )
+
+        let output = result.monospaceAlignedText()
+        // col = Int(0.10 * 120) = 12, so "Name" starts after 12 spaces
+        XCTAssertTrue(output.hasPrefix(String(repeating: " ", count: 12) + "Name"))
+        // col = Int(0.50 * 120) = 60, so "Value" starts at position 60
+        let valueIndex = output.index(output.startIndex, offsetBy: 60)
+        XCTAssertEqual(output[valueIndex...], "Value")
+        XCTAssertEqual(output.components(separatedBy: "\n").count, 1)
+    }
+
+    func testMonospaceAlignedTextProducesMultipleLines() {
+        let result = OCRResult(
+            blocks: [
+                OCRTextBlock(text: "Hello", confidence: 0.95, boundingBox: CGRect(x: 0.10, y: 0.80, width: 0.10, height: 0.04)),
+                OCRTextBlock(text: "World", confidence: 0.95, boundingBox: CGRect(x: 0.10, y: 0.72, width: 0.10, height: 0.04))
+            ],
+            captureDate: Date(),
+            sourceRect: .zero
+        )
+
+        let output = result.monospaceAlignedText()
+        let lines = output.components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 2)
+        XCTAssertTrue(lines[0].hasSuffix("Hello"))
+        XCTAssertTrue(lines[1].hasSuffix("World"))
+    }
+
+    func testMonospaceAlignedTextInsertsBlankLinesForLargeVerticalGap() {
+        let result = OCRResult(
+            blocks: [
+                OCRTextBlock(text: "Top", confidence: 0.95, boundingBox: CGRect(x: 0.10, y: 0.80, width: 0.06, height: 0.04)),
+                OCRTextBlock(text: "Bottom", confidence: 0.95, boundingBox: CGRect(x: 0.10, y: 0.60, width: 0.12, height: 0.04))
+            ],
+            captureDate: Date(),
+            sourceRect: .zero
+        )
+
+        let output = result.monospaceAlignedText()
+        let lines = output.components(separatedBy: "\n")
+        XCTAssertTrue(lines.first?.hasSuffix("Top") == true)
+        XCTAssertTrue(lines.last?.hasSuffix("Bottom") == true)
+        XCTAssertGreaterThan(lines.count, 2)
+        XCTAssertTrue(lines.dropFirst().dropLast().allSatisfy { $0.isEmpty })
+    }
+
+    func testMonospaceAlignedTextEmptyBlocksReturnsEmpty() {
+        let result = OCRResult(
+            blocks: [],
+            captureDate: Date(),
+            sourceRect: .zero
+        )
+
+        XCTAssertEqual(result.monospaceAlignedText(), "")
+    }
+
+    func testMonospaceAlignedTextSingleBlock() {
+        let result = OCRResult(
+            blocks: [
+                OCRTextBlock(text: "Hello", confidence: 0.95, boundingBox: CGRect(x: 0.10, y: 0.80, width: 0.10, height: 0.04))
+            ],
+            captureDate: Date(),
+            sourceRect: .zero
+        )
+
+        let output = result.monospaceAlignedText()
+        XCTAssertTrue(output.hasSuffix("Hello"))
+    }
+
+    func testMonospaceAlignedTextSortsBlocksByXWithinLine() {
+        let result = OCRResult(
+            blocks: [
+                OCRTextBlock(text: "Right", confidence: 0.95, boundingBox: CGRect(x: 0.50, y: 0.80, width: 0.10, height: 0.04)),
+                OCRTextBlock(text: "Left", confidence: 0.95, boundingBox: CGRect(x: 0.10, y: 0.80, width: 0.08, height: 0.04))
+            ],
+            captureDate: Date(),
+            sourceRect: .zero
+        )
+
+        let output = result.monospaceAlignedText()
+        let leftRange = output.range(of: "Left")!
+        let rightRange = output.range(of: "Right")!
+        XCTAssertLessThan(leftRange.lowerBound, rightRange.lowerBound)
+    }
+
+    func testMonospaceAlignedTextWithExplicitColumns() {
+        let result = OCRResult(
+            blocks: [
+                OCRTextBlock(text: "A", confidence: 0.95, boundingBox: CGRect(x: 0.10, y: 0.80, width: 0.02, height: 0.04)),
+                OCRTextBlock(text: "B", confidence: 0.95, boundingBox: CGRect(x: 0.50, y: 0.80, width: 0.02, height: 0.04))
+            ],
+            captureDate: Date(),
+            sourceRect: .zero
+        )
+
+        // With 40 columns: A at col 4, B at col 20
+        let output40 = result.monospaceAlignedText(columns: 40)
+        let indexB40 = output40.index(output40.startIndex, offsetBy: 20)
+        XCTAssertEqual(output40[indexB40], "B")
+
+        // With 200 columns: A at col 20, B at col 100
+        let output200 = result.monospaceAlignedText(columns: 200)
+        let indexB200 = output200.index(output200.startIndex, offsetBy: 100)
+        XCTAssertEqual(output200[indexB200], "B")
+    }
+
+    func testMonospaceAlignedTextClampsColumnCount() {
+        let result = OCRResult(
+            blocks: [
+                OCRTextBlock(text: "Test", confidence: 0.95, boundingBox: CGRect(x: 0.10, y: 0.80, width: 0.08, height: 0.04))
+            ],
+            captureDate: Date(),
+            sourceRect: .zero
+        )
+
+        // Columns below 20 should be clamped to 20, above 300 to 300
+        let outputLow = result.monospaceAlignedText(columns: 5)
+        let outputHigh = result.monospaceAlignedText(columns: 500)
+        // Both should produce valid output with "Test" at the clamped column position
+        XCTAssertTrue(outputLow.hasSuffix("Test"))
+        XCTAssertTrue(outputHigh.hasSuffix("Test"))
+    }
 }
