@@ -280,6 +280,7 @@ enum InterfaceLanguage: String, CaseIterable, Codable, Equatable, Sendable, Iden
     case system
     case turkish
     case english
+    case chinese
 
     var id: String { rawValue }
 
@@ -291,6 +292,8 @@ enum InterfaceLanguage: String, CaseIterable, Codable, Equatable, Sendable, Iden
             return "Türkçe"
         case .english:
             return "English"
+        case .chinese:
+            return "简体中文"
         }
     }
 
@@ -302,6 +305,8 @@ enum InterfaceLanguage: String, CaseIterable, Codable, Equatable, Sendable, Iden
             return L10n.pair("Arayüz her zaman Türkçe görünür.", "The interface always appears in Turkish.")
         case .english:
             return L10n.pair("Arayüz her zaman English görünür.", "The interface always appears in English.")
+        case .chinese:
+            return L10n.triple("Arayüz her zaman Çince görünür.", "The interface always appears in Chinese.", "界面始终显示为简体中文。")
         }
     }
 
@@ -313,6 +318,8 @@ enum InterfaceLanguage: String, CaseIterable, Codable, Equatable, Sendable, Iden
             return "tr"
         case .english:
             return "en"
+        case .chinese:
+            return "zh"
         }
     }
 }

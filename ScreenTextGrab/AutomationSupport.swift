@@ -515,6 +515,8 @@ private extension OCRLanguagePreference {
             return .italian
         case "pt", "pt-br", "portuguese", "portugues":
             return .portuguese
+        case "zh", "zh-hans", "zh-cn", "chinese", "简体中文":
+            return .chinese
         default:
             return nil
         }
@@ -536,6 +538,8 @@ private extension OCRLanguagePreference {
             return "it"
         case .portuguese:
             return "pt"
+        case .chinese:
+            return "zh"
         }
     }
 }

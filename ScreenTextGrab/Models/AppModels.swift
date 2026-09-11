@@ -112,26 +112,26 @@ enum CaptureMode: String, CaseIterable, Codable, Equatable, Sendable, Identifiab
     var title: String {
         switch self {
         case .standard:
-            return L10n.pair("Standart", "Standard")
+            return L10n.triple("Standart", "Standard", "标准")
         case .subtitle:
-            return L10n.pair("Altyazı", "Subtitle")
+            return L10n.triple("Altyazı", "Subtitle", "字幕")
         case .code:
-            return L10n.pair("Kod", "Code")
+            return L10n.triple("Kod", "Code", "代码")
         case .table:
-            return L10n.pair("Tablo", "Table")
+            return L10n.triple("Tablo", "Table", "表格")
         }
     }
 
     var shortTitle: String {
         switch self {
         case .standard:
-            return L10n.pair("Standart", "Standard")
+            return L10n.triple("Standart", "Standard", "标准")
         case .subtitle:
-            return L10n.pair("Altyazı", "Subtitle")
+            return L10n.triple("Altyazı", "Subtitle", "字幕")
         case .code:
-            return L10n.pair("Kod", "Code")
+            return L10n.triple("Kod", "Code", "代码")
         case .table:
-            return L10n.pair("Tablo", "Table")
+            return L10n.triple("Tablo", "Table", "表格")
         }
     }
 
@@ -239,11 +239,11 @@ enum CaptureOutputPreset: String, CaseIterable, Codable, Equatable, Sendable, Id
     var title: String {
         switch self {
         case .smart:
-            return L10n.pair("Akıllı", "Smart")
+            return L10n.triple("Akıllı", "Smart", "智能")
         case .plainText:
-            return L10n.pair("Düz Metin", "Plain Text")
+            return L10n.triple("Düz Metin", "Plain Text", "纯文本")
         case .cleaned:
-            return L10n.pair("Temizlenmiş", "Cleaned")
+            return L10n.triple("Temizlenmiş", "Cleaned", "已清理")
         case .office:
             return "Office"
         case .markdown:
@@ -256,7 +256,7 @@ enum CaptureOutputPreset: String, CaseIterable, Codable, Equatable, Sendable, Id
     var shortTitle: String {
         switch self {
         case .smart:
-            return L10n.pair("Akıllı", "Smart")
+            return L10n.triple("Akıllı", "Smart", "智能")
         case .plainText:
             return L10n.pair("Düz", "Plain")
         case .cleaned:
@@ -273,11 +273,11 @@ enum CaptureOutputPreset: String, CaseIterable, Codable, Equatable, Sendable, Id
     var summary: String {
         switch self {
         case .smart:
-            return L10n.pair("Moda göre en uygun sonuç", "Best result for the current mode")
+            return L10n.triple("Moda göre en uygun sonuç", "Best result for the current mode", "当前模式的最佳结果")
         case .plainText:
-            return L10n.pair("Yalın ve doğrudan metin", "Simple, direct text")
+            return L10n.triple("Yalın ve doğrudan metin", "Simple, direct text", "简洁直接的文本")
         case .cleaned:
-            return L10n.pair("OCR gürültüsünü azaltır", "Reduces OCR noise")
+            return L10n.triple("OCR gürültüsünü azaltır", "Reduces OCR noise", "减少 OCR 噪声")
         case .office:
             return L10n.pair("Office ve tablo uygulamalarıyla uyumlu", "Works well with spreadsheet and word processor apps")
         case .markdown:
@@ -481,6 +481,7 @@ enum OCRLanguagePreference: String, CaseIterable, Codable, Equatable, Sendable, 
     case spanish = "es-ES"
     case italian = "it-IT"
     case portuguese = "pt-BR"
+    case chinese = "zh-Hans"
 
     var id: String { rawValue }
 
@@ -500,6 +501,8 @@ enum OCRLanguagePreference: String, CaseIterable, Codable, Equatable, Sendable, 
             return L10n.pair("Italiano", "Italian")
         case .portuguese:
             return L10n.pair("Português", "Portuguese")
+        case .chinese:
+            return L10n.triple("Çince", "Chinese", "简体中文")
         }
     }
 
@@ -519,6 +522,8 @@ enum OCRLanguagePreference: String, CaseIterable, Codable, Equatable, Sendable, 
             return "IT"
         case .portuguese:
             return "PT"
+        case .chinese:
+            return "ZH"
         }
     }
 }
