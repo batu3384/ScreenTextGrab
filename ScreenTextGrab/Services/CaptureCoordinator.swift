@@ -1173,8 +1173,10 @@ final class CaptureCoordinator: CaptureCoordinating {
         appState.statusMessage = "Panoya kopyalanıyor..."
         STGLog.pipeline.info("State → copying")
 
+        let effectiveRawText = resolvedRawText(for: best)
+
         let clipboardResult = outputWriter.copyCapturedText(
-            rawText: best.text,
+            rawText: effectiveRawText,
             captureMode: captureMode,
             contentKind: historyContentKind(for: best),
             source: source,
@@ -1191,6 +1193,18 @@ final class CaptureCoordinator: CaptureCoordinating {
         case .failedWrite, .failedReadback:
             throw CapturePipelineError.clipboardFailed(result: clipboardResult)
         }
+    }
+
+    private func resolvedRawText(for selection: CaptureOCRSelection) -> String {
+        guard appState.monospaceLayoutSettings.isEnabled else {
+            return selection.text
+        }
+
+        let monospaceText = selection.ocrResult.monospaceAlignedText(
+            columns: appState.monospaceLayoutSettings.columns,
+            multicolumnSorting: appState.monospaceLayoutSettings.multicolumnSortingEnabled
+        )
+        return monospaceText.isEmpty ? selection.text : monospaceText
     }
 
     nonisolated
@@ -1504,8 +1518,19 @@ final class CaptureCoordinator: CaptureCoordinating {
     ) async -> Bool {
         guard appState.watchState == .active else { return false }
 
+        let effectiveRawText: String
+        if appState.monospaceLayoutSettings.isEnabled {
+            let monospaceText = selection.ocrResult.monospaceAlignedText(
+                columns: appState.monospaceLayoutSettings.columns,
+                multicolumnSorting: appState.monospaceLayoutSettings.multicolumnSortingEnabled
+            )
+            effectiveRawText = monospaceText.isEmpty ? rawText : monospaceText
+        } else {
+            effectiveRawText = rawText
+        }
+
         let clipboardResult = outputWriter.copyCapturedText(
-            rawText: rawText,
+            rawText: effectiveRawText,
             captureMode: currentWatchSession?.captureMode ?? appState.captureMode,
             contentKind: historyContentKind(for: selection),
             source: currentWatchSession?.source,

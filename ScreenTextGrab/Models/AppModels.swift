@@ -654,6 +654,58 @@ enum CaptureOutputPresetStore {
     }
 }
 
+struct MonospaceLayoutSettings: Codable, Equatable, Sendable {
+    var isEnabled: Bool
+    var columns: Int
+    var multicolumnSortingEnabled: Bool
+
+    static let defaultColumns = 120
+    static let defaultValue = MonospaceLayoutSettings(
+        isEnabled: false,
+        columns: defaultColumns,
+        multicolumnSortingEnabled: false
+    )
+
+    init(isEnabled: Bool = false, columns: Int = defaultColumns, multicolumnSortingEnabled: Bool = false) {
+        self.isEnabled = isEnabled
+        self.columns = max(20, min(300, columns))
+        self.multicolumnSortingEnabled = multicolumnSortingEnabled
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case isEnabled
+        case columns
+        case multicolumnSortingEnabled
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
+        let columns = try container.decodeIfPresent(Int.self, forKey: .columns) ?? Self.defaultColumns
+        let multicolumnSortingEnabled = try container.decodeIfPresent(Bool.self, forKey: .multicolumnSortingEnabled) ?? false
+        self.init(isEnabled: isEnabled, columns: columns, multicolumnSortingEnabled: multicolumnSortingEnabled)
+    }
+}
+
+enum MonospaceLayoutSettingsStore {
+    static let key = "screenTextGrab.monospaceLayoutSettings"
+
+    static func load(defaults: UserDefaults = .standard) -> MonospaceLayoutSettings {
+        guard let data = defaults.data(forKey: key),
+              let settings = try? JSONDecoder().decode(MonospaceLayoutSettings.self, from: data) else {
+            return .defaultValue
+        }
+        return settings
+    }
+
+    static func save(_ settings: MonospaceLayoutSettings, defaults: UserDefaults = .standard) {
+        guard let data = try? JSONEncoder().encode(settings) else {
+            return
+        }
+        defaults.set(data, forKey: key)
+    }
+}
+
 struct ClipboardHistoryEntry: Identifiable, Equatable, Sendable, Codable {
     enum ContentKind: String, CaseIterable, Identifiable, Codable, Sendable {
         case text
