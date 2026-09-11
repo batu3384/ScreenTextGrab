@@ -11,6 +11,8 @@ struct ScreenTextGrabApp: App {
         MenuBarExtra {
             MenuBarView()
                 .environmentObject(appDelegate.appState)
+                .environmentObject(ThemeManager.shared)
+                .preferredColorScheme(ThemeManager.shared.effectiveColorScheme)
         } label: {
             MenuBarStatusIcon()
         }
@@ -19,12 +21,16 @@ struct ScreenTextGrabApp: App {
         Window(L10n.pair("Ayarlar", "Settings"), id: Self.settingsWindowID) {
             SettingsView()
                 .environmentObject(appDelegate.appState)
+                .environmentObject(ThemeManager.shared)
+                .preferredColorScheme(ThemeManager.shared.effectiveColorScheme)
                 .frame(width: 620, height: 560)
         }
 
         Window(L10n.pair("Tablo Duzenleyici", "Table Editor"), id: Self.tableReviewWindowID) {
             TableReviewView()
                 .environmentObject(appDelegate.appState)
+                .environmentObject(ThemeManager.shared)
+                .preferredColorScheme(ThemeManager.shared.effectiveColorScheme)
                 .frame(minWidth: 860, idealWidth: 920, minHeight: 580, idealHeight: 640)
         }
     }

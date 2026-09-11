@@ -23,7 +23,7 @@ struct MenuBarCard<Content: View>: View {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(
                             LinearGradient(
-                                colors: [Color.white.opacity(0.04), Color.clear],
+                                colors: [Color.stgWhite.opacity(0.04), Color.clear],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -76,7 +76,7 @@ struct MenuBarSecondaryButton: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .font(.system(size: isCompact ? 9.8 : 10.5, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(.stgWhite)
             .lineLimit(2)
             .padding(.horizontal, isCompact ? 10 : 12)
             .padding(.vertical, isCompact ? 8 : 9)
@@ -114,7 +114,7 @@ struct MenuBarSmallActionButton: View {
                 Text(title)
             }
             .font(.system(size: isCompact ? 9.5 : 10, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(.stgWhite)
             .lineLimit(1)
             .minimumScaleFactor(0.82)
             .padding(.horizontal, isCompact ? 10 : 11)
@@ -153,7 +153,7 @@ struct MenuBarCompactInlineButton: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .font(.system(size: isCompact ? 9.6 : 10.1, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(.stgWhite)
             .lineLimit(2)
             .minimumScaleFactor(0.8)
             .padding(.horizontal, isCompact ? 9 : 10)
@@ -187,7 +187,7 @@ struct MenuBarIconActionButton: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(.stgWhite)
                 .frame(width: isCompact ? 30 : 32, height: isCompact ? 30 : 32)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -223,7 +223,7 @@ struct MenuBarUpdateActionButton: View {
                     .minimumScaleFactor(0.84)
             }
             .font(.system(size: isCompact ? 8.9 : 9.8, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(.stgWhite)
             .padding(.horizontal, isCompact ? 10 : 11)
             .padding(.vertical, isCompact ? 6 : 7)
             .frame(width: presentation.width, height: isCompact ? 32 : 34)
@@ -272,11 +272,11 @@ struct MenuBarQuickSettingRow<Control: View>: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: isCompact ? 11.5 : 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.stgWhite)
 
                 Text(detail)
                     .font(.system(size: isCompact ? 10 : 10.3, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.66))
+                    .foregroundStyle(Color.stgWhite.opacity(0.66))
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -319,13 +319,13 @@ struct MenuBarHeaderSection: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("ScreenTextGrab")
                     .font(.system(size: isCompact ? 15 : 16.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.stgWhite)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
 
                 Text(headerLine)
                     .font(.system(size: isCompact ? 10 : 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.68))
+                    .foregroundStyle(Color.stgWhite.opacity(0.68))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -370,7 +370,7 @@ struct MenuBarStatusSection: View {
 
                     Text(statusTitle)
                         .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.stgWhite)
 
                     Spacer()
 
@@ -383,7 +383,7 @@ struct MenuBarStatusSection: View {
 
                 Text(statusDescription)
                     .font(.system(size: isCompact ? 11 : 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.72))
+                    .foregroundStyle(Color.stgWhite.opacity(0.72))
                     .lineLimit(isCompact ? 2 : 3)
             }
         }
@@ -403,18 +403,18 @@ struct MenuBarPrimaryActionSection: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: isCompact ? 15 : 17, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.stgWhite)
                     .frame(width: isCompact ? 32 : 36, height: isCompact ? 32 : 36)
-                    .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: isCompact ? 10 : 12, style: .continuous))
+                    .background(Color.stgWhite.opacity(0.14), in: RoundedRectangle(cornerRadius: isCompact ? 10 : 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: isCompact ? 14 : 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.stgWhite)
 
                     Text(subtitle)
                         .font(.system(size: isCompact ? 10.5 : 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.78))
+                        .foregroundStyle(Color.stgWhite.opacity(0.78))
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -432,7 +432,7 @@ struct MenuBarPrimaryActionSection: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(canStartCapture ? Color.white.opacity(0.14) : Color.controlStroke, lineWidth: 1)
+                    .stroke(canStartCapture ? Color.stgWhite.opacity(0.14) : Color.controlStroke, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: canStartCapture ? Color.black.opacity(0.18) : .clear, radius: 12, y: 8)
@@ -459,11 +459,11 @@ struct MenuBarNoticeSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(notice.title)
                             .font(.system(size: isCompact ? 11 : 11.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.stgWhite)
 
                         Text(notice.message)
                             .font(.system(size: isCompact ? 10 : 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color.white.opacity(0.66))
+                            .foregroundStyle(Color.stgWhite.opacity(0.66))
                             .lineLimit(isCompact ? 2 : 3)
                     }
                 }
@@ -498,11 +498,11 @@ struct MenuBarImportDropOverlay: View {
 
                     Text(L10n.pair("Görsel veya PDF bırak", "Drop an Image or PDF"))
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.stgWhite)
 
                     Text(L10n.pair("Görsel dosyası OCR’a gider, PDF dosyası doğrudan içe alınır.", "Image files go through OCR, and PDF files are imported directly."))
                         .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.72))
+                        .foregroundStyle(Color.stgWhite.opacity(0.72))
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 220)
                 }
