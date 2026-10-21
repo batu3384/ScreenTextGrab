@@ -284,7 +284,10 @@ final class CaptureCoordinatorTests: XCTestCase {
         XCTAssertTrue(clipboard.copiedPayloads.last?.html?.contains("<pre") == true)
         XCTAssertEqual(appState.copyHistory.first?.outputPreset, .office)
         XCTAssertEqual(appState.copyHistory.first?.source?.bundleIdentifier, "com.apple.dt.Xcode")
-        XCTAssertEqual(appState.statusMessage, "✅ Microsoft Word için Office çıktısı kopyalandı")
+        XCTAssertEqual(
+            appState.statusMessage,
+            L10n.profileOutputCopied(appName: "Microsoft Word", preset: CaptureOutputPreset.office.title)
+        )
     }
 
     // MARK: - New Tests
@@ -981,7 +984,7 @@ final class CaptureCoordinatorTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 50_000_000)
 
         XCTAssertEqual(overlay.showCount, 0)
-        XCTAssertTrue(appState.statusMessage.contains("İzleme aktif"))
+        XCTAssertEqual(appState.statusMessage, L10n.captureBlockedByWatch)
     }
 
     @MainActor
@@ -1193,7 +1196,7 @@ final class CaptureCoordinatorTests: XCTestCase {
         coordinator.captureClipboardImage(sessionOverrides: nil)
 
         XCTAssertEqual(appState.captureState, .failed)
-        XCTAssertTrue(appState.statusMessage.contains("Panoda okunabilir bir görsel yok"))
+        XCTAssertTrue(appState.statusMessage.contains(L10n.clipboardImageMissing))
     }
 
     @MainActor
