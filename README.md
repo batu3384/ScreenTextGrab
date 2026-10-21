@@ -266,7 +266,7 @@ stg version
 
 ### URL scheme
 
-URL-scheme automation is gated. Enable it in `Settings > General > URL Automation`, or approve the session/always prompt when a link arrives. Finder file opens are not gated.
+URL-scheme automation and direct launch arguments are gated. Enable them in `Settings > General > URL Automation`, or approve the session prompt. The `stg` command uses the URL scheme. Finder file opens are not gated.
 
 ```bash
 open 'stg://capture?mode=table&output=office'

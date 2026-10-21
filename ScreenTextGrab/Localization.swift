@@ -98,4 +98,91 @@ enum L10n {
     static var accessibilityOCRLanguage: String { pair("OCR dili", "OCR language") }
     static var accessibilityAutomaticLanguage: String { pair("Dili otomatik algıla", "Automatically detect language") }
     static var accessibilityInterfaceLanguage: String { pair("Arayüz dili", "Interface language") }
+
+    static var captureBlockedByWatch: String { pair("👁 İzleme aktifken normal yakalama başlamaz. Önce izlemeyi durdur.", "👁 Stop watching before starting a normal capture.") }
+    static var capturePreparing: String { pair("Yakalamaya hazırlanıyor...", "Preparing capture...") }
+    static var permissionRestartCapture: String { pair("🔐 İzin verildi. Lütfen uygulamayı yeniden başlatın.", "🔐 Access granted. Restart the app to capture.") }
+    static var permissionDeniedRefresh: String { pair("🔐 Ekran kaydı izni gerekli. İzin verdiyseniz 'Yenile' ile tekrar kontrol edin.", "🔐 Screen recording permission is required. If you already allowed it, use Refresh.") }
+    static var permissionUnknown: String { pair("🔐 İzin durumu doğrulanamadı. Sistem Ayarları veya 'Yenile' ile tekrar deneyin.", "🔐 Permission status could not be verified. Use System Settings or Refresh.") }
+    static var permissionRequestInProgress: String { pair("İzin isteği devam ediyor...", "Permission request is still in progress...") }
+    static var repeatBlockedByWatch: String { pair("👁 İzleme aktifken son alan yeniden yakalanmaz. Önce izlemeyi durdur.", "👁 Stop watching before recapturing the last region.") }
+    static var repeatNeedsSelection: String { pair("Önce bir alan yakala, sonra tekrar kullan.", "Capture a region once before repeating it.") }
+    static var savedRegionBlockedByWatch: String { pair("👁 İzleme aktifken kayıtlı bölge yakalanmaz. Önce izlemeyi durdur.", "👁 Stop watching before capturing a saved region.") }
+    static var clipboardImageBlockedByWatch: String { pair("👁 İzleme aktifken panodaki görsel okunmaz. Önce izlemeyi durdur.", "👁 Stop watching before reading a clipboard image.") }
+    static var clipboardImagePreparing: String { pair("Panodaki görsel hazırlanıyor...", "Preparing the clipboard image...") }
+    static var imageFileBlockedByWatch: String { pair("👁 İzleme aktifken dosya OCR başlamaz. Önce izlemeyi durdur.", "👁 Stop watching before reading an image file.") }
+    static var imageFilePreparing: String { pair("Görsel dosyası hazırlanıyor...", "Preparing the image file...") }
+    static var pdfBlockedByWatch: String { pair("👁 İzleme aktifken PDF OCR başlamaz. Önce izlemeyi durdur.", "👁 Stop watching before reading a PDF.") }
+    static var pdfPreparing: String { pair("PDF hazırlanıyor...", "Preparing the PDF...") }
+    static var searchablePDFBlockedByWatch: String { pair("👁 İzleme aktifken searchable PDF üretilemez. Önce izlemeyi durdur.", "👁 Stop watching before creating a searchable PDF.") }
+    static var searchablePDFPreparing: String { pair("Searchable PDF hazırlanıyor...", "Preparing the searchable PDF...") }
+    static var watchPreparing: String { pair("İzleme hazırlanıyor...", "Preparing watch mode...") }
+    static var watchPermissionRestart: String { pair("🔐 İzin verildi. İzleme için uygulamayı yeniden başlatın.", "🔐 Access granted. Restart the app before watching.") }
+    static var watchPermissionDenied: String { pair("🔐 İzleme için ekran kaydı izni gerekli.", "🔐 Screen recording permission is required for watch mode.") }
+    static var watchPermissionUnknown: String { pair("🔐 İzin durumu doğrulanamadı. Önce yenileyin.", "🔐 Permission status could not be verified. Refresh first.") }
+    static var watchPermissionInProgress: String { pair("İzin isteği sürüyor...", "Permission request is still running...") }
+    static var watchStopped: String { pair("İzleme durduruldu", "Watching stopped") }
+    static var captureCancelled: String { pair("Yakalama iptal edildi", "Capture cancelled") }
+    static var permissionRequesting: String { pair("Ekran izni isteniyor...", "Requesting screen recording permission...") }
+    static var copyingToClipboard: String { pair("Panoya kopyalanıyor...", "Copying to the clipboard...") }
+    static var pdfTextCopied: String { pair("✅ PDF metni kopyalandı", "✅ PDF text copied") }
+    static var watchCancelled: String { pair("İzleme iptal edildi", "Watching cancelled") }
+    static var permissionRestartShort: String { pair("🔐 İzin verildi, uygulamayı yeniden başlatın", "🔐 Access granted, restart the app") }
+    static var permissionUnknownShort: String { pair("İzin durumu doğrulanamıyor. Sistem Ayarları veya 'Yenile' ile tekrar deneyin.", "Permission status cannot be verified. Use System Settings or Refresh.") }
+    static var watchStoppedPermissionOff: String { pair("🔐 İzleme durdu. Ekran kaydı izni kapalı.", "🔐 Watching stopped. Screen recording permission is off.") }
+    static var watchStoppedNeedsRestart: String { pair("🔐 İzleme durdu. Yeni izin için uygulamayı yeniden başlatın.", "🔐 Watching stopped. Restart the app to use the new permission.") }
+    static var watchTemporaryPermissionError: String { pair("👁 Geçici izin hatası algılandı, izleme devam ediyor.", "👁 A temporary permission error was detected. Watching continues.") }
+    static var watchClipboardFailed: String { pair("⚠️ İzleme kopyalama hatası", "⚠️ Watch mode could not copy text") }
+    static var localImageOnly: String { pair("Yalnızca yerel görsel dosyaları destekleniyor.", "Only local image files are supported.") }
+    static var localPDFOnly: String { pair("Yalnızca yerel PDF dosyaları destekleniyor.", "Only local PDF files are supported.") }
+    static var unsupportedPath: String { pair("⚠️ Desteklenmeyen dosya yolu.", "⚠️ Unsupported file path.") }
+    static var imageOpenFailed: String { pair("Görsel dosyası açılamadı veya desteklenmiyor.", "The image file could not be opened or is unsupported.") }
+    static var imageTooLarge: String { pair("Görsel çözünürlüğü çok yüksek. Daha küçük bir dosya kullanın.", "The image resolution is too high. Use a smaller file.") }
+    static var unknownFailure: String { pair("❌ Bilinmeyen hata", "❌ Unknown error") }
+    static var clipboardImageMissing: String { pair("Panoda okunabilir bir görsel yok.", "The clipboard does not contain a readable image.") }
+    static var clipboardImageMissingStatus: String { pair("⚠️ Panoda okunabilir bir görsel yok.", "⚠️ The clipboard does not contain a readable image.") }
+
+    static func savedRegionMissing(_ name: String) -> String {
+        format("Kayıtlı bölge bulunamadı: %@", "Saved region not found: %@", name)
+    }
+
+    static func savedSnippetMissing(_ name: String) -> String {
+        format("Kayıtlı snippet bulunamadı: %@", "Saved snippet not found: %@", name)
+    }
+
+    static func profileOutputCopied(appName: String, preset: String) -> String {
+        format("✅ %@ için %@ çıktısı kopyalandı", "✅ %@ — %@ output copied", appName, preset)
+    }
+
+    static func watchActive(mode: String) -> String {
+        format("👁 İzleme aktif. %@ profiliyle yeni içerik otomatik kopyalanır.", "👁 Watching. New %@ content is copied automatically.", mode)
+    }
+
+    static func retryProgress(_ title: String, index: Int, total: Int) -> String {
+        format("%@... (%d/%d)", "%@... (%d/%d)", title, index, total)
+    }
+
+    static func recognitionVariants(_ title: String, count: Int) -> String {
+        format("%@... (%d varyant)", "%@... (%d variants)", title, count)
+    }
+
+    static func clipboardRecognition(_ title: String) -> String {
+        format("%@... (panodaki görsel)", "%@... (clipboard image)", title)
+    }
+
+    static func fileRecognition(_ title: String) -> String {
+        format("%@... (dosya)", "%@... (file)", title)
+    }
+
+    static func pdfPageRecognition(_ title: String, page: Int, total: Int) -> String {
+        format("%@... (PDF %d/%d)", "%@... (PDF %d/%d)", title, page, total)
+    }
+
+    static func searchablePDFCreated(_ name: String) -> String {
+        format("✅ Searchable PDF oluşturuldu: %@", "✅ Searchable PDF created: %@", name)
+    }
+
+    static func chooseWatchRegion(mode: String, preset: String) -> String {
+        format("İzlenecek alanı seçin (%@ • %@)", "Choose a region to watch (%@ • %@)", mode, preset)
+    }
 }

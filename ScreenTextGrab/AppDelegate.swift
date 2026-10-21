@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var captureStateObserver: AnyCancellable?
     private var automationCommandQueue = AutomationCommandQueue()
     private var urlSchemeAutomationAllowedThisSession = false
+    private var launchArgumentsNeedAutomationAuthorization = false
     private var screenshotLaunchMode: ScreenshotLaunchMode? {
         ScreenshotLaunchMode(arguments: ProcessInfo.processInfo.arguments)
     }
@@ -41,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if let automationCommand = AutomationCommand(arguments: ProcessInfo.processInfo.arguments) {
             automationCommandQueue.enqueue([automationCommand])
+            launchArgumentsNeedAutomationAuthorization = true
         }
 
         NSApp.setActivationPolicy(.accessory)
@@ -470,6 +472,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func flushPendingAutomationCommands() {
         guard let coordinator = captureCoordinator else {
             return
+        }
+
+        if launchArgumentsNeedAutomationAuthorization {
+            launchArgumentsNeedAutomationAuthorization = false
+            guard authorizeURLSchemeAutomationIfNeeded() else {
+                automationCommandQueue = AutomationCommandQueue()
+                return
+            }
         }
 
         while let command = automationCommandQueue.nextCommand(captureState: appState.captureState) {

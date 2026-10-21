@@ -59,7 +59,7 @@ struct TableReviewView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
             VStack(alignment: .leading, spacing: 5) {
-                Text(L10n.pair("Tablo Duzenleyici", "Table Editor"))
+                Text(L10n.pair("Tablo Düzenleyici", "Table Editor"))
                     .font(.system(size: 22, weight: .bold, design: .rounded))
 
                 Text(L10n.pair("OCR ile cikan tabloyu hucre bazinda duzelt, sonra Office uyumlu sekilde yeniden kopyala.", "Fix the OCR table cell by cell, then copy it again in an Office-friendly format."))
@@ -363,12 +363,12 @@ struct TableReviewView: View {
         switch result {
         case .success:
             feedback = InlineFeedback(
-                message: L10n.usesEnglish ? "\(preset.title) output was copied to the clipboard." : "\(preset.title) cikti panoya kopyalandi.",
+                message: L10n.usesEnglish ? "\(preset.title) output was copied to the clipboard." : "\(preset.title) çıktı panoya kopyalandı.",
                 tint: .accentCool
             )
         case .failedWrite, .failedReadback:
             feedback = InlineFeedback(
-                message: L10n.pair("Duzenlenen tablo panoya yazilamadi.", "The reviewed table could not be written to the clipboard."),
+                message: L10n.pair("Düzenlenen tablo panoya yazılamadı.", "The reviewed table could not be written to the clipboard."),
                 tint: .accentRose
             )
         }

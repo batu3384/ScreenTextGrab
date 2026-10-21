@@ -217,8 +217,8 @@ struct SettingsGeneralTabView: View {
                     .accessibilityLabel(L10n.pair("URL şeması otomasyonu", "URL-scheme automation"))
 
                     Text(L10n.pair(
-                        "Kapalıyken her stg:// isteği oturum onayı ister. Finder dosyaları ve stg CLI etkilenmez.",
-                        "When off, each stg:// request asks for session approval. Finder file opens and the stg CLI are unaffected."
+                        "Kapalıyken stg:// ve doğrudan başlatma argümanları oturum onayı ister. Finder dosyaları etkilenmez.",
+                        "When off, stg:// links and direct launch arguments ask for session approval. Finder file opens are unaffected."
                     ))
                     .font(.system(size: 11.5, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
@@ -628,7 +628,7 @@ struct SettingsHistoryTabView: View {
                             )
 
                             SettingsActionButton(
-                                title: L10n.pair("Vazgec", "Cancel"),
+                                title: L10n.pair("Vazgeç", "Cancel"),
                                 icon: "xmark",
                                 tint: .accentNeutral,
                                 action: cancelSnippetCollectionEditing

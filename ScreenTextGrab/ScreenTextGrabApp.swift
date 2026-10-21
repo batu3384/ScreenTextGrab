@@ -22,7 +22,7 @@ struct ScreenTextGrabApp: App {
                 .frame(width: 620, height: 560)
         }
 
-        Window(L10n.pair("Tablo Duzenleyici", "Table Editor"), id: Self.tableReviewWindowID) {
+        Window(L10n.pair("Tablo Düzenleyici", "Table Editor"), id: Self.tableReviewWindowID) {
             TableReviewView()
                 .environmentObject(appDelegate.appState)
                 .frame(minWidth: 860, idealWidth: 920, minHeight: 580, idealHeight: 640)

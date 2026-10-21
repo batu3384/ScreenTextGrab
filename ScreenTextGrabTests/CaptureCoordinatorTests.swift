@@ -753,6 +753,46 @@ final class CaptureCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testWatchClipboardFailureWaitsBeforeNextCapture() async {
+        let appState = AppState()
+
+        let capture = MockScreenCaptureService()
+        capture.candidates = [
+            CaptureCandidate(strategy: .screenshotKitGlobalRect, image: Self.makeImage(), debugInfo: "watch")
+        ]
+
+        let ocr = MockOCRService()
+        ocr.result = .success(OCRResult(
+            blocks: [OCRTextBlock(text: "aynı satır", confidence: 0.94, boundingBox: .zero)],
+            captureDate: Date(),
+            sourceRect: .zero
+        ))
+
+        let clipboard = MockClipboardService()
+        clipboard.result = .failedWrite
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: MockPermissionService(),
+            screenCaptureService: capture,
+            ocrService: ocr,
+            clipboardService: clipboard,
+            watchIntervalNanoseconds: 5_000_000_000
+        )
+
+        await coordinator.startWatchSession(
+            screenRect: CGRect(x: 10, y: 10, width: 500, height: 120),
+            preferredDisplay: nil,
+            environment: Self.emptyEnvironment
+        )
+
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        coordinator.stopWatching()
+
+        XCTAssertEqual(capture.captureCallCount, 1)
+        XCTAssertTrue(appState.copyHistory.isEmpty)
+    }
+
+    @MainActor
     func testWatchNewLinesOnlyCopiesOnlyDelta() async {
         let appState = AppState()
         appState.setWatchCopyBehavior(.newLinesOnly)

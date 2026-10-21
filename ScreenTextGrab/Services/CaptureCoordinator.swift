@@ -3,6 +3,10 @@ import ImageIO
 import PDFKit
 import Vision
 
+private enum CaptureEpoch {
+    @TaskLocal static var value: Int?
+}
+
 enum CaptureTrigger: String, Sendable {
     case hotkey
     case menu
@@ -80,6 +84,8 @@ final class CaptureCoordinator: CaptureCoordinating {
 
     private var activeOverlay: SelectionOverlayPresenting?
     private var lastCaptureStart: Date?
+    private var captureTask: Task<Void, Never>?
+    private var captureEpoch = 0
     private var watchTask: Task<Void, Never>?
     private var currentWatchSession: CaptureWatchSession?
 
@@ -106,6 +112,45 @@ final class CaptureCoordinator: CaptureCoordinating {
         self.outputWriter = CaptureOutputWriter(appState: appState, clipboardService: clipboardService)
     }
 
+    /// Returns false when a capture is still inside the stuck window and the caller should bail.
+    private func reclaimStuckCaptureIfNeeded() -> Bool {
+        guard appState.captureState.isBusy else { return true }
+        guard let start = lastCaptureStart,
+              timeProvider().timeIntervalSince(start) > 30 else {
+            return false
+        }
+
+        STGLog.pipeline.error("Pipeline stuck for 30+ seconds — force resetting state")
+        abandonInFlightCapture()
+        appState.captureState = .idle
+        return true
+    }
+
+    private func abandonInFlightCapture() {
+        captureEpoch += 1
+        captureTask?.cancel()
+        captureTask = nil
+        activeOverlay?.closeOverlay()
+        activeOverlay = nil
+        lastCaptureStart = nil
+    }
+
+    private func runCapture(_ work: @escaping @MainActor () async -> Void) {
+        captureEpoch += 1
+        let epoch = captureEpoch
+        captureTask?.cancel()
+        captureTask = Task { @MainActor in
+            await CaptureEpoch.$value.withValue(epoch) {
+                await work()
+            }
+        }
+    }
+
+    private func captureWorkIsCurrent() -> Bool {
+        guard let epoch = CaptureEpoch.value else { return true }
+        return epoch == captureEpoch && !Task.isCancelled
+    }
+
     func startCapture(trigger: CaptureTrigger) {
         startCapture(trigger: trigger, sessionOverrides: nil)
     }
@@ -114,64 +159,53 @@ final class CaptureCoordinator: CaptureCoordinating {
         let sourceContext = Self.captureHistorySourceContext()
         let sessionConfiguration = resolvedSessionConfiguration(for: sourceContext, overrides: sessionOverrides)
         guard appState.watchState != .active && appState.watchState != .selecting else {
-            appState.statusMessage = "👁 İzleme aktifken normal yakalama başlamaz. Önce izlemeyi durdur."
+            appState.statusMessage = L10n.captureBlockedByWatch
             return
         }
 
-        if appState.captureState.isBusy {
-            if let start = lastCaptureStart,
-               timeProvider().timeIntervalSince(start) > 30 {
-                STGLog.pipeline.error("Pipeline stuck for 30+ seconds — force resetting state")
-                appState.captureState = .idle
-                activeOverlay?.closeOverlay()
-                activeOverlay = nil
-                lastCaptureStart = nil
-            } else {
-                return
-            }
-        }
+        guard reclaimStuckCaptureIfNeeded() else { return }
 
         lastCaptureStart = timeProvider()
         appState.lastError = nil
         appState.captureState = .preparing
-        appState.statusMessage = "Yakalamaya hazırlanıyor..."
+        appState.statusMessage = L10n.capturePreparing
         STGLog.pipeline.info("Pipeline started; trigger=\(trigger.rawValue, privacy: .public)")
 
-        Task { @MainActor in
-            let permissionState = await permissionService.resolveState()
-            appState.permissionState = permissionState
+        runCapture {
+            let permissionState = await self.permissionService.resolveState()
+            self.appState.permissionState = permissionState
 
             switch permissionState {
             case .granted:
-                presentOverlay(trigger: trigger, source: sourceContext, sessionConfiguration: sessionConfiguration)
+                self.presentOverlay(trigger: trigger, source: sourceContext, sessionConfiguration: sessionConfiguration)
             case .requiresRestart:
-                lastCaptureStart = nil
-                appState.captureState = .failed
-                appState.statusMessage = "🔐 İzin verildi. Lütfen uygulamayı yeniden başlatın."
+                self.lastCaptureStart = nil
+                self.appState.captureState = .failed
+                self.appState.statusMessage = L10n.permissionRestartCapture
             case .denied:
-                lastCaptureStart = nil
-                appState.captureState = .failed
-                appState.statusMessage = "🔐 Ekran kaydı izni gerekli. İzin verdiyseniz 'Yenile' ile tekrar kontrol edin."
+                self.lastCaptureStart = nil
+                self.appState.captureState = .failed
+                self.appState.statusMessage = L10n.permissionDeniedRefresh
             case .unknown:
-                lastCaptureStart = nil
-                appState.captureState = .failed
-                appState.statusMessage = "🔐 İzin durumu doğrulanamadı. Sistem Ayarları veya 'Yenile' ile tekrar deneyin."
+                self.lastCaptureStart = nil
+                self.appState.captureState = .failed
+                self.appState.statusMessage = L10n.permissionUnknown
             case .requestInProgress:
-                lastCaptureStart = nil
-                appState.captureState = .idle
-                appState.statusMessage = "İzin isteği devam ediyor..."
+                self.lastCaptureStart = nil
+                self.appState.captureState = .idle
+                self.appState.statusMessage = L10n.permissionRequestInProgress
             }
         }
     }
 
     func repeatLastCapture(sessionOverrides: AutomationCaptureOverrides? = nil) {
         guard appState.watchState != .active && appState.watchState != .selecting else {
-            appState.statusMessage = "👁 İzleme aktifken son alan yeniden yakalanmaz. Önce izlemeyi durdur."
+            appState.statusMessage = L10n.repeatBlockedByWatch
             return
         }
 
         guard let lastSelection = appState.lastCaptureSelection else {
-            appState.statusMessage = "Önce bir alan yakala, sonra tekrar kullan."
+            appState.statusMessage = L10n.repeatNeedsSelection
             return
         }
 
@@ -185,7 +219,7 @@ final class CaptureCoordinator: CaptureCoordinating {
 
     func captureSavedRegion(_ region: SavedCaptureRegion, sessionOverrides: AutomationCaptureOverrides? = nil) {
         guard appState.watchState != .active && appState.watchState != .selecting else {
-            appState.statusMessage = "👁 İzleme aktifken kayıtlı bölge yakalanmaz. Önce izlemeyi durdur."
+            appState.statusMessage = L10n.savedRegionBlockedByWatch
             return
         }
 
@@ -199,7 +233,7 @@ final class CaptureCoordinator: CaptureCoordinating {
 
     func captureSavedRegion(named name: String, sessionOverrides: AutomationCaptureOverrides? = nil) {
         guard let region = appState.savedCaptureRegion(named: name) else {
-            appState.statusMessage = "Kayıtlı bölge bulunamadı: \(name)"
+            appState.statusMessage = L10n.savedRegionMissing(name)
             return
         }
 
@@ -223,7 +257,7 @@ final class CaptureCoordinator: CaptureCoordinating {
             _ = appState.noteSavedSnippetUsed(snippet)
             if let targetProfile,
                effectiveOutputPreset != snippet.outputPreset {
-                appState.statusMessage = "✅ \(targetProfile.appName) için \(effectiveOutputPreset.title) çıktısı kopyalandı"
+                appState.statusMessage = L10n.profileOutputCopied(appName: targetProfile.appName, preset: effectiveOutputPreset.title)
             }
         }
 
@@ -232,7 +266,7 @@ final class CaptureCoordinator: CaptureCoordinating {
 
     func copySavedSnippet(named name: String) -> ClipboardWriteResult {
         guard let snippet = appState.savedSnippet(named: name) else {
-            appState.statusMessage = "Kayıtlı snippet bulunamadı: \(name)"
+            appState.statusMessage = L10n.savedSnippetMissing(name)
             return .failedWrite
         }
 
@@ -241,32 +275,21 @@ final class CaptureCoordinator: CaptureCoordinating {
 
     func captureClipboardImage(sessionOverrides: AutomationCaptureOverrides? = nil) {
         guard appState.watchState != .active && appState.watchState != .selecting else {
-            appState.statusMessage = "👁 İzleme aktifken panodaki görsel okunmaz. Önce izlemeyi durdur."
+            appState.statusMessage = L10n.clipboardImageBlockedByWatch
             return
         }
 
-        if appState.captureState.isBusy {
-            if let start = lastCaptureStart,
-               timeProvider().timeIntervalSince(start) > 30 {
-                STGLog.pipeline.error("Clipboard OCR stuck for 30+ seconds — force resetting state")
-                appState.captureState = .idle
-                activeOverlay?.closeOverlay()
-                activeOverlay = nil
-                lastCaptureStart = nil
-            } else {
-                return
-            }
-        }
+        guard reclaimStuckCaptureIfNeeded() else { return }
 
         guard let image = clipboardService.readImageFromClipboard() else {
             let error = CapturePipelineError.captureFailed(
                 domain: "Clipboard",
                 code: -2,
-                description: "Panoda okunabilir bir görsel yok."
+                description: L10n.clipboardImageMissing
             )
             appState.lastError = error
             appState.captureState = .failed
-            appState.statusMessage = error.errorDescription ?? "⚠️ Panoda okunabilir bir görsel yok."
+            appState.statusMessage = error.errorDescription ?? L10n.clipboardImageMissingStatus
             return
         }
 
@@ -275,11 +298,11 @@ final class CaptureCoordinator: CaptureCoordinating {
         lastCaptureStart = timeProvider()
         appState.lastError = nil
         appState.captureState = .preparing
-        appState.statusMessage = "Panodaki görsel hazırlanıyor..."
+        appState.statusMessage = L10n.clipboardImagePreparing
         STGLog.pipeline.info("Clipboard OCR started")
 
-        Task { @MainActor in
-            await performClipboardImagePipeline(
+        runCapture {
+            await self.performClipboardImagePipeline(
                 image: image,
                 source: sourceContext,
                 sessionConfiguration: sessionConfiguration
@@ -293,18 +316,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         preparingMessage: String,
         logMessage: String
     ) {
-        if appState.captureState.isBusy {
-            if let start = lastCaptureStart,
-               timeProvider().timeIntervalSince(start) > 30 {
-                STGLog.pipeline.error("Selection capture stuck for 30+ seconds — force resetting state")
-                appState.captureState = .idle
-                activeOverlay?.closeOverlay()
-                activeOverlay = nil
-                lastCaptureStart = nil
-            } else {
-                return
-            }
-        }
+        guard reclaimStuckCaptureIfNeeded() else { return }
 
         let sessionConfiguration = (sessionOverrides ?? AutomationCaptureOverrides()).applying(to: selection.sessionConfiguration)
 
@@ -314,9 +326,9 @@ final class CaptureCoordinator: CaptureCoordinating {
         appState.statusMessage = preparingMessage
         STGLog.pipeline.info("\(logMessage)")
 
-        Task { @MainActor in
-            let permissionState = await permissionService.resolveState()
-            appState.permissionState = permissionState
+        runCapture {
+            let permissionState = await self.permissionService.resolveState()
+            self.appState.permissionState = permissionState
 
             switch permissionState {
             case .granted:
@@ -325,7 +337,7 @@ final class CaptureCoordinator: CaptureCoordinating {
                     for: selection.screenRect,
                     preferredDisplayID: selection.preferredDisplayID
                 )
-                await performCapturePipeline(
+                await self.performCapturePipeline(
                     screenRect: selection.screenRect,
                     preferredDisplay: preferredDisplay,
                     environment: environment,
@@ -333,54 +345,43 @@ final class CaptureCoordinator: CaptureCoordinating {
                     sessionConfiguration: sessionConfiguration
                 )
             case .requiresRestart:
-                lastCaptureStart = nil
-                appState.captureState = .failed
-                appState.statusMessage = "🔐 İzin verildi. Lütfen uygulamayı yeniden başlatın."
+                self.lastCaptureStart = nil
+                self.appState.captureState = .failed
+                self.appState.statusMessage = L10n.permissionRestartCapture
             case .denied:
-                lastCaptureStart = nil
-                appState.captureState = .failed
-                appState.statusMessage = "🔐 Ekran kaydı izni gerekli. İzin verdiyseniz 'Yenile' ile tekrar kontrol edin."
+                self.lastCaptureStart = nil
+                self.appState.captureState = .failed
+                self.appState.statusMessage = L10n.permissionDeniedRefresh
             case .unknown:
-                lastCaptureStart = nil
-                appState.captureState = .failed
-                appState.statusMessage = "🔐 İzin durumu doğrulanamadı. Sistem Ayarları veya 'Yenile' ile tekrar deneyin."
+                self.lastCaptureStart = nil
+                self.appState.captureState = .failed
+                self.appState.statusMessage = L10n.permissionUnknown
             case .requestInProgress:
-                lastCaptureStart = nil
-                appState.captureState = .idle
-                appState.statusMessage = "İzin isteği devam ediyor..."
+                self.lastCaptureStart = nil
+                self.appState.captureState = .idle
+                self.appState.statusMessage = L10n.permissionRequestInProgress
             }
         }
     }
 
     func captureImageFile(at url: URL, sessionOverrides: AutomationCaptureOverrides? = nil) {
         guard appState.watchState != .active && appState.watchState != .selecting else {
-            appState.statusMessage = "👁 İzleme aktifken dosya OCR başlamaz. Önce izlemeyi durdur."
+            appState.statusMessage = L10n.imageFileBlockedByWatch
             return
         }
 
-        if appState.captureState.isBusy {
-            if let start = lastCaptureStart,
-               timeProvider().timeIntervalSince(start) > 30 {
-                STGLog.pipeline.error("Image file OCR stuck for 30+ seconds — force resetting state")
-                appState.captureState = .idle
-                activeOverlay?.closeOverlay()
-                activeOverlay = nil
-                lastCaptureStart = nil
-            } else {
-                return
-            }
-        }
+        guard reclaimStuckCaptureIfNeeded() else { return }
 
         let standardizedURL = url.standardizedFileURL
         guard standardizedURL.isFileURL else {
             let error = CapturePipelineError.captureFailed(
                 domain: "FileImport",
                 code: -10,
-                description: "Yalnızca yerel görsel dosyaları destekleniyor."
+                description: L10n.localImageOnly
             )
             appState.lastError = error
             appState.captureState = .failed
-            appState.statusMessage = error.errorDescription ?? "⚠️ Desteklenmeyen dosya yolu."
+            appState.statusMessage = error.errorDescription ?? L10n.unsupportedPath
             return
         }
 
@@ -396,54 +397,43 @@ final class CaptureCoordinator: CaptureCoordinating {
         lastCaptureStart = timeProvider()
         appState.lastError = nil
         appState.captureState = .preparing
-        appState.statusMessage = "Görsel dosyası hazırlanıyor..."
+        appState.statusMessage = L10n.imageFilePreparing
         STGLog.pipeline.info("Image file OCR started path=\(standardizedURL.path, privacy: .public)")
 
-        Task { @MainActor in
+        runCapture {
             do {
                 let image = try Self.loadImageFile(at: standardizedURL)
-                await performImageFilePipeline(
+                await self.performImageFilePipeline(
                     image: image,
                     fileURL: standardizedURL,
                     sessionConfiguration: sessionConfiguration
                 )
             } catch {
                 let pipelineError = Self.mapToPipelineError(error)
-                lastCaptureStart = nil
-                handleFailure(pipelineError)
+                self.lastCaptureStart = nil
+                self.handleFailure(pipelineError)
             }
         }
     }
 
     func capturePDFFile(at url: URL, sessionOverrides: AutomationCaptureOverrides? = nil) {
         guard appState.watchState != .active && appState.watchState != .selecting else {
-            appState.statusMessage = "👁 İzleme aktifken PDF OCR başlamaz. Önce izlemeyi durdur."
+            appState.statusMessage = L10n.pdfBlockedByWatch
             return
         }
 
-        if appState.captureState.isBusy {
-            if let start = lastCaptureStart,
-               timeProvider().timeIntervalSince(start) > 30 {
-                STGLog.pipeline.error("PDF OCR stuck for 30+ seconds — force resetting state")
-                appState.captureState = .idle
-                activeOverlay?.closeOverlay()
-                activeOverlay = nil
-                lastCaptureStart = nil
-            } else {
-                return
-            }
-        }
+        guard reclaimStuckCaptureIfNeeded() else { return }
 
         let standardizedURL = url.standardizedFileURL
         guard standardizedURL.isFileURL else {
             let error = CapturePipelineError.captureFailed(
                 domain: "PDFImport",
                 code: -20,
-                description: "Yalnızca yerel PDF dosyaları destekleniyor."
+                description: L10n.localPDFOnly
             )
             appState.lastError = error
             appState.captureState = .failed
-            appState.statusMessage = error.errorDescription ?? "⚠️ Desteklenmeyen PDF yolu."
+            appState.statusMessage = error.errorDescription ?? L10n.unsupportedPath
             return
         }
 
@@ -459,21 +449,21 @@ final class CaptureCoordinator: CaptureCoordinating {
         lastCaptureStart = timeProvider()
         appState.lastError = nil
         appState.captureState = .preparing
-        appState.statusMessage = "PDF hazırlanıyor..."
+        appState.statusMessage = L10n.pdfPreparing
         STGLog.pipeline.info("PDF OCR started path=\(standardizedURL.path, privacy: .public)")
 
-        Task { @MainActor in
+        runCapture {
             do {
                 let pages = try PDFProcessingService.renderPages(from: standardizedURL)
-                await performPDFFilePipeline(
+                await self.performPDFFilePipeline(
                     pages: pages,
                     fileURL: standardizedURL,
                     sessionConfiguration: sessionConfiguration
                 )
             } catch {
                 let pipelineError = Self.mapToPipelineError(error)
-                lastCaptureStart = nil
-                handleFailure(pipelineError)
+                self.lastCaptureStart = nil
+                self.handleFailure(pipelineError)
             }
         }
     }
@@ -484,33 +474,22 @@ final class CaptureCoordinator: CaptureCoordinating {
         sessionOverrides: AutomationCaptureOverrides? = nil
     ) {
         guard appState.watchState != .active && appState.watchState != .selecting else {
-            appState.statusMessage = "👁 İzleme aktifken searchable PDF üretilemez. Önce izlemeyi durdur."
+            appState.statusMessage = L10n.searchablePDFBlockedByWatch
             return
         }
 
-        if appState.captureState.isBusy {
-            if let start = lastCaptureStart,
-               timeProvider().timeIntervalSince(start) > 30 {
-                STGLog.pipeline.error("Searchable PDF export stuck for 30+ seconds — force resetting state")
-                appState.captureState = .idle
-                activeOverlay?.closeOverlay()
-                activeOverlay = nil
-                lastCaptureStart = nil
-            } else {
-                return
-            }
-        }
+        guard reclaimStuckCaptureIfNeeded() else { return }
 
         let standardizedURL = url.standardizedFileURL
         guard standardizedURL.isFileURL else {
             let error = CapturePipelineError.captureFailed(
                 domain: "PDFExport",
                 code: -21,
-                description: "Yalnızca yerel PDF dosyaları destekleniyor."
+                description: L10n.localPDFOnly
             )
             appState.lastError = error
             appState.captureState = .failed
-            appState.statusMessage = error.errorDescription ?? "⚠️ Desteklenmeyen PDF yolu."
+            appState.statusMessage = error.errorDescription ?? L10n.unsupportedPath
             return
         }
 
@@ -528,15 +507,15 @@ final class CaptureCoordinator: CaptureCoordinating {
         lastCaptureStart = timeProvider()
         appState.lastError = nil
         appState.captureState = .preparing
-        appState.statusMessage = "Searchable PDF hazırlanıyor..."
+        appState.statusMessage = L10n.searchablePDFPreparing
         STGLog.pipeline.info(
             "Searchable PDF export started source=\(standardizedURL.path, privacy: .public) destination=\(resolvedDestination.path, privacy: .public)"
         )
 
-        Task { @MainActor in
+        runCapture {
             do {
                 let pages = try PDFProcessingService.renderPages(from: standardizedURL)
-                await performSearchablePDFExportPipeline(
+                await self.performSearchablePDFExportPipeline(
                     pages: pages,
                     fileURL: standardizedURL,
                     destinationURL: resolvedDestination,
@@ -544,8 +523,8 @@ final class CaptureCoordinator: CaptureCoordinating {
                 )
             } catch {
                 let pipelineError = Self.mapToPipelineError(error)
-                lastCaptureStart = nil
-                handleFailure(pipelineError)
+                self.lastCaptureStart = nil
+                self.handleFailure(pipelineError)
             }
         }
     }
@@ -560,7 +539,7 @@ final class CaptureCoordinator: CaptureCoordinating {
             return
         }
 
-        appState.statusMessage = "İzleme hazırlanıyor..."
+        appState.statusMessage = L10n.watchPreparing
         appState.updateWatchState(.selecting)
 
         Task { @MainActor in
@@ -572,16 +551,16 @@ final class CaptureCoordinator: CaptureCoordinating {
                 presentWatchOverlay(source: sourceContext, sessionConfiguration: sessionConfiguration)
             case .requiresRestart:
                 appState.updateWatchState(.inactive)
-                appState.statusMessage = "🔐 İzin verildi. İzleme için uygulamayı yeniden başlatın."
+                appState.statusMessage = L10n.watchPermissionRestart
             case .denied:
                 appState.updateWatchState(.inactive)
-                appState.statusMessage = "🔐 İzleme için ekran kaydı izni gerekli."
+                appState.statusMessage = L10n.watchPermissionDenied
             case .unknown:
                 appState.updateWatchState(.inactive)
-                appState.statusMessage = "🔐 İzin durumu doğrulanamadı. Önce yenileyin."
+                appState.statusMessage = L10n.watchPermissionUnknown
             case .requestInProgress:
                 appState.updateWatchState(.inactive)
-                appState.statusMessage = "İzin isteği sürüyor..."
+                appState.statusMessage = L10n.watchPermissionInProgress
             }
         }
     }
@@ -598,23 +577,21 @@ final class CaptureCoordinator: CaptureCoordinating {
             if appState.permissionState == .granted, !appState.captureState.isBusy {
                 appState.statusMessage = appState.readyStatusMessage
             } else if !appState.captureState.isBusy {
-                appState.statusMessage = "İzleme durduruldu"
+                appState.statusMessage = L10n.watchStopped
             }
         }
     }
 
     func cancelCapture() {
-        activeOverlay?.closeOverlay()
-        activeOverlay = nil
-        lastCaptureStart = nil
+        abandonInFlightCapture()
         appState.captureState = .cancelled
-        appState.statusMessage = "Yakalama iptal edildi"
+        appState.statusMessage = L10n.captureCancelled
     }
 
     func requestPermission() {
         Task { @MainActor in
             appState.permissionState = .requestInProgress
-            appState.statusMessage = "Ekran izni isteniyor..."
+            appState.statusMessage = L10n.permissionRequesting
             let state = await permissionService.requestIfNeeded()
             applyPermissionState(state)
         }
@@ -728,7 +705,7 @@ final class CaptureCoordinator: CaptureCoordinating {
                 }
 
                 for (retryIndex, retryAttempt) in retryAttempts.enumerated() {
-                    appState.statusMessage = "\(captureMode.retryProgressTitle)... (\(retryIndex + 2)/\(retryAttempts.count + 1))"
+                    appState.statusMessage = L10n.retryProgress(captureMode.retryProgressTitle, index: retryIndex + 2, total: retryAttempts.count + 1)
                     try? await Task.sleep(nanoseconds: retryAttempt.delayNanoseconds)
 
                     evaluation = try await performAttempt(
@@ -811,7 +788,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         )
         currentWatchSession = session
         appState.updateWatchState(.active)
-        appState.statusMessage = "👁 İzleme aktif. \(resolvedConfiguration.captureMode.title) profiliyle yeni içerik otomatik kopyalanır."
+        appState.statusMessage = L10n.watchActive(mode: resolvedConfiguration.captureMode.title)
 
         watchTask = Task { [weak self] in
             guard let self else { return }
@@ -852,7 +829,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         }
 
         appState.captureState = .recognizing
-        appState.statusMessage = "\(captureMode.recognitionProgressTitle)... (\(candidates.count) varyant)"
+        appState.statusMessage = L10n.recognitionVariants(captureMode.recognitionProgressTitle, count: candidates.count)
         STGLog.pipeline.info(
             "State → recognizing attempt=\(attemptLabel, privacy: .public) candidates=\(candidates.count)"
         )
@@ -901,7 +878,7 @@ final class CaptureCoordinator: CaptureCoordinating {
 
         do {
             appState.captureState = .recognizing
-            appState.statusMessage = "\(sessionConfiguration.captureMode.recognitionProgressTitle)... (panodaki görsel)"
+            appState.statusMessage = L10n.clipboardRecognition(sessionConfiguration.captureMode.recognitionProgressTitle)
             STGLog.pipeline.info("Clipboard OCR recognizing")
 
             let evaluation = await Self.evaluateCandidatesAsync(
@@ -954,7 +931,7 @@ final class CaptureCoordinator: CaptureCoordinating {
 
         do {
             appState.captureState = .recognizing
-            appState.statusMessage = "\(sessionConfiguration.captureMode.recognitionProgressTitle)... (dosya)"
+            appState.statusMessage = L10n.fileRecognition(sessionConfiguration.captureMode.recognitionProgressTitle)
             STGLog.pipeline.info("Image file OCR recognizing path=\(fileURL.path, privacy: .public)")
 
             let evaluation = await Self.evaluateCandidatesAsync(
@@ -1012,6 +989,8 @@ final class CaptureCoordinator: CaptureCoordinating {
             return
         }
 
+        guard captureWorkIsCurrent() else { return }
+
         let result = copyCapturedText(
             rawText: recognition.text,
             captureMode: sessionConfiguration.captureMode,
@@ -1024,7 +1003,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         case .success:
             lastCaptureStart = nil
             appState.captureState = .completed
-            appState.statusMessage = "✅ PDF metni kopyalandı"
+            appState.statusMessage = L10n.pdfTextCopied
         case .failedWrite, .failedReadback:
             lastCaptureStart = nil
             appState.captureState = .failed
@@ -1060,6 +1039,8 @@ final class CaptureCoordinator: CaptureCoordinating {
                 return
             }
 
+            guard captureWorkIsCurrent() else { return }
+
             try PDFProcessingService.exportSearchablePDF(
                 from: fileURL,
                 recognizedPages: recognition.pages,
@@ -1068,7 +1049,7 @@ final class CaptureCoordinator: CaptureCoordinating {
 
             lastCaptureStart = nil
             appState.captureState = .completed
-            appState.statusMessage = "✅ Searchable PDF oluşturuldu: \(destinationURL.lastPathComponent)"
+            appState.statusMessage = L10n.searchablePDFCreated(destinationURL.lastPathComponent)
             appState.appendDiagnostic(
                 category: "pdf",
                 message: "Searchable PDF exported to \(destinationURL.path)",
@@ -1101,7 +1082,7 @@ final class CaptureCoordinator: CaptureCoordinating {
             )
 
             appState.captureState = .recognizing
-            appState.statusMessage = "\(sessionConfiguration.captureMode.recognitionProgressTitle)... (PDF \(pageOffset + 1)/\(pages.count))"
+            appState.statusMessage = L10n.pdfPageRecognition(sessionConfiguration.captureMode.recognitionProgressTitle, page: pageOffset + 1, total: pages.count)
 
             let evaluation = await Self.evaluateCandidatesAsync(
                 ocrService: ocrService,
@@ -1141,6 +1122,7 @@ final class CaptureCoordinator: CaptureCoordinating {
     }
 
     private func handleEmptyResult(captureMode: CaptureMode, attemptSummary: String) {
+        guard captureWorkIsCurrent() else { return }
         lastCaptureStart = nil
         appState.captureState = .completedEmpty
         appState.statusMessage = captureMode.emptyResultMessage
@@ -1159,6 +1141,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         source: ClipboardHistoryEntry.SourceContext?,
         notificationDisplayFrame: CGRect?
     ) throws {
+        guard captureWorkIsCurrent() else { return }
         STGLog.capture.info(
             "Capture selected strategy=\(best.candidate.strategy.rawValue, privacy: .public) attempt=\(best.attemptLabel, privacy: .public) score=\(best.score) chars=\(best.text.count)"
         )
@@ -1170,7 +1153,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         )
 
         appState.captureState = .copying
-        appState.statusMessage = "Panoya kopyalanıyor..."
+        appState.statusMessage = L10n.copyingToClipboard
         STGLog.pipeline.info("State → copying")
 
         let clipboardResult = outputWriter.copyCapturedText(
@@ -1340,8 +1323,9 @@ final class CaptureCoordinator: CaptureCoordinating {
                 let preferredDisplay = environment.descriptor(for: screen)
                 self.activeOverlay = nil
 
-                Task {
+                self.runCapture {
                     try? await Task.sleep(nanoseconds: 400_000_000)
+                    guard self.captureWorkIsCurrent() else { return }
                     await self.performCapturePipeline(
                         screenRect: rect,
                         preferredDisplay: preferredDisplay,
@@ -1353,10 +1337,9 @@ final class CaptureCoordinator: CaptureCoordinating {
             },
             { [weak self] in
                 guard let self else { return }
-                self.activeOverlay = nil
-                self.lastCaptureStart = nil
+                self.abandonInFlightCapture()
                 self.appState.captureState = .cancelled
-                self.appState.statusMessage = "Yakalama iptal edildi"
+                self.appState.statusMessage = L10n.captureCancelled
             }
         )
         activeOverlay?.showOverlay()
@@ -1367,7 +1350,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         sessionConfiguration: CaptureSessionConfiguration
     ) {
         appState.updateWatchState(.selecting)
-        appState.statusMessage = "İzlenecek alanı seçin (\(sessionConfiguration.captureMode.title) • \(sessionConfiguration.outputPreset.title))"
+        appState.statusMessage = L10n.chooseWatchRegion(mode: sessionConfiguration.captureMode.title, preset: sessionConfiguration.outputPreset.title)
 
         activeOverlay = overlayFactory(
             { [weak self] rect, screen in
@@ -1390,7 +1373,7 @@ final class CaptureCoordinator: CaptureCoordinating {
                 guard let self else { return }
                 self.activeOverlay = nil
                 self.appState.updateWatchState(.inactive)
-                self.appState.statusMessage = "İzleme iptal edildi"
+                self.appState.statusMessage = L10n.watchCancelled
             }
         )
         activeOverlay?.showOverlay()
@@ -1409,13 +1392,13 @@ final class CaptureCoordinator: CaptureCoordinating {
                 appState.statusMessage = appState.readyStatusMessage
             }
         case .requiresRestart:
-            appState.statusMessage = "🔐 İzin verildi, uygulamayı yeniden başlatın"
+            appState.statusMessage = L10n.permissionRestartShort
         case .denied:
-            appState.statusMessage = "🔐 Ekran kaydı izni gerekli. İzin verdiyseniz 'Yenile' ile tekrar kontrol edin."
+            appState.statusMessage = L10n.permissionDeniedRefresh
         case .requestInProgress:
-            appState.statusMessage = "Ekran izni isteniyor..."
+            appState.statusMessage = L10n.permissionRequesting
         case .unknown:
-            appState.statusMessage = "İzin durumu doğrulanamıyor. Sistem Ayarları veya 'Yenile' ile tekrar deneyin."
+            appState.statusMessage = L10n.permissionUnknownShort
         }
     }
 
@@ -1470,14 +1453,17 @@ final class CaptureCoordinator: CaptureCoordinating {
                                 rawText: payload,
                                 preferredDisplay: preferredDisplay
                             )
-                            guard copied else {
-                                continue
+                            if copied {
+                                session.lastRecognizedSignature = signature
+                                session.lastRawText = best.text
+                                currentWatchSession = session
                             }
+                        } else {
+                            // Empty filtered payload: mark seen so the same frame is not reconsidered.
+                            session.lastRecognizedSignature = signature
+                            session.lastRawText = best.text
+                            currentWatchSession = session
                         }
-                        // Empty filtered payload: mark seen so we do not spin on the same frame.
-                        session.lastRecognizedSignature = signature
-                        session.lastRawText = best.text
-                        currentWatchSession = session
                     }
                 }
             } catch {
@@ -1517,7 +1503,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         case .success:
             return true
         case .failedWrite, .failedReadback:
-            appState.statusMessage = CapturePipelineError.clipboardFailed(result: clipboardResult).errorDescription ?? "⚠️ İzleme kopyalama hatası"
+            appState.statusMessage = CapturePipelineError.clipboardFailed(result: clipboardResult).errorDescription ?? L10n.watchClipboardFailed
             appState.appendDiagnostic(
                 category: "watch",
                 message: "Clipboard write failed during watch mode",
@@ -1537,13 +1523,13 @@ final class CaptureCoordinator: CaptureCoordinating {
 
             switch resolved {
             case .denied, .unknown:
-                appState.statusMessage = "🔐 İzleme durdu. Ekran kaydı izni kapalı."
+                appState.statusMessage = L10n.watchStoppedPermissionOff
                 appState.updateWatchState(.inactive)
                 watchTask?.cancel()
                 watchTask = nil
                 return true
             case .requiresRestart:
-                appState.statusMessage = "🔐 İzleme durdu. Yeni izin için uygulamayı yeniden başlatın."
+                appState.statusMessage = L10n.watchStoppedNeedsRestart
                 appState.updateWatchState(.inactive)
                 watchTask?.cancel()
                 watchTask = nil
@@ -1557,7 +1543,7 @@ final class CaptureCoordinator: CaptureCoordinating {
                     severity: .warning
                 )
                 if appState.watchState == .active {
-                    appState.statusMessage = "👁 Geçici izin hatası algılandı, izleme devam ediyor."
+                    appState.statusMessage = L10n.watchTemporaryPermissionError
                 }
                 return false
             }
@@ -1654,7 +1640,7 @@ final class CaptureCoordinator: CaptureCoordinating {
             throw CapturePipelineError.captureFailed(
                 domain: "FileImport",
                 code: -11,
-                description: "Görsel dosyası açılamadı veya desteklenmiyor."
+                description: L10n.imageOpenFailed
             )
         }
 
@@ -1664,7 +1650,7 @@ final class CaptureCoordinator: CaptureCoordinating {
             throw CapturePipelineError.captureFailed(
                 domain: "FileImport",
                 code: -12,
-                description: "Görsel çözünürlüğü çok yüksek. Daha küçük bir dosya kullanın."
+                description: L10n.imageTooLarge
             )
         }
 
@@ -1672,9 +1658,10 @@ final class CaptureCoordinator: CaptureCoordinating {
     }
 
     private func handleFailure(_ error: CapturePipelineError) {
+        guard captureWorkIsCurrent() else { return }
         appState.captureState = .failed
         appState.lastError = error
-        appState.statusMessage = error.errorDescription ?? "❌ Bilinmeyen hata"
+        appState.statusMessage = error.errorDescription ?? L10n.unknownFailure
 
         switch error {
         case .permissionDenied(let detail):

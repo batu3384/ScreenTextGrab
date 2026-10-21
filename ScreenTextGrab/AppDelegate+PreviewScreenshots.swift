@@ -94,7 +94,7 @@ extension AppDelegate {
             DiagnosticEntry(
                 timestamp: Date().addingTimeInterval(-240),
                 category: "permission",
-                message: L10n.pair("Screen Recording izni dogrulandi ve grant kaniti guncellendi.", "Screen Recording permission was verified and the grant evidence was refreshed."),
+                message: L10n.pair("Screen Recording izni doğrulandı ve grant kanıtı güncellendi.", "Screen Recording permission was verified and the grant evidence was refreshed."),
                 domain: "ScreenPermissionService",
                 code: 0,
                 severity: .info
@@ -322,7 +322,7 @@ extension AppDelegate {
             }
         case .tableReview:
             showPreviewWindow(
-                title: L10n.pair("Tablo Duzenleyici", "Table Editor"),
+                title: L10n.pair("Tablo Düzenleyici", "Table Editor"),
                 size: NSSize(width: 1020, height: 720)
             ) {
                 TableReviewView()

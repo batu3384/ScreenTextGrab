@@ -373,7 +373,7 @@ struct SettingsView: View {
             HStack(spacing: 10) {
                 if entry.captureMode == .table, entry.contentKind == .text {
                     settingsActionButton(
-                        title: L10n.pair("Duzenle", "Edit"),
+                        title: L10n.pair("Düzenle", "Edit"),
                         icon: "tablecells.badge.ellipsis",
                         tint: .accentMint,
                         action: { openTableReview(entry) }
@@ -569,7 +569,7 @@ struct SettingsView: View {
                         .opacity(snippetTagDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.55 : 1)
 
                         settingsActionButton(
-                            title: L10n.pair("Vazgec", "Cancel"),
+                            title: L10n.pair("Vazgeç", "Cancel"),
                             icon: "xmark",
                             tint: .accentNeutral,
                             action: cancelSnippetTagEditing
