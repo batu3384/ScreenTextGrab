@@ -104,6 +104,16 @@ final class ScreenPermissionService: ScreenPermissionProviding {
             persistResolvedState(resolvedState)
             return resolvedState
         case .unknown:
+            // Probe returned indeterminate result. If we have prior confirmed grant
+            // evidence (persisted across launches), trust it — CGPreflightScreenCaptureAccess
+            // and ScreenCaptureKit probes can be transiently unreliable on macOS 14+ for
+            // ad-hoc signed apps.
+            let previouslyGranted = defaults.bool(forKey: Self.permissionPreviouslyGrantedKey)
+            if lastConfirmedGrantAt != nil || previouslyGranted {
+                lastResolvedState = .granted
+                persistResolvedState(.granted)
+                return .granted
+            }
             let resolvedState: ScreenPermissionState = needsRestartAfterGrant ? .requiresRestart : .unknown
             lastResolvedState = resolvedState
             persistResolvedState(resolvedState)
@@ -266,11 +276,17 @@ final class ScreenPermissionService: ScreenPermissionProviding {
         case .granted, .requiresRestart:
             defaults.set(true, forKey: Self.autoPromptAttemptedKey)
             defaults.set(true, forKey: Self.permissionPreviouslyGrantedKey)
-        case .denied, .unknown:
+        case .denied:
             if previouslyGranted {
                 defaults.set(false, forKey: Self.autoPromptAttemptedKey)
                 defaults.set(false, forKey: Self.permissionPreviouslyGrantedKey)
             }
+        case .unknown:
+            // Probe returned indeterminate result; preserve previously granted state
+            // instead of resetting. CGPreflightScreenCaptureAccess is unreliable on
+            // macOS 14+ for ad-hoc signed apps, and transient probe failures should
+            // not cause repeated permission prompts.
+            break
         case .requestInProgress:
             break
         }
