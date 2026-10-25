@@ -18,6 +18,7 @@ final class AppState: ObservableObject {
     @Published var speechState: SpeechPlaybackState
     @Published var ocrLanguageSelection: OCRLanguageSelection
     @Published var captureOutputPreset: CaptureOutputPreset
+    @Published var monospaceLayoutSettings: MonospaceLayoutSettings
     @Published var interfaceLanguage: InterfaceLanguage
     @Published var watchConfiguration: WatchConfiguration
     @Published var appProfiles: [AppCaptureProfile]
@@ -76,6 +77,9 @@ final class AppState: ObservableObject {
         self.captureOutputPreset = persistsUserPreferences
             ? CaptureOutputPresetStore.load(defaults: defaults)
             : .smart
+        self.monospaceLayoutSettings = persistsUserPreferences
+            ? MonospaceLayoutSettingsStore.load(defaults: defaults)
+            : .defaultValue
         self.interfaceLanguage = persistsUserPreferences
             ? InterfaceLanguageStore.load(defaults: defaults)
             : .system
@@ -247,6 +251,22 @@ final class AppState: ObservableObject {
     func setCaptureOutputPreset(_ preset: CaptureOutputPreset) {
         captureOutputPreset = preset
         persistCaptureOutputPresetIfNeeded()
+    }
+
+    func setMonospaceLayoutEnabled(_ enabled: Bool) {
+        monospaceLayoutSettings = MonospaceLayoutSettings(
+            isEnabled: enabled,
+            columns: monospaceLayoutSettings.columns
+        )
+        persistMonospaceLayoutSettingsIfNeeded()
+    }
+
+    func setMonospaceLayoutColumns(_ columns: Int) {
+        monospaceLayoutSettings = MonospaceLayoutSettings(
+            isEnabled: monospaceLayoutSettings.isEnabled,
+            columns: columns
+        )
+        persistMonospaceLayoutSettingsIfNeeded()
     }
 
     func setInterfaceLanguage(_ language: InterfaceLanguage) {
@@ -645,6 +665,11 @@ final class AppState: ObservableObject {
     private func persistCaptureOutputPresetIfNeeded() {
         guard persistsUserPreferences else { return }
         CaptureOutputPresetStore.save(captureOutputPreset, defaults: defaults)
+    }
+
+    private func persistMonospaceLayoutSettingsIfNeeded() {
+        guard persistsUserPreferences else { return }
+        MonospaceLayoutSettingsStore.save(monospaceLayoutSettings, defaults: defaults)
     }
 
     private func persistInterfaceLanguageIfNeeded() {

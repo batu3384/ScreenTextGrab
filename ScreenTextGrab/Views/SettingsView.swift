@@ -150,6 +150,12 @@ struct SettingsView: View {
             captureModeFeedback: captureModeFeedback,
             outputPresetDetail: appState.captureOutputPreset.detail,
             outputPresetFeedback: outputPresetFeedback,
+            monospaceLayoutEnabledBinding: Binding(
+                get: { appState.monospaceLayoutSettings.isEnabled },
+                set: { appState.setMonospaceLayoutEnabled($0) }
+            ),
+            monospaceLayoutColumns: appState.monospaceLayoutSettings.columns,
+            onMonospaceLayoutColumnsChange: { appState.setMonospaceLayoutColumns($0) },
             isRecordingHotkey: isRecordingHotkey,
             hotkeyDisplayLabel: appState.hotkeyDisplayLabel,
             hotkeyFeedback: hotkeyFeedback,
