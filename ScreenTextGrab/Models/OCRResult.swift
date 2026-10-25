@@ -43,6 +43,307 @@ struct OCRResult: Sendable {
         }
     }
 
+    /// Eş aralıklı (monospace) hizalı metin üretir.
+    /// Metin bloklarının boundingBox konumlarını kullanarak satırlara ayırır,
+    /// yatay konumu sabit sütun sayısına göre padding ile korur,
+    /// dikey boşlukları boş satırlarla ifade eder.
+    /// - Parameter columns: Çıktı toplam sütun sayısı (varsayılan 120).
+    ///   Yatay hizalama doğruluğunu kontrol eder.
+    func monospaceAlignedText(columns: Int = 120, multicolumnSorting: Bool = false) -> String {
+        guard !blocks.isEmpty else {
+            return ""
+        }
+
+        let resolvedColumns = max(20, min(300, columns))
+
+        // Çok sütunlu sıralama açıksa, boşluk ağacı ile insan okuma sırasını uygula
+        let orderedBlocks = multicolumnSorting ? readingOrderSortedBlocks() : blocks
+
+        // y'ye göre sırala (büyük y = ekranın üstü, y yakınsa x'e göre)
+        let sorted = orderedBlocks.sorted { a, b in
+            if abs(a.boundingBox.midY - b.boundingBox.midY) < 0.02 {
+                return a.boundingBox.minX < b.boundingBox.minX
+            }
+            return a.boundingBox.midY > b.boundingBox.midY
+        }
+
+        // Satır kümeleme
+        var rows: [[OCRTextBlock]] = []
+        var currentRow: [OCRTextBlock] = []
+        for block in sorted {
+            if let first = currentRow.first {
+                if abs(block.boundingBox.midY - first.boundingBox.midY) < 0.02 {
+                    currentRow.append(block)
+                } else {
+                    rows.append(currentRow)
+                    currentRow = [block]
+                }
+            } else {
+                currentRow = [block]
+            }
+        }
+        if !currentRow.isEmpty {
+            rows.append(currentRow)
+        }
+
+        // Medyan satır yüksekliği — boş satır hesaplaması için
+        let rowHeights = rows
+            .compactMap { $0.first?.boundingBox.height }
+            .filter { $0 > 0 }
+            .sorted()
+        let medianRowHeight = rowHeights.isEmpty ? 0.02 : rowHeights[rowHeights.count / 2]
+
+        var output = ""
+        var lastRowTopY: CGFloat?
+
+        for row in rows {
+            let sortedRow = row.sorted { $0.boundingBox.minX < $1.boundingBox.minX }
+            let rowTopY = sortedRow.map { $0.boundingBox.maxY }.max() ?? 0
+
+            // Dikey boşluk → boş satır
+            if let ly = lastRowTopY {
+                let gap = ly - rowTopY
+                let blankLines = Int(gap / max(medianRowHeight * 1.5, 0.015))
+                if blankLines > 0 {
+                    output += String(repeating: "\n", count: min(blankLines, 6))
+                }
+            }
+
+            // Yatay: sütun konumuna padding ile hizala
+            var line = ""
+            for block in sortedRow {
+                let col = Int(block.boundingBox.minX * CGFloat(resolvedColumns))
+                if col > line.count {
+                    line += String(repeating: " ", count: col - line.count)
+                } else if !line.isEmpty {
+                    line += " "
+                }
+                line += block.text
+            }
+            output += line + "\n"
+            lastRowTopY = rowTopY
+        }
+
+        if output.hasSuffix("\n") {
+            output.removeLast()
+        }
+
+        return output
+    }
+
+    // MARK: - Gap Tree (Çok Sütunlu Okuma Sırası)
+
+    /// Boşluk ağacı algoritması ile blokları insan okuma sırasına göre sıralar.
+    /// Dikey boşlukları sütun sınırı olarak algılar, önce sol sütunu tamamen
+    /// yukarıdan aşağıya okur, sonra sağ sütuna geçer.
+    func readingOrderSortedBlocks() -> [OCRTextBlock] {
+        guard blocks.count > 1 else {
+            return blocks
+        }
+        let tree = buildLayoutTree(blocks)
+        return traverseLayoutTree(tree)
+    }
+
+    private indirect enum LayoutNode {
+        case leaf([OCRTextBlock])
+        case verticalSplit(left: LayoutNode, right: LayoutNode)
+        case horizontalSplit(top: LayoutNode, bottom: LayoutNode)
+    }
+
+    /// Dikey kesimleri algılar: birden fazla satır bandında sürekli boşluk olan x konumları
+    private func detectVerticalCuts(_ blocks: [OCRTextBlock]) -> [CGFloat] {
+        guard blocks.count >= 4 else {
+            return []
+        }
+
+        let minY = blocks.map { $0.boundingBox.minY }.min() ?? 0
+        let maxY = blocks.map { $0.boundingBox.maxY }.max() ?? 1
+        let totalHeight = maxY - minY
+        guard totalHeight > 0.05 else {
+            return []
+        }
+
+        // Y eksenini bandlara böl, her bandda boşluk olan x aralıklarını topla
+        let bandCount = 20
+        let bandHeight = totalHeight / CGFloat(bandCount)
+        var gapSupport: [ClosedRange<CGFloat>: Int] = [:]
+
+        for bandIndex in 0..<bandCount {
+            let bandMinY = minY + CGFloat(bandIndex) * bandHeight
+            let bandMaxY = bandMinY + bandHeight
+
+            // Bu bandla kesişen blokların x aralıkları
+            let occupiedRanges = blocks
+                .filter { block in
+                    block.boundingBox.maxY > bandMinY && block.boundingBox.minY < bandMaxY
+                }
+                .map { block in
+                    block.boundingBox.minX...block.boundingBox.maxX
+                }
+                .sorted { $0.lowerBound < $1.lowerBound }
+
+            guard !occupiedRanges.isEmpty else {
+                continue
+            }
+
+            // Boşluk aralıklarını bul
+            var currentEnd = occupiedRanges[0].upperBound
+            for range in occupiedRanges.dropFirst() {
+                if range.lowerBound > currentEnd {
+                    let gap = currentEnd...range.lowerBound
+                    gapSupport[gap] = (gapSupport[gap] ?? 0) + 1
+                }
+                currentEnd = max(currentEnd, range.upperBound)
+            }
+        }
+
+        // En az %40 bandda desteklenen boşlukları kesim olarak kabul et
+        let minSupport = max(2, Int(Double(bandCount) * 0.4))
+        let cuts = gapSupport
+            .filter { $0.value >= minSupport }
+            .map { ($0.key.lowerBound + $0.key.upperBound) / 2 }
+            .sorted()
+
+        // Birbirine çok yakın kesimleri birleştir
+        var merged: [CGFloat] = []
+        for cut in cuts {
+            if let last = merged.last, abs(cut - last) < 0.03 {
+                merged[merged.count - 1] = (last + cut) / 2
+            } else {
+                merged.append(cut)
+            }
+        }
+
+        return merged
+    }
+
+    /// Yatay kesimleri algılar: büyük dikey boşluklar (paragraf araları)
+    private func detectHorizontalCuts(_ blocks: [OCRTextBlock]) -> [CGFloat] {
+        guard blocks.count >= 3 else {
+            return []
+        }
+
+        // Satırlara kümüle
+        let sorted = blocks.sorted { $0.boundingBox.midY > $1.boundingBox.midY }
+        var rows: [[OCRTextBlock]] = []
+        var currentRow: [OCRTextBlock] = []
+        for block in sorted {
+            if let first = currentRow.first,
+               abs(block.boundingBox.midY - first.boundingBox.midY) < 0.02 {
+                currentRow.append(block)
+            } else {
+                if !currentRow.isEmpty {
+                    rows.append(currentRow)
+                }
+                currentRow = [block]
+            }
+        }
+        if !currentRow.isEmpty {
+            rows.append(currentRow)
+        }
+
+        guard rows.count >= 2 else {
+            return []
+        }
+
+        // Satır arası boşlukları hesapla, medyanın 2xinden büyükleri kesim
+        let gaps = zip(rows, rows.dropFirst()).map { topRow, bottomRow in
+            let topMinY = topRow.map { $0.boundingBox.minY }.min() ?? 0
+            let bottomMaxY = bottomRow.map { $0.boundingBox.maxY }.max() ?? 0
+            return topMinY - bottomMaxY
+        }
+
+        let sortedGaps = gaps.filter { $0 > 0 }.sorted()
+        guard !sortedGaps.isEmpty else {
+            return []
+        }
+        let medianGap = sortedGaps[sortedGaps.count / 2]
+        let threshold = max(medianGap * 2.0, 0.04)
+
+        var cuts: [CGFloat] = []
+        for (index, gap) in gaps.enumerated() where gap >= threshold {
+            let topRow = rows[index]
+            let bottomRow = rows[index + 1]
+            let topMinY = topRow.map { $0.boundingBox.minY }.min() ?? 0
+            let bottomMaxY = bottomRow.map { $0.boundingBox.maxY }.max() ?? 0
+            cuts.append((topMinY + bottomMaxY) / 2)
+        }
+
+        return cuts
+    }
+
+    /// Layout ağacını özyinelemeli olarak oluşturur
+    private func buildLayoutTree(_ blocks: [OCRTextBlock]) -> LayoutNode {
+        guard blocks.count > 1 else {
+            return .leaf(blocks)
+        }
+
+        // Önce dikey kesim (sütun) dene
+        let verticalCuts = detectVerticalCuts(blocks)
+        if !verticalCuts.isEmpty {
+            let split = splitBlocksByVerticalCuts(blocks, cuts: verticalCuts)
+            if split.count >= 2, split.allSatisfy({ !$0.isEmpty }) {
+                let leftTree = buildLayoutTree(split[0])
+                let rightTree = buildLayoutTree(Array(split.dropFirst().joined()))
+                return .verticalSplit(left: leftTree, right: rightTree)
+            }
+        }
+
+        // Sonra yatay kesim (satır grubu) dene
+        let horizontalCuts = detectHorizontalCuts(blocks)
+        if !horizontalCuts.isEmpty {
+            let split = splitBlocksByHorizontalCuts(blocks, cuts: horizontalCuts)
+            if split.count >= 2, split.allSatisfy({ !$0.isEmpty }) {
+                let topTree = buildLayoutTree(split[0])
+                let bottomTree = buildLayoutTree(Array(split.dropFirst().joined()))
+                return .horizontalSplit(top: topTree, bottom: bottomTree)
+            }
+        }
+
+        return .leaf(blocks)
+    }
+
+    private func splitBlocksByVerticalCuts(_ blocks: [OCRTextBlock], cuts: [CGFloat]) -> [[OCRTextBlock]] {
+        guard !cuts.isEmpty else {
+            return [blocks]
+        }
+
+        var groups: [[OCRTextBlock]] = Array(repeating: [], count: cuts.count + 1)
+        for block in blocks {
+            let midX = block.boundingBox.midX
+            let groupIndex = cuts.firstIndex { midX < $0 } ?? cuts.count
+            groups[groupIndex].append(block)
+        }
+        return groups
+    }
+
+    private func splitBlocksByHorizontalCuts(_ blocks: [OCRTextBlock], cuts: [CGFloat]) -> [[OCRTextBlock]] {
+        guard !cuts.isEmpty else {
+            return [blocks]
+        }
+
+        var groups: [[OCRTextBlock]] = Array(repeating: [], count: cuts.count + 1)
+        for block in blocks {
+            let midY = block.boundingBox.midY
+            // Büyük y = üstte, ilk kesimden büyükse üst grupta
+            let groupIndex = cuts.firstIndex { midY < $0 } ?? cuts.count
+            groups[groupIndex].append(block)
+        }
+        return groups
+    }
+
+    /// Ağacı pre-order dolaşarak okuma sırasını elde et
+    private func traverseLayoutTree(_ node: LayoutNode) -> [OCRTextBlock] {
+        switch node {
+        case .leaf(let blocks):
+            return blocks
+        case .verticalSplit(let left, let right):
+            return traverseLayoutTree(left) + traverseLayoutTree(right)
+        case .horizontalSplit(let top, let bottom):
+            return traverseLayoutTree(top) + traverseLayoutTree(bottom)
+        }
+    }
+
     private var standardFormattedText: String {
         groupedLines(lineThreshold: 0.03)
             .map { line in

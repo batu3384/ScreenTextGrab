@@ -8,6 +8,10 @@ struct SettingsGeneralTabView: View {
     let captureModeFeedback: InlineFeedback?
     let outputPresetDetail: String
     let outputPresetFeedback: InlineFeedback?
+    let monospaceLayoutEnabledBinding: Binding<Bool>
+    let monospaceLayoutColumns: Int
+    let onMonospaceLayoutColumnsChange: (Int) -> Void
+    let monospaceMulticolumnSortingBinding: Binding<Bool>
     let isRecordingHotkey: Bool
     let hotkeyDisplayLabel: String
     let hotkeyFeedback: HotkeyFeedback?
@@ -123,6 +127,57 @@ struct SettingsGeneralTabView: View {
 
                     if let outputPresetFeedback {
                         renderOutputPresetFeedback(outputPresetFeedback)
+                    }
+                }
+
+                SettingsSectionCard(
+                    title: L10n.pair("Eş Aralıklı Düzen", "Monospace Layout"),
+                    subtitle: L10n.pair("OCR bloklarının ekran konumını kullanarak metni eş aralıklı hizalar. Terminal ve tablo görünümleri için uygun.", "Aligns text using OCR block positions. Suitable for terminal and table layouts.")
+                ) {
+                    Toggle(isOn: monospaceLayoutEnabledBinding) {
+                        Text(L10n.pair("Eş aralıklı hizalamayı kullan", "Use monospace alignment"))
+                            .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    }
+                    .toggleStyle(.switch)
+                    .tint(.accentMint)
+
+                    if monospaceLayoutEnabledBinding.wrappedValue {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(L10n.pair("Sütun sayısı: \(monospaceLayoutColumns)", "Columns: \(monospaceLayoutColumns)"))
+                                .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                                .foregroundStyle(.secondary)
+
+                            Slider(
+                                value: Binding(
+                                    get: { Double(monospaceLayoutColumns) },
+                                    set: { onMonospaceLayoutColumnsChange(Int($0.rounded())) }
+                                ),
+                                in: 40...200,
+                                step: 10
+                            )
+                            .tint(.accentMint)
+
+                            Text(L10n.pair("Daha fazla sütun = daha hassas yatay hizalama.", "More columns = more precise horizontal alignment."))
+                                .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                                .foregroundStyle(.secondary)
+
+                            Rectangle()
+                                .fill(Color.white.opacity(0.08))
+                                .frame(height: 1)
+                                .padding(.vertical, 4)
+
+                            Toggle(isOn: monospaceMulticolumnSortingBinding) {
+                                Text(L10n.pair("Çok sütunlu okuma sırası", "Multi-column reading order"))
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            }
+                            .toggleStyle(.switch)
+                            .tint(.accentMint)
+
+                            Text(L10n.pair("Boşluk ağacı ile sütunları algılar, sol sütunu tamamen okur sonra sağ sütuna geçer.", "Detects columns with a gap tree; reads the left column fully before the right column."))
+                                .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 8)
                     }
                 }
 
