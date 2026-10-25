@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct SettingsGeneralTabView: View {
+    @EnvironmentObject private var themeManager: ThemeManager
+
     let interfaceLanguageBinding: Binding<InterfaceLanguage>
     let interfaceLanguageDetail: String
     let languageFeedback: InlineFeedback?
@@ -85,6 +87,23 @@ struct SettingsGeneralTabView: View {
                 }
 
                 SettingsSectionCard(
+                    title: L10n.pair("Görünüm", "Appearance"),
+                    subtitle: L10n.pair("Menü paneli ve ayarlar için tema seç.", "Choose a theme for the menu panel and settings.")
+                ) {
+                    Picker("", selection: Binding(
+                        get: { themeManager.mode },
+                        set: { themeManager.setMode($0) }
+                    )) {
+                        ForEach(ThemeMode.allCases) { mode in
+                            Label(mode.title, systemImage: mode.icon)
+                                .tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityLabel(L10n.pair("Tema", "Theme"))
+                }
+
+                SettingsSectionCard(
                     title: L10n.pair("Yakalama Modu", "Capture Mode"),
                     subtitle: L10n.pair("Metin, altyazı, kod veya tablo odaklı yakalama arasında geçiş yap.", "Switch between text, subtitle, code, or table-focused capture.")
                 ) {
@@ -136,7 +155,7 @@ struct SettingsGeneralTabView: View {
                         Button(action: toggleHotkeyRecording) {
                             Text(isRecordingHotkey ? L10n.pair("Tuşa Bas...", "Press Keys...") : hotkeyDisplayLabel)
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.stgWhite)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 10)
                                 .background(

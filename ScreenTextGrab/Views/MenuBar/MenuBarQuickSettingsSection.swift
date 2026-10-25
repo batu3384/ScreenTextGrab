@@ -31,7 +31,7 @@ struct MenuBarQuickSettingsSection: View {
                 HStack(spacing: 8) {
                     Text(L10n.controlsTitle)
                         .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.stgWhite)
 
                     Spacer()
 
@@ -41,7 +41,7 @@ struct MenuBarQuickSettingsSection: View {
                 VStack(alignment: .leading, spacing: isCompact ? 8 : 10) {
                     Text(L10n.pair("Yakalama Modu", "Capture Mode"))
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.stgWhite)
 
                     LazyVGrid(
                         columns: [
@@ -65,7 +65,7 @@ struct MenuBarQuickSettingsSection: View {
                 }
 
                 Rectangle()
-                    .fill(Color.white.opacity(0.08))
+                    .fill(Color.stgWhite.opacity(0.08))
                     .frame(height: 1)
 
                 watchRow
@@ -80,13 +80,13 @@ struct MenuBarQuickSettingsSection: View {
 
                 if shouldShowSmartActionsPanel {
                     Rectangle()
-                        .fill(Color.white.opacity(0.08))
+                        .fill(Color.stgWhite.opacity(0.08))
                         .frame(height: 1)
 
                     VStack(alignment: .leading, spacing: 7) {
                         Text(L10n.pair("Hızlı İşlem", "Quick Actions"))
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.stgWhite)
 
                         HStack(spacing: 8) {
                             ForEach(Array(smartActions.prefix(2))) { action in
@@ -142,7 +142,7 @@ struct MenuBarQuickSettingsSection: View {
             HStack(spacing: 8) {
                 Image(systemName: outputPresetIcon(outputPreset))
                     .font(.system(size: 10.5, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(.stgWhite.opacity(0.9))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(outputPreset.title)
@@ -151,17 +151,17 @@ struct MenuBarQuickSettingsSection: View {
 
                     Text(outputPreset.summary)
                         .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.68))
+                        .foregroundStyle(Color.stgWhite.opacity(0.68))
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.65))
+                    .foregroundStyle(Color.stgWhite.opacity(0.65))
             }
             .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(.stgWhite)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .frame(minWidth: isCompact ? 146 : 160, alignment: .leading)
@@ -186,11 +186,11 @@ struct MenuBarQuickSettingsSection: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L10n.pair("İzleme", "Watch"))
                     .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.stgWhite)
 
                 Text(watchSummary)
                     .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.66))
+                    .foregroundStyle(Color.stgWhite.opacity(0.66))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -220,11 +220,11 @@ struct MenuBarQuickSettingsSection: View {
                 HStack(spacing: 6) {
                     Image(systemName: captureModeIcon(mode))
                         .font(.system(size: isCompact ? 9.5 : 10.5, weight: .bold))
-                        .foregroundStyle(isSelected ? .white : tint)
+                        .foregroundStyle(isSelected ? .stgWhite : tint)
                         .frame(width: isCompact ? 22 : 24, height: isCompact ? 22 : 24)
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(isSelected ? Color.white.opacity(0.14) : tint.opacity(0.12))
+                                .fill(isSelected ? Color.stgWhite.opacity(0.14) : tint.opacity(0.12))
                         )
                     Text(mode.title)
                         .font(.system(size: isCompact ? 11 : 12, weight: .bold, design: .rounded))
@@ -238,9 +238,9 @@ struct MenuBarQuickSettingsSection: View {
                     .minimumScaleFactor(0.9)
                     .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.leading)
-                    .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.84))
+                    .foregroundStyle(isSelected ? Color.stgWhite : Color.stgWhite.opacity(0.84))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(.stgWhite)
             .padding(.horizontal, isCompact ? 9 : 10)
             .padding(.vertical, isCompact ? 8 : 10)
             .frame(maxWidth: .infinity, minHeight: isCompact ? 68 : 74, alignment: .leading)

@@ -111,33 +111,13 @@ struct MenuBarView: View {
     }
 
     private var background: some View {
-        LinearGradient(
-            colors: [.surfaceTop, .surfaceBottom],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .overlay(alignment: .topTrailing) {
-            Circle()
-                .fill(Color.accentCool.opacity(0.16))
-                .frame(width: 168, height: 168)
-                .blur(radius: 36)
-                .offset(x: 54, y: -52)
+        ZStack {
+            // Raycast-style material background with tint
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(Color.rayBackground.opacity(0.70))
+                .ignoresSafeArea()
         }
-        .overlay(alignment: .bottomLeading) {
-            Circle()
-                .fill(Color.accentWarm.opacity(0.12))
-                .frame(width: 184, height: 184)
-                .blur(radius: 42)
-                .offset(x: -56, y: 70)
-        }
-        .overlay {
-            LinearGradient(
-                colors: [Color.white.opacity(0.06), Color.clear, Color.black.opacity(0.10)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-        .ignoresSafeArea()
     }
 
     private var header: some View {
@@ -219,11 +199,11 @@ struct MenuBarView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L10n.pair("İzleme", "Watch"))
                     .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.stgWhite)
 
                 Text(watchSummary)
                     .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.66))
+                    .foregroundStyle(Color.stgWhite.opacity(0.66))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -271,10 +251,10 @@ struct MenuBarView: View {
 
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8.5, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.64))
+                    .foregroundStyle(Color.stgWhite.opacity(0.64))
             }
             .font(.system(size: isCompactPanel ? 9.6 : 10.2, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(.stgWhite)
             .lineLimit(1)
             .padding(.horizontal, isCompactPanel ? 10 : 11)
             .padding(.vertical, isCompactPanel ? 7 : 8)
@@ -304,7 +284,7 @@ struct MenuBarView: View {
                 Text(title)
             }
             .font(.system(size: isCompactPanel ? 9.5 : 10, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(.stgWhite)
             .lineLimit(1)
             .minimumScaleFactor(0.82)
             .padding(.horizontal, isCompactPanel ? 10 : 11)
@@ -373,7 +353,7 @@ struct MenuBarView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .font(.system(size: isCompactPanel ? 9.6 : 10.1, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(.stgWhite)
             .lineLimit(2)
             .minimumScaleFactor(0.8)
             .padding(.horizontal, isCompactPanel ? 9 : 10)
@@ -406,7 +386,7 @@ struct MenuBarView: View {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .fill(
                                 LinearGradient(
-                                    colors: [Color.white.opacity(0.04), Color.clear],
+                                    colors: [Color.stgWhite.opacity(0.04), Color.clear],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
@@ -428,11 +408,11 @@ struct MenuBarView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: isCompactPanel ? 11.5 : 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.stgWhite)
 
                 Text(detail)
                     .font(.system(size: isCompactPanel ? 10 : 10.3, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.66))
+                    .foregroundStyle(Color.stgWhite.opacity(0.66))
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -468,7 +448,7 @@ struct MenuBarView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .font(.system(size: isCompactPanel ? 9.6 : 10.2, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(.stgWhite)
             .lineLimit(2)
             .minimumScaleFactor(0.8)
             .padding(.horizontal, isCompactPanel ? 10 : 11)
@@ -507,11 +487,11 @@ struct MenuBarView: View {
                 HStack(spacing: 6) {
                     Image(systemName: captureModeIcon(for: mode))
                         .font(.system(size: isCompactPanel ? 9.5 : 10.5, weight: .bold))
-                        .foregroundStyle(isSelected ? .white : tint)
+                        .foregroundStyle(isSelected ? .stgWhite : tint)
                         .frame(width: isCompactPanel ? 22 : 24, height: isCompactPanel ? 22 : 24)
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(isSelected ? Color.white.opacity(0.14) : tint.opacity(0.12))
+                                .fill(isSelected ? Color.stgWhite.opacity(0.14) : tint.opacity(0.12))
                         )
                     Text(mode.title)
                         .font(.system(size: isCompactPanel ? 11 : 12, weight: .bold, design: .rounded))
@@ -525,9 +505,9 @@ struct MenuBarView: View {
                     .minimumScaleFactor(0.9)
                     .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.leading)
-                    .foregroundStyle((isSelected ? Color.white : Color.white.opacity(0.84)))
+                    .foregroundStyle((isSelected ? Color.stgWhite : Color.stgWhite.opacity(0.84)))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(.stgWhite)
             .padding(.horizontal, isCompactPanel ? 9 : 10)
             .padding(.vertical, isCompactPanel ? 8 : 10)
             .frame(maxWidth: .infinity, minHeight: isCompactPanel ? 68 : 74, alignment: .leading)
@@ -1090,11 +1070,11 @@ struct MenuBarView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(L10n.pair("Hazır snippet'ler", "Ready snippets"))
                                 .font(.system(size: isCompactPanel ? 11 : 11.5, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.stgWhite)
 
                             Text(activeSavedSnippetQuickPickSummary(for: suggestion, hiddenCount: hiddenCount))
                                 .font(.system(size: isCompactPanel ? 10 : 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color.white.opacity(0.66))
+                                .foregroundStyle(Color.stgWhite.opacity(0.66))
                                 .lineLimit(isCompactPanel ? 2 : 3)
                         }
 
@@ -1475,12 +1455,12 @@ struct MenuBarView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(snippet.name)
                         .font(.system(size: isCompactPanel ? 11 : 11.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.stgWhite)
                         .lineLimit(1)
 
                     Text(snippet.previewText)
                         .font(.system(size: isCompactPanel ? 9.5 : 10.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.68))
+                        .foregroundStyle(Color.stgWhite.opacity(0.68))
                         .lineLimit(1)
                 }
 
@@ -1496,11 +1476,11 @@ struct MenuBarView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.07))
+                    .fill(Color.stgWhite.opacity(0.07))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                    .stroke(Color.stgWhite.opacity(0.10), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

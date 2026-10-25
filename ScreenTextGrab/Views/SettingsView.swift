@@ -347,7 +347,7 @@ struct SettingsView: View {
                         .frame(width: 28, height: 28)
                         .background(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill((entry.isPinned ? Color.accentAmber : Color.white).opacity(entry.isPinned ? 0.18 : 0.08))
+                                .fill((entry.isPinned ? Color.accentAmber : Color.stgWhite).opacity(entry.isPinned ? 0.18 : 0.08))
                         )
                 }
                 .buttonStyle(.plain)
@@ -1008,7 +1008,7 @@ struct SettingsView: View {
                     .font(.system(size: 10.5, weight: .medium, design: .rounded))
                     .lineLimit(2)
             }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .foregroundStyle(isSelected ? Color.stgWhite : Color.primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1040,7 +1040,7 @@ struct SettingsView: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .foregroundStyle(isSelected ? Color.stgWhite : Color.primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
             .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
@@ -1072,7 +1072,7 @@ struct SettingsView: View {
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .foregroundStyle(isSelected ? Color.stgWhite : Color.primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1139,7 +1139,7 @@ struct SettingsView: View {
                     .font(.system(size: 10.5, weight: .medium, design: .rounded))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .foregroundStyle(isSelected ? Color.stgWhite : Color.primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity)
@@ -1172,7 +1172,7 @@ struct SettingsView: View {
                     .minimumScaleFactor(0.9)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .foregroundStyle(isSelected ? Color.stgWhite : Color.primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
