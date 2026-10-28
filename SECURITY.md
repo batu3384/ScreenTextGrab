@@ -22,7 +22,7 @@ If the report includes screenshots or logs, remove personal data first.
 - No secrets, signing credentials, or personal data should be committed to the repository.
 - Public release artifacts must be signed with `Developer ID Application`.
 - Public release artifacts must be notarized before distribution.
-- Only the Screen Recording permission is expected at runtime.
+- Only the Screen Recording permission is requested at runtime. If the process is already trusted for Accessibility, the frontmost window title may be read. Launch at login uses a separate system approval.
 
 ## Automation Trust Boundaries
 

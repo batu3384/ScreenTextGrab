@@ -141,6 +141,7 @@ enum L10n {
     static var unknownFailure: String { pair("❌ Bilinmeyen hata", "❌ Unknown error") }
     static var clipboardImageMissing: String { pair("Panoda okunabilir bir görsel yok.", "The clipboard does not contain a readable image.") }
     static var clipboardImageMissingStatus: String { pair("⚠️ Panoda okunabilir bir görsel yok.", "⚠️ The clipboard does not contain a readable image.") }
+    static var historySaveFailed: String { pair("⚠️ Geçmiş diske şifrelenerek yazılamadı.", "⚠️ History could not be encrypted to disk.") }
 
     static func savedRegionMissing(_ name: String) -> String {
         format("Kayıtlı bölge bulunamadı: %@", "Saved region not found: %@", name)

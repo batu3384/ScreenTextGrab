@@ -40,6 +40,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        if terminateIfAnotherInstanceIsRunning() {
+            return
+        }
+
         if let automationCommand = AutomationCommand(arguments: ProcessInfo.processInfo.arguments) {
             automationCommandQueue.enqueue([automationCommand])
             launchArgumentsNeedAutomationAuthorization = true
@@ -284,7 +288,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var isRunningUnderTests: Bool {
         let env = ProcessInfo.processInfo.environment
-        return env["XCTestConfigurationFilePath"] != nil
+        return env["XCTestConfigurationFilePath"] != nil || NSClassFromString("XCTestCase") != nil
+    }
+
+    /// Release binaries must not treat an env var as consent. In-process XCTest still skips the prompt.
+    private var allowsUnattendedAutomation: Bool {
+        NSClassFromString("XCTestCase") != nil
+    }
+
+    private func terminateIfAnotherInstanceIsRunning() -> Bool {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return false }
+        let currentPID = ProcessInfo.processInfo.processIdentifier
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .filter { $0.processIdentifier != currentPID }
+        guard let existing = others.first else { return false }
+        existing.activate(options: [.activateAllWindows])
+        NSApp.terminate(nil)
+        return true
     }
 
     private func beginActiveAppTracking() {
@@ -413,7 +433,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func authorizeURLSchemeAutomationIfNeeded() -> Bool {
         if appState.urlSchemeAutomationEnabled ||
             urlSchemeAutomationAllowedThisSession ||
-            isRunningUnderTests {
+            allowsUnattendedAutomation {
             return true
         }
 

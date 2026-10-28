@@ -75,6 +75,10 @@ struct AppVersion: Comparable, Equatable {
     static func == (lhs: AppVersion, rhs: AppVersion) -> Bool {
         !(lhs < rhs) && !(rhs < lhs)
     }
+
+    static func isSafeReleasePathComponent(_ version: String) -> Bool {
+        version.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"#, options: .regularExpression) != nil
+    }
 }
 
 struct GitHubReleaseInfo: Decodable, Equatable {
@@ -89,6 +93,19 @@ struct GitHubReleaseInfo: Decodable, Equatable {
             case browserDownloadURL = "browser_download_url"
             case size
             case digest
+        }
+
+        var isTrustedDownloadURL: Bool {
+            guard let host = browserDownloadURL.host?.lowercased() else { return false }
+            switch host {
+            case "github.com",
+                 "release-assets.githubusercontent.com",
+                 "objects.githubusercontent.com",
+                 "github-releases.githubusercontent.com":
+                return true
+            default:
+                return false
+            }
         }
     }
 
@@ -145,6 +162,13 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
                 currentBundleURL: bundle.bundleURL.resolvingSymlinksInPath().standardizedFileURL,
                 expectedTeamIdentifier: codeSigningTeamIdentifier(for: bundle.bundleURL)
             )
+        }
+
+        static func acceptedTeamIdentifier(expected: String?, downloaded: String?) -> Bool {
+            guard let expected, let downloaded, !expected.isEmpty, !downloaded.isEmpty else {
+                return false
+            }
+            return expected == downloaded
         }
 
         fileprivate static func codeSigningTeamIdentifier(for bundleURL: URL) -> String? {
@@ -281,6 +305,11 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
         expectedDownloadDigest = asset.digest
         appState?.updateUpdateState(.downloading(version: version, progressPercent: 0))
 
+        guard asset.isTrustedDownloadURL else {
+            fail(with: UpdateError.untrustedDownloadHost)
+            return
+        }
+
         var request = URLRequest(url: asset.browserDownloadURL)
         request.setValue("ScreenTextGrab", forHTTPHeaderField: "User-Agent")
         let task = downloadSession.downloadTask(with: request)
@@ -326,6 +355,9 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
     private func finishDownload(from temporaryURL: URL) {
         do {
             let version = latestRelease?.normalizedVersion ?? configuration.currentVersion.rawValue
+            guard AppVersion.isSafeReleasePathComponent(version) else {
+                throw UpdateError.invalidResponse
+            }
             let updateRoot = try updateRootURL(for: version)
             let zipURL = updateRoot.appendingPathComponent(configuration.releaseAssetName)
             let extractionURL = updateRoot.appendingPathComponent("extracted", isDirectory: true)
@@ -449,9 +481,11 @@ final class AppUpdateService: NSObject, AppUpdateManaging {
 
         try verifyCodeSignature(at: appURL)
 
-        if let expectedTeamIdentifier = configuration.expectedTeamIdentifier,
-           let downloadedTeamIdentifier = Configuration.codeSigningTeamIdentifier(for: appURL),
-           downloadedTeamIdentifier != expectedTeamIdentifier {
+        let downloadedTeamIdentifier = Configuration.codeSigningTeamIdentifier(for: appURL)
+        guard Configuration.acceptedTeamIdentifier(
+            expected: configuration.expectedTeamIdentifier,
+            downloaded: downloadedTeamIdentifier
+        ) else {
             throw UpdateError.signingIdentityMismatch
         }
     }
@@ -632,6 +666,7 @@ private enum UpdateError: LocalizedError {
     case bundleIdentifierMismatch
     case olderDownloadedVersion
     case signingIdentityMismatch
+    case untrustedDownloadHost
     case installPreparationMissing
     case processFailed(String)
     case wrapped(String)
@@ -680,6 +715,8 @@ private enum UpdateError: LocalizedError {
             return L10n.pair("İndirilen sürüm mevcut uygulamadan daha eski.", "The downloaded version is older than the installed app.")
         case .signingIdentityMismatch:
             return L10n.pair("İndirilen güncellemenin imzası mevcut uygulamayla eşleşmiyor.", "The downloaded update was signed by a different identity.")
+        case .untrustedDownloadHost:
+            return L10n.pair("Güncelleme paketi güvenilmeyen bir adresten geliyor.", "The update package is hosted on an untrusted address.")
         case .installPreparationMissing:
             return L10n.pair("Kurulmaya hazır bir güncelleme bulunamadı.", "No downloaded update is ready to install.")
         case .processFailed(let message):

@@ -60,6 +60,7 @@ enum ClipboardHistoryExportFormatStore {
 
 enum ClipboardHistoryStore {
     static let key = "screenTextGrab.copyHistory"
+    static let legacyPlaintextConsumedKey = "screenTextGrab.copyHistory.legacyPlaintextConsumed"
     static let maximumEntries = 25
     private static let embeddedKeyMaterialKey = "screenTextGrab.copyHistory.aesKey"
     private static let keychainService = "ScreenTextGrab.ClipboardHistory"
@@ -70,31 +71,39 @@ enum ClipboardHistoryStore {
             return []
         }
 
-        if let plaintext = try? decrypt(data, defaults: defaults),
+        if let plaintext = try? open(data, defaults: defaults),
            let history = try? JSONDecoder().decode([ClipboardHistoryEntry].self, from: plaintext) {
             return Array(history.prefix(maximumEntries))
         }
 
-        // Legacy plaintext UserDefaults payload — re-save encrypted.
+        if defaults.bool(forKey: legacyPlaintextConsumedKey) {
+            return []
+        }
+
+        // One-shot legacy plaintext payload. Later plaintext writes are ignored.
         if let history = try? JSONDecoder().decode([ClipboardHistoryEntry].self, from: data) {
             let trimmed = Array(history.prefix(maximumEntries))
-            save(trimmed, defaults: defaults)
+            if save(trimmed, defaults: defaults) {
+                defaults.set(true, forKey: legacyPlaintextConsumedKey)
+            }
             return trimmed
         }
 
         return []
     }
 
-    static func save(_ history: [ClipboardHistoryEntry], defaults: UserDefaults = .standard) {
+    @discardableResult
+    static func save(_ history: [ClipboardHistoryEntry], defaults: UserDefaults = .standard) -> Bool {
         let trimmed = Array(history.prefix(maximumEntries))
         guard let plaintext = try? JSONEncoder().encode(trimmed),
-              let sealed = try? encrypt(plaintext, defaults: defaults) else {
-            return
+              let sealed = try? seal(plaintext, defaults: defaults) else {
+            return false
         }
         defaults.set(sealed, forKey: key)
+        return true
     }
 
-    private static func encrypt(_ plaintext: Data, defaults: UserDefaults) throws -> Data {
+    static func seal(_ plaintext: Data, defaults: UserDefaults = .standard) throws -> Data {
         let sealed = try AES.GCM.seal(plaintext, using: symmetricKey(defaults: defaults))
         guard let combined = sealed.combined else {
             throw CocoaError(.fileWriteUnknown)
@@ -102,7 +111,7 @@ enum ClipboardHistoryStore {
         return combined
     }
 
-    private static func decrypt(_ data: Data, defaults: UserDefaults) throws -> Data {
+    static func open(_ data: Data, defaults: UserDefaults = .standard) throws -> Data {
         let box = try AES.GCM.SealedBox(combined: data)
         return try AES.GCM.open(box, using: symmetricKey(defaults: defaults))
     }

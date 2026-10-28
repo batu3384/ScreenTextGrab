@@ -483,24 +483,44 @@ struct SavedSnippet: Identifiable, Equatable, Codable, Sendable {
 
 enum SavedSnippetStore {
     static let key = "screenTextGrab.savedSnippets"
+    static let legacyPlaintextConsumedKey = "screenTextGrab.savedSnippets.legacyPlaintextConsumed"
     static let maximumEntries = 16
 
     static func load(defaults: UserDefaults = .standard) -> [SavedSnippet] {
-        guard let data = defaults.data(forKey: key),
-              let snippets = try? JSONDecoder().decode([SavedSnippet].self, from: data) else {
+        guard let data = defaults.data(forKey: key) else {
             return []
         }
 
-        return Array(sortedSnippets(snippets).prefix(maximumEntries))
-    }
-
-    static func save(_ snippets: [SavedSnippet], defaults: UserDefaults = .standard) {
-        let trimmed = Array(sortedSnippets(snippets).prefix(maximumEntries))
-        guard let data = try? JSONEncoder().encode(trimmed) else {
-            return
+        if let plaintext = try? ClipboardHistoryStore.open(data, defaults: defaults),
+           let snippets = try? JSONDecoder().decode([SavedSnippet].self, from: plaintext) {
+            return Array(sortedSnippets(snippets).prefix(maximumEntries))
         }
 
-        defaults.set(data, forKey: key)
+        if defaults.bool(forKey: legacyPlaintextConsumedKey) {
+            return []
+        }
+
+        guard let snippets = try? JSONDecoder().decode([SavedSnippet].self, from: data) else {
+            return []
+        }
+
+        let trimmed = Array(sortedSnippets(snippets).prefix(maximumEntries))
+        if save(trimmed, defaults: defaults) {
+            defaults.set(true, forKey: legacyPlaintextConsumedKey)
+        }
+        return trimmed
+    }
+
+    @discardableResult
+    static func save(_ snippets: [SavedSnippet], defaults: UserDefaults = .standard) -> Bool {
+        let trimmed = Array(sortedSnippets(snippets).prefix(maximumEntries))
+        guard let plaintext = try? JSONEncoder().encode(trimmed),
+              let sealed = try? ClipboardHistoryStore.seal(plaintext, defaults: defaults) else {
+            return false
+        }
+
+        defaults.set(sealed, forKey: key)
+        return true
     }
 
     private static func sortedSnippets(_ snippets: [SavedSnippet]) -> [SavedSnippet] {

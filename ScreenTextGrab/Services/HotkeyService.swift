@@ -5,6 +5,7 @@ enum HotkeyRegistrationError: LocalizedError, Equatable {
     case invalidShortcut
     case installHandlerFailed(status: OSStatus)
     case registerHotKeyFailed(status: OSStatus)
+    case rollbackFailed
 
     var errorDescription: String? {
         switch self {
@@ -14,6 +15,8 @@ enum HotkeyRegistrationError: LocalizedError, Equatable {
             return L10n.format("Global hotkey event handler kurulamadı (%d).", "The global hotkey event handler could not be installed (%d).", status)
         case .registerHotKeyFailed(let status):
             return L10n.format("Global hotkey kaydedilemedi (%d). Muhtemelen kısayol başka bir uygulama tarafından kullanılıyor.", "The global hotkey could not be registered (%d). The shortcut is likely in use by another app.", status)
+        case .rollbackFailed:
+            return L10n.pair("Yeni kısayol kaydedilemedi ve eski kısayol da geri yüklenemedi.", "The new shortcut failed and the previous shortcut could not be restored.")
         }
     }
 }
@@ -174,7 +177,11 @@ final class HotkeyService {
         } catch {
             configuration = previousConfiguration
             if hadRegistered {
-                try? registerHotkey()
+                do {
+                    try registerHotkey()
+                } catch {
+                    throw HotkeyRegistrationError.rollbackFailed
+                }
             }
             throw error
         }

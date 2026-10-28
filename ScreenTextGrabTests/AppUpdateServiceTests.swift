@@ -106,4 +106,32 @@ final class AppUpdateServiceTests: XCTestCase {
         XCTAssertEqual(restart.width, 156)
         XCTAssertFalse(restart.isBusy)
     }
+
+    func testDownloadHostAllowlistRejectsArbitraryHosts() throws {
+        let trusted = try JSONDecoder().decode(
+            GitHubReleaseInfo.self,
+            from: Data(#"{"tag_name":"v1.2.0","assets":[{"name":"ScreenTextGrab.zip","browser_download_url":"https://github.com/batu3384/ScreenTextGrab/releases/download/v1.2.0/ScreenTextGrab.zip","size":1}]}"#.utf8)
+        )
+        let untrusted = try JSONDecoder().decode(
+            GitHubReleaseInfo.self,
+            from: Data(#"{"tag_name":"v1.2.0","assets":[{"name":"ScreenTextGrab.zip","browser_download_url":"https://example.com/ScreenTextGrab.zip","size":1}]}"#.utf8)
+        )
+
+        XCTAssertTrue(trusted.primaryAsset(named: "ScreenTextGrab.zip")?.isTrustedDownloadURL == true)
+        XCTAssertFalse(untrusted.primaryAsset(named: "ScreenTextGrab.zip")?.isTrustedDownloadURL == true)
+    }
+
+    func testTeamIdentifierMatchFailsClosed() {
+        XCTAssertFalse(AppUpdateService.Configuration.acceptedTeamIdentifier(expected: nil, downloaded: "TEAM"))
+        XCTAssertFalse(AppUpdateService.Configuration.acceptedTeamIdentifier(expected: "TEAM", downloaded: nil))
+        XCTAssertFalse(AppUpdateService.Configuration.acceptedTeamIdentifier(expected: "AAAA", downloaded: "BBBB"))
+        XCTAssertTrue(AppUpdateService.Configuration.acceptedTeamIdentifier(expected: "TEAM", downloaded: "TEAM"))
+    }
+
+    func testReleasePathComponentRejectsTraversal() {
+        XCTAssertTrue(AppVersion.isSafeReleasePathComponent("1.2.3"))
+        XCTAssertFalse(AppVersion.isSafeReleasePathComponent("../tmp"))
+        XCTAssertFalse(AppVersion.isSafeReleasePathComponent("1.2.3/../../tmp"))
+        XCTAssertFalse(AppVersion.isSafeReleasePathComponent(""))
+    }
 }

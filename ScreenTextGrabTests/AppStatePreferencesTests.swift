@@ -192,6 +192,56 @@ final class AppStatePreferencesTests: XCTestCase {
         XCTAssertEqual(loaded.map(\.text), ["gizli-metin"])
     }
 
+    func testClipboardHistoryStoreMigratesPlaintextOnce() throws {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let entry = ClipboardHistoryEntry(
+            text: "eski-duz",
+            date: Date(timeIntervalSince1970: 7),
+            captureMode: .standard
+        )
+        let plaintext = try JSONEncoder().encode([entry])
+        defaults.set(plaintext, forKey: ClipboardHistoryStore.key)
+
+        XCTAssertEqual(ClipboardHistoryStore.load(defaults: defaults).map(\.text), ["eski-duz"])
+        XCTAssertTrue(defaults.bool(forKey: ClipboardHistoryStore.legacyPlaintextConsumedKey))
+
+        defaults.set(plaintext, forKey: ClipboardHistoryStore.key)
+        XCTAssertTrue(ClipboardHistoryStore.load(defaults: defaults).isEmpty)
+    }
+
+    func testSavedSnippetStoreEncryptsPersistedPayload() throws {
+        let defaults = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let snippet = SavedSnippet(
+            name: "Gizli",
+            text: "snippet-gizli",
+            rawText: "snippet-gizli",
+            captureMode: .standard,
+            outputPreset: .plainText,
+            contentKind: .text,
+            ocrConfidence: 0.9,
+            source: nil
+        )
+        XCTAssertTrue(SavedSnippetStore.save([snippet], defaults: defaults))
+
+        let raw = try XCTUnwrap(defaults.data(forKey: SavedSnippetStore.key))
+        XCTAssertNil(try? JSONDecoder().decode([SavedSnippet].self, from: raw))
+        XCTAssertEqual(SavedSnippetStore.load(defaults: defaults).map(\.text), ["snippet-gizli"])
+    }
+
+    @MainActor
+    func testUpdateHotkeyRejectsInvalidShortcut() {
+        let service = HotkeyService {}
+        XCTAssertThrowsError(
+            try service.updateHotkey(to: HotkeyConfiguration(keyCode: 1, modifiers: 0, keyDisplay: ""))
+        ) { error in
+            XCTAssertEqual(error as? HotkeyRegistrationError, .invalidShortcut)
+        }
+    }
+
     func testPDFProcessingServiceRejectsUnsafeAutomationDestination() {
         XCTAssertTrue(
             PDFProcessingService.isSafeAutomationDestination(

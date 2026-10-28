@@ -629,7 +629,10 @@ final class AppState: ObservableObject {
 
     private func persistHistoryIfNeeded() {
         guard persistsUserPreferences else { return }
-        ClipboardHistoryStore.save(copyHistory, defaults: defaults)
+        guard ClipboardHistoryStore.save(copyHistory, defaults: defaults) else {
+            statusMessage = L10n.historySaveFailed
+            return
+        }
     }
 
     private func persistOCRLanguagesIfNeeded() {
@@ -689,7 +692,10 @@ final class AppState: ObservableObject {
 
     private func persistSavedSnippetsIfNeeded() {
         guard persistsUserPreferences else { return }
-        SavedSnippetStore.save(savedSnippets, defaults: defaults)
+        guard SavedSnippetStore.save(savedSnippets, defaults: defaults) else {
+            statusMessage = L10n.historySaveFailed
+            return
+        }
     }
 
     private func persistSavedSnippetCollectionsIfNeeded() {
