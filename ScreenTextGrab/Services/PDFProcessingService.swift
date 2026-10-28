@@ -116,7 +116,13 @@ enum PDFProcessingService {
 
             let pageBounds = page.bounds(for: .mediaBox).standardized
             let longestEdge = max(pageBounds.width, pageBounds.height)
-            let renderScale = max(1, min(3, maxDimension / max(longestEdge, 1)))
+            let area = max(pageBounds.width * pageBounds.height, 1)
+            let maxPixels: CGFloat = 40_000_000
+            var renderScale = min(3, maxDimension / max(longestEdge, 1))
+            if area * renderScale * renderScale > maxPixels {
+                renderScale = (maxPixels / area).squareRoot()
+            }
+            renderScale = min(3, max(0.05, renderScale))
 
             let pixelWidth = max(1, Int(ceil(pageBounds.width * renderScale)))
             let pixelHeight = max(1, Int(ceil(pageBounds.height * renderScale)))

@@ -988,6 +988,91 @@ final class CaptureCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testCancelledCaptureDoesNotOpenOverlayAfterLatePermission() async {
+        let appState = AppState()
+        let permission = MockPermissionService()
+        permission.refreshState = .granted
+        permission.resolveDelayNanoseconds = 150_000_000
+
+        let overlay = MockOverlay()
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: permission,
+            screenCaptureService: MockScreenCaptureService(),
+            ocrService: MockOCRService(),
+            clipboardService: MockClipboardService(),
+            overlayFactory: { _, _ in overlay }
+        )
+
+        coordinator.startCapture(trigger: .menu)
+        coordinator.cancelCapture()
+        try? await Task.sleep(nanoseconds: 250_000_000)
+
+        XCTAssertEqual(overlay.showCount, 0)
+        XCTAssertEqual(appState.captureState, .cancelled)
+    }
+
+    @MainActor
+    func testStopWatchingIgnoresLatePermissionGrant() async {
+        let appState = AppState()
+        let permission = MockPermissionService()
+        permission.refreshState = .granted
+        permission.resolveDelayNanoseconds = 150_000_000
+
+        let overlay = MockOverlay()
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: permission,
+            screenCaptureService: MockScreenCaptureService(),
+            ocrService: MockOCRService(),
+            clipboardService: MockClipboardService(),
+            overlayFactory: { _, _ in overlay }
+        )
+
+        coordinator.startWatching()
+        coordinator.stopWatching()
+        try? await Task.sleep(nanoseconds: 250_000_000)
+
+        XCTAssertEqual(overlay.showCount, 0)
+        XCTAssertEqual(appState.watchState, .inactive)
+    }
+
+    @MainActor
+    func testWatchClipboardFailureDoesNotRetrySameText() async {
+        let appState = AppState()
+        let capture = MockScreenCaptureService()
+        capture.candidates = [
+            CaptureCandidate(strategy: .screenshotKitGlobalRect, image: Self.makeImage(), debugInfo: "watch")
+        ]
+        let ocr = MockOCRService()
+        ocr.result = .success(OCRResult(
+            blocks: [OCRTextBlock(text: "ayni satir", confidence: 0.95, boundingBox: .zero)],
+            captureDate: Date(),
+            sourceRect: .zero
+        ))
+        let clipboard = MockClipboardService()
+        clipboard.result = .failedWrite
+        let coordinator = CaptureCoordinator(
+            appState: appState,
+            permissionService: MockPermissionService(),
+            screenCaptureService: capture,
+            ocrService: ocr,
+            clipboardService: clipboard,
+            watchIntervalNanoseconds: 1_000_000
+        )
+
+        await coordinator.startWatchSession(
+            screenRect: CGRect(x: 10, y: 10, width: 320, height: 80),
+            preferredDisplay: nil,
+            environment: Self.emptyEnvironment
+        )
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        coordinator.stopWatching()
+
+        XCTAssertEqual(clipboard.copiedTexts.count, 1)
+    }
+
+    @MainActor
     func testStuckPipelineResetsAfter30Seconds() async {
         let appState = AppState()
         let permission = MockPermissionService()
@@ -1440,6 +1525,7 @@ private final class MockPermissionService: ScreenPermissionProviding {
     var needsRestartAfterGrant: Bool = false
     var refreshState: ScreenPermissionState = .granted
     var requestState: ScreenPermissionState = .granted
+    var resolveDelayNanoseconds: UInt64 = 0
     private(set) var resolveCallCount: Int = 0
 
     func refreshPreflight() -> ScreenPermissionState {
@@ -1448,6 +1534,9 @@ private final class MockPermissionService: ScreenPermissionProviding {
 
     func resolveState() async -> ScreenPermissionState {
         resolveCallCount += 1
+        if resolveDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: resolveDelayNanoseconds)
+        }
         return refreshState
     }
 

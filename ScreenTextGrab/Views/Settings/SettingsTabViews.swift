@@ -358,6 +358,7 @@ struct SettingsGeneralTabView: View {
                         Toggle("", isOn: appProfilePanelAutoSyncBinding)
                             .labelsHidden()
                             .toggleStyle(.switch)
+                            .accessibilityLabel(L10n.pair("Akıllı Panel Senkronu", "Smart Panel Sync"))
                     }
 
                     Text(L10n.pair("Profil seçilen uygulama için mod, çıktı biçimi ve OCR dili override eder.", "A profile overrides the mode, output format, and OCR language for the selected app."))
@@ -536,6 +537,7 @@ struct SettingsHistoryTabView: View {
                         Toggle("", isOn: savedRegionQuickStartBinding)
                             .labelsHidden()
                             .toggleStyle(.switch)
+                            .accessibilityLabel(L10n.pair("Akıllı Başlangıç", "Smart Start"))
                     }
 
                     if let savedRegionFeedback {
@@ -590,6 +592,7 @@ struct SettingsHistoryTabView: View {
                         Toggle("", isOn: savedSnippetCollectionAutoSyncBinding)
                             .labelsHidden()
                             .toggleStyle(.switch)
+                            .accessibilityLabel(L10n.pair("Akıllı Koleksiyon Senkronu", "Smart Collection Sync"))
                     }
 
                     TextField(L10n.pair("Snippet ara", "Search snippets"), text: snippetSearchQuery)

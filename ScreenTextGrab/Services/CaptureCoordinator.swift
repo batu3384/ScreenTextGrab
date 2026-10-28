@@ -87,6 +87,8 @@ final class CaptureCoordinator: CaptureCoordinating {
     private var captureTask: Task<Void, Never>?
     private var captureEpoch = 0
     private var watchTask: Task<Void, Never>?
+    private var watchPermissionTask: Task<Void, Never>?
+    private var watchPermissionGeneration = 0
     private var currentWatchSession: CaptureWatchSession?
 
     init(
@@ -147,8 +149,42 @@ final class CaptureCoordinator: CaptureCoordinating {
     }
 
     private func captureWorkIsCurrent() -> Bool {
-        guard let epoch = CaptureEpoch.value else { return true }
+        guard let epoch = CaptureEpoch.value else { return !Task.isCancelled }
         return epoch == captureEpoch && !Task.isCancelled
+    }
+
+    private func clearCaptureClockIfCurrent() {
+        guard captureWorkIsCurrent() else { return }
+        lastCaptureStart = nil
+    }
+
+    private func applyResolvedPermission(
+        _ permissionState: ScreenPermissionState,
+        onGranted: () async -> Void
+    ) async {
+        guard captureWorkIsCurrent() else { return }
+        appState.permissionState = permissionState
+
+        switch permissionState {
+        case .granted:
+            await onGranted()
+        case .requiresRestart:
+            clearCaptureClockIfCurrent()
+            appState.captureState = .failed
+            appState.statusMessage = L10n.permissionRestartCapture
+        case .denied:
+            clearCaptureClockIfCurrent()
+            appState.captureState = .failed
+            appState.statusMessage = L10n.permissionDeniedRefresh
+        case .unknown:
+            clearCaptureClockIfCurrent()
+            appState.captureState = .failed
+            appState.statusMessage = L10n.permissionUnknown
+        case .requestInProgress:
+            clearCaptureClockIfCurrent()
+            appState.captureState = .idle
+            appState.statusMessage = L10n.permissionRequestInProgress
+        }
     }
 
     func startCapture(trigger: CaptureTrigger) {
@@ -173,27 +209,8 @@ final class CaptureCoordinator: CaptureCoordinating {
 
         runCapture {
             let permissionState = await self.permissionService.resolveState()
-            self.appState.permissionState = permissionState
-
-            switch permissionState {
-            case .granted:
+            await self.applyResolvedPermission(permissionState) {
                 self.presentOverlay(trigger: trigger, source: sourceContext, sessionConfiguration: sessionConfiguration)
-            case .requiresRestart:
-                self.lastCaptureStart = nil
-                self.appState.captureState = .failed
-                self.appState.statusMessage = L10n.permissionRestartCapture
-            case .denied:
-                self.lastCaptureStart = nil
-                self.appState.captureState = .failed
-                self.appState.statusMessage = L10n.permissionDeniedRefresh
-            case .unknown:
-                self.lastCaptureStart = nil
-                self.appState.captureState = .failed
-                self.appState.statusMessage = L10n.permissionUnknown
-            case .requestInProgress:
-                self.lastCaptureStart = nil
-                self.appState.captureState = .idle
-                self.appState.statusMessage = L10n.permissionRequestInProgress
             }
         }
     }
@@ -328,10 +345,7 @@ final class CaptureCoordinator: CaptureCoordinating {
 
         runCapture {
             let permissionState = await self.permissionService.resolveState()
-            self.appState.permissionState = permissionState
-
-            switch permissionState {
-            case .granted:
+            await self.applyResolvedPermission(permissionState) {
                 let environment = ScreenEnvironmentSnapshot.capture()
                 let preferredDisplay = environment.bestDisplay(
                     for: selection.screenRect,
@@ -344,22 +358,6 @@ final class CaptureCoordinator: CaptureCoordinating {
                     source: selection.source,
                     sessionConfiguration: sessionConfiguration
                 )
-            case .requiresRestart:
-                self.lastCaptureStart = nil
-                self.appState.captureState = .failed
-                self.appState.statusMessage = L10n.permissionRestartCapture
-            case .denied:
-                self.lastCaptureStart = nil
-                self.appState.captureState = .failed
-                self.appState.statusMessage = L10n.permissionDeniedRefresh
-            case .unknown:
-                self.lastCaptureStart = nil
-                self.appState.captureState = .failed
-                self.appState.statusMessage = L10n.permissionUnknown
-            case .requestInProgress:
-                self.lastCaptureStart = nil
-                self.appState.captureState = .idle
-                self.appState.statusMessage = L10n.permissionRequestInProgress
             }
         }
     }
@@ -398,7 +396,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         appState.lastError = nil
         appState.captureState = .preparing
         appState.statusMessage = L10n.imageFilePreparing
-        STGLog.pipeline.info("Image file OCR started path=\(standardizedURL.path, privacy: .public)")
+        STGLog.pipeline.info("Image file OCR started")
 
         runCapture {
             do {
@@ -409,9 +407,8 @@ final class CaptureCoordinator: CaptureCoordinating {
                     sessionConfiguration: sessionConfiguration
                 )
             } catch {
-                let pipelineError = Self.mapToPipelineError(error)
-                self.lastCaptureStart = nil
-                self.handleFailure(pipelineError)
+                self.clearCaptureClockIfCurrent()
+                self.handleFailure(Self.mapToPipelineError(error))
             }
         }
     }
@@ -450,7 +447,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         appState.lastError = nil
         appState.captureState = .preparing
         appState.statusMessage = L10n.pdfPreparing
-        STGLog.pipeline.info("PDF OCR started path=\(standardizedURL.path, privacy: .public)")
+        STGLog.pipeline.info("PDF OCR started")
 
         runCapture {
             do {
@@ -461,9 +458,8 @@ final class CaptureCoordinator: CaptureCoordinating {
                     sessionConfiguration: sessionConfiguration
                 )
             } catch {
-                let pipelineError = Self.mapToPipelineError(error)
-                self.lastCaptureStart = nil
-                self.handleFailure(pipelineError)
+                self.clearCaptureClockIfCurrent()
+                self.handleFailure(Self.mapToPipelineError(error))
             }
         }
     }
@@ -508,9 +504,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         appState.lastError = nil
         appState.captureState = .preparing
         appState.statusMessage = L10n.searchablePDFPreparing
-        STGLog.pipeline.info(
-            "Searchable PDF export started source=\(standardizedURL.path, privacy: .public) destination=\(resolvedDestination.path, privacy: .public)"
-        )
+        STGLog.pipeline.info("Searchable PDF export started")
 
         runCapture {
             do {
@@ -522,9 +516,8 @@ final class CaptureCoordinator: CaptureCoordinating {
                     sessionConfiguration: sessionConfiguration
                 )
             } catch {
-                let pipelineError = Self.mapToPipelineError(error)
-                self.lastCaptureStart = nil
-                self.handleFailure(pipelineError)
+                self.clearCaptureClockIfCurrent()
+                self.handleFailure(Self.mapToPipelineError(error))
             }
         }
     }
@@ -541,31 +534,38 @@ final class CaptureCoordinator: CaptureCoordinating {
 
         appState.statusMessage = L10n.watchPreparing
         appState.updateWatchState(.selecting)
-
-        Task { @MainActor in
+        watchPermissionGeneration += 1
+        let generation = watchPermissionGeneration
+        watchPermissionTask?.cancel()
+        watchPermissionTask = Task { @MainActor in
             let permissionState = await permissionService.resolveState()
-            appState.permissionState = permissionState
+            guard generation == self.watchPermissionGeneration else { return }
+            guard self.appState.watchState == .selecting else { return }
+            self.appState.permissionState = permissionState
 
             switch permissionState {
             case .granted:
-                presentWatchOverlay(source: sourceContext, sessionConfiguration: sessionConfiguration)
+                self.presentWatchOverlay(source: sourceContext, sessionConfiguration: sessionConfiguration)
             case .requiresRestart:
-                appState.updateWatchState(.inactive)
-                appState.statusMessage = L10n.watchPermissionRestart
+                self.appState.updateWatchState(.inactive)
+                self.appState.statusMessage = L10n.watchPermissionRestart
             case .denied:
-                appState.updateWatchState(.inactive)
-                appState.statusMessage = L10n.watchPermissionDenied
+                self.appState.updateWatchState(.inactive)
+                self.appState.statusMessage = L10n.watchPermissionDenied
             case .unknown:
-                appState.updateWatchState(.inactive)
-                appState.statusMessage = L10n.watchPermissionUnknown
+                self.appState.updateWatchState(.inactive)
+                self.appState.statusMessage = L10n.watchPermissionUnknown
             case .requestInProgress:
-                appState.updateWatchState(.inactive)
-                appState.statusMessage = L10n.watchPermissionInProgress
+                self.appState.updateWatchState(.inactive)
+                self.appState.statusMessage = L10n.watchPermissionInProgress
             }
         }
     }
 
     func stopWatching() {
+        watchPermissionGeneration += 1
+        watchPermissionTask?.cancel()
+        watchPermissionTask = nil
         activeOverlay?.closeOverlay()
         activeOverlay = nil
         watchTask?.cancel()
@@ -594,6 +594,9 @@ final class CaptureCoordinator: CaptureCoordinating {
             appState.statusMessage = L10n.permissionRequesting
             let state = await permissionService.requestIfNeeded()
             applyPermissionState(state)
+            if state == .granted {
+                retryAfterPermission()
+            }
         }
     }
 
@@ -705,8 +708,14 @@ final class CaptureCoordinator: CaptureCoordinating {
                 }
 
                 for (retryIndex, retryAttempt) in retryAttempts.enumerated() {
+                    guard captureWorkIsCurrent() else { return }
                     appState.statusMessage = L10n.retryProgress(captureMode.retryProgressTitle, index: retryIndex + 2, total: retryAttempts.count + 1)
-                    try? await Task.sleep(nanoseconds: retryAttempt.delayNanoseconds)
+                    do {
+                        try await Task.sleep(nanoseconds: retryAttempt.delayNanoseconds)
+                    } catch {
+                        return
+                    }
+                    guard captureWorkIsCurrent() else { return }
 
                     evaluation = try await performAttempt(
                         request: baseRequest,
@@ -761,9 +770,8 @@ final class CaptureCoordinator: CaptureCoordinating {
                 notificationDisplayFrame: preferredDisplay?.frame
             )
         } catch {
-            let pipelineError = Self.mapToPipelineError(error)
-            lastCaptureStart = nil
-            handleFailure(pipelineError)
+            clearCaptureClockIfCurrent()
+            handleFailure(Self.mapToPipelineError(error))
         }
     }
 
@@ -806,6 +814,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         attemptIndex: Int,
         totalAttempts: Int
     ) async throws -> CaptureOCRAttemptEvaluation {
+        guard captureWorkIsCurrent() else { throw CancellationError() }
         appState.captureState = .capturing
         appState.statusMessage = totalAttempts > 1
             ? "Görüntü yakalanıyor... (\(attemptIndex)/\(totalAttempts))"
@@ -820,6 +829,7 @@ final class CaptureCoordinator: CaptureCoordinating {
             environment: request.environment
         )
         let candidates = try await Self.captureCandidatesAsync(service: screenCaptureService, request: attemptRequest)
+        guard captureWorkIsCurrent() else { throw CancellationError() }
         guard !candidates.isEmpty else {
             throw CapturePipelineError.captureFailed(
                 domain: "CaptureCoordinator",
@@ -834,7 +844,7 @@ final class CaptureCoordinator: CaptureCoordinating {
             "State → recognizing attempt=\(attemptLabel, privacy: .public) candidates=\(candidates.count)"
         )
 
-        return await Self.evaluateCandidatesAsync(
+        let evaluation = await Self.evaluateCandidatesAsync(
             ocrService: ocrService,
             candidates: candidates,
             captureRect: captureRect,
@@ -843,6 +853,8 @@ final class CaptureCoordinator: CaptureCoordinating {
             languageSelection: languageSelection,
             attemptLabel: attemptLabel
         )
+        guard captureWorkIsCurrent() else { throw CancellationError() }
+        return evaluation
     }
 
     nonisolated
@@ -869,6 +881,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         source: ClipboardHistoryEntry.SourceContext?,
         sessionConfiguration: CaptureSessionConfiguration
     ) async {
+        guard captureWorkIsCurrent() else { return }
         let sourceRect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
         let candidate = CaptureCandidate(
             strategy: .clipboardImage,
@@ -911,9 +924,8 @@ final class CaptureCoordinator: CaptureCoordinating {
                 notificationDisplayFrame: nil
             )
         } catch {
-            let pipelineError = Self.mapToPipelineError(error)
-            lastCaptureStart = nil
-            handleFailure(pipelineError)
+            clearCaptureClockIfCurrent()
+            handleFailure(Self.mapToPipelineError(error))
         }
     }
 
@@ -922,6 +934,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         fileURL: URL,
         sessionConfiguration: CaptureSessionConfiguration
     ) async {
+        guard captureWorkIsCurrent() else { return }
         let sourceRect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
         let candidate = CaptureCandidate(
             strategy: .importedImageFile,
@@ -932,7 +945,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         do {
             appState.captureState = .recognizing
             appState.statusMessage = L10n.fileRecognition(sessionConfiguration.captureMode.recognitionProgressTitle)
-            STGLog.pipeline.info("Image file OCR recognizing path=\(fileURL.path, privacy: .public)")
+            STGLog.pipeline.info("Image file OCR recognizing")
 
             let evaluation = await Self.evaluateCandidatesAsync(
                 ocrService: ocrService,
@@ -964,9 +977,8 @@ final class CaptureCoordinator: CaptureCoordinating {
                 notificationDisplayFrame: nil
             )
         } catch {
-            let pipelineError = Self.mapToPipelineError(error)
-            lastCaptureStart = nil
-            handleFailure(pipelineError)
+            clearCaptureClockIfCurrent()
+            handleFailure(Self.mapToPipelineError(error))
         }
     }
 
@@ -1001,11 +1013,11 @@ final class CaptureCoordinator: CaptureCoordinating {
 
         switch result {
         case .success:
-            lastCaptureStart = nil
+            clearCaptureClockIfCurrent()
             appState.captureState = .completed
             appState.statusMessage = L10n.pdfTextCopied
         case .failedWrite, .failedReadback:
-            lastCaptureStart = nil
+            clearCaptureClockIfCurrent()
             appState.captureState = .failed
             let error = CapturePipelineError.clipboardFailed(result: result)
             appState.lastError = error
@@ -1047,7 +1059,7 @@ final class CaptureCoordinator: CaptureCoordinating {
                 to: destinationURL
             )
 
-            lastCaptureStart = nil
+            clearCaptureClockIfCurrent()
             appState.captureState = .completed
             appState.statusMessage = L10n.searchablePDFCreated(destinationURL.lastPathComponent)
             appState.appendDiagnostic(
@@ -1059,9 +1071,8 @@ final class CaptureCoordinator: CaptureCoordinating {
             )
             NSWorkspace.shared.activateFileViewerSelecting([destinationURL])
         } catch {
-            let pipelineError = Self.mapToPipelineError(error)
-            lastCaptureStart = nil
-            handleFailure(pipelineError)
+            clearCaptureClockIfCurrent()
+            handleFailure(Self.mapToPipelineError(error))
         }
     }
 
@@ -1074,6 +1085,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         var recognizedPages: [ImportedPDFRecognitionPage] = []
 
         for (pageOffset, page) in pages.enumerated() {
+            guard captureWorkIsCurrent() else { break }
             let sourceRect = CGRect(origin: .zero, size: page.pageBounds.size)
             let candidate = CaptureCandidate(
                 strategy: .importedPDFPage,
@@ -1123,7 +1135,7 @@ final class CaptureCoordinator: CaptureCoordinating {
 
     private func handleEmptyResult(captureMode: CaptureMode, attemptSummary: String) {
         guard captureWorkIsCurrent() else { return }
-        lastCaptureStart = nil
+        clearCaptureClockIfCurrent()
         appState.captureState = .completedEmpty
         appState.statusMessage = captureMode.emptyResultMessage
         appState.appendDiagnostic(
@@ -1170,7 +1182,7 @@ final class CaptureCoordinator: CaptureCoordinating {
         switch clipboardResult {
         case .success:
             appState.captureState = .completed
-            lastCaptureStart = nil
+            clearCaptureClockIfCurrent()
         case .failedWrite, .failedReadback:
             throw CapturePipelineError.clipboardFailed(result: clipboardResult)
         }
@@ -1360,6 +1372,7 @@ final class CaptureCoordinator: CaptureCoordinating {
                 self.activeOverlay = nil
 
                 Task { @MainActor in
+                    guard self.appState.watchState == .selecting else { return }
                     await self.startWatchSession(
                         screenRect: rect,
                         preferredDisplay: preferredDisplay,
@@ -1422,7 +1435,8 @@ final class CaptureCoordinator: CaptureCoordinating {
                 let request = CaptureRequest(
                     selectionRect: captureRect,
                     preferredDisplay: preferredDisplay,
-                    environment: environment
+                    environment: environment,
+                    singleStrategy: true
                 )
                 let candidates = try await Self.captureCandidatesAsync(service: screenCaptureService, request: request)
                 let evaluation = await Self.evaluateCandidatesAsync(
@@ -1453,11 +1467,11 @@ final class CaptureCoordinator: CaptureCoordinating {
                                 rawText: payload,
                                 preferredDisplay: preferredDisplay
                             )
+                            session.lastRecognizedSignature = signature
                             if copied {
-                                session.lastRecognizedSignature = signature
                                 session.lastRawText = best.text
-                                currentWatchSession = session
                             }
+                            currentWatchSession = session
                         } else {
                             // Empty filtered payload: mark seen so the same frame is not reconsidered.
                             session.lastRecognizedSignature = signature

@@ -471,6 +471,7 @@ struct CaptureRequest: Sendable {
     let selectionRect: CGRect
     let preferredDisplay: ScreenDescriptor?
     let environment: ScreenEnvironmentSnapshot
+    var singleStrategy: Bool = false
 }
 
 enum OCRLanguagePreference: String, CaseIterable, Codable, Equatable, Sendable, Identifiable {

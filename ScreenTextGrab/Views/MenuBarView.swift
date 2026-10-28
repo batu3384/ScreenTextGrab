@@ -165,11 +165,11 @@ struct MenuBarView: View {
     private var primaryAction: some View {
         MenuBarPrimaryActionSection(
             isCompact: isCompactPanel,
-            canStartCapture: canStartCapture,
+            canStartCapture: canStartCapture || canCancelCapture,
             icon: primaryActionIcon,
             title: primaryActionTitle,
             subtitle: primarySubtitle,
-            action: startCapture
+            action: canCancelCapture ? cancelCapture : startCapture
         )
     }
 
@@ -619,6 +619,10 @@ struct MenuBarView: View {
         appState.watchState != .selecting
     }
 
+    private var canCancelCapture: Bool {
+        appState.captureState.isBusy
+    }
+
     private var primaryQuickStartRegion: SavedCaptureRegion? {
         guard canStartCapture else {
             return nil
@@ -628,6 +632,9 @@ struct MenuBarView: View {
     }
 
     private var primaryActionTitle: String {
+        if canCancelCapture {
+            return L10n.actionCancel
+        }
         if primaryQuickStartRegion != nil {
             return L10n.pair("Kayıtlı Bölgeyi Yakala", "Capture Saved Region")
         }
@@ -636,7 +643,10 @@ struct MenuBarView: View {
     }
 
     private var primaryActionIcon: String {
-        primaryQuickStartRegion == nil ? "viewfinder" : "scope"
+        if canCancelCapture {
+            return "xmark"
+        }
+        return primaryQuickStartRegion == nil ? "viewfinder" : "scope"
     }
 
     private var headerLine: String {
@@ -709,6 +719,10 @@ struct MenuBarView: View {
 
         switch appState.permissionState {
         case .granted:
+            if appState.captureState == .completed || appState.captureState == .cancelled,
+               !appState.statusMessage.isEmpty {
+                return appState.statusMessage
+            }
             if appState.captureState == .idle || appState.captureState == .completed || appState.captureState == .cancelled {
                 if let region = primaryQuickStartRegion {
                     switch appState.activeSavedCaptureRegionSuggestion?.matchKind {
@@ -750,6 +764,10 @@ struct MenuBarView: View {
     }
 
     private var primarySubtitle: String {
+        if canCancelCapture {
+            return L10n.pair("Süren yakalamayı durdur.", "Stop the capture in progress.")
+        }
+
         if appState.watchState == .active {
             return L10n.pair("İzleme aktifken normal yakalama devre dışı.", "Normal capture is disabled while watch mode is active.")
         }
@@ -1150,6 +1168,10 @@ struct MenuBarView: View {
         )
     }
 
+    private func cancelCapture() {
+        appState.coordinator?.cancelCapture()
+    }
+
     private func startCapture() {
         if let region = primaryQuickStartRegion {
             appState.coordinator?.captureSavedRegion(region, sessionOverrides: nil)
@@ -1457,16 +1479,26 @@ struct MenuBarView: View {
         let base: String
         switch suggestion.matchKind {
         case .application:
-            base = "\(suggestion.source.displayName) için \(suggestion.collection.name) koleksiyonundaki en uygun snippet'ler listelendi."
+            base = L10n.format(
+                "%@ için %@ koleksiyonundaki en uygun snippet'ler listelendi.",
+                "Showing the best snippets from %@ for %@.",
+                suggestion.source.displayName,
+                suggestion.collection.name
+            )
         case .windowTitle(let windowTitle):
-            base = "\"\(windowTitle)\" penceresine uyan snippet'ler \(suggestion.collection.name) koleksiyonundan getirildi."
+            base = L10n.format(
+                "\"%@\" penceresine uyan snippet'ler %@ koleksiyonundan getirildi.",
+                "Snippets for \"%@\" came from %@.",
+                windowTitle,
+                suggestion.collection.name
+            )
         }
 
         guard hiddenCount > 0 else {
             return base
         }
 
-        return "\(base) +\(hiddenCount) ek eşleşme daha var."
+        return L10n.format("%@ +%d ek eşleşme daha var.", "%@ +%d more matches.", base, hiddenCount)
     }
 
     private func savedSnippetQuickPickButton(_ snippet: SavedSnippet) -> some View {

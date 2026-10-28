@@ -210,8 +210,8 @@ enum CaptureRecognitionHeuristics {
         if captureMode.isSubtitleFocused {
             let bottomBand = CGRect(x: 0.0, y: 0.0, width: 1.0, height: 0.40)
             let bottomTight = CGRect(x: 0.05, y: 0.0, width: 0.90, height: 0.26)
-            regions.insert(bottomTight, at: 0)
-            regions.insert(bottomBand, at: 0)
+            regions.append(bottomTight)
+            regions.append(bottomBand)
         }
 
         return regions

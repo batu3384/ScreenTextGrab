@@ -351,6 +351,7 @@ struct SettingsView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(entry.isPinned ? L10n.pair("Sabitlemeyi kaldır", "Unpin") : L10n.pair("Sabitle", "Pin"))
             }
 
             HStack(spacing: 8) {
@@ -1869,7 +1870,7 @@ struct SettingsView: View {
             )
         } catch {
             historyFeedback = InlineFeedback(
-                message: "Geçmiş dışa aktarılamadı: \(error.localizedDescription)",
+                message: L10n.format("Geçmiş dışa aktarılamadı: %@", "Could not export history: %@", error.localizedDescription),
                 tint: .accentRose
             )
         }

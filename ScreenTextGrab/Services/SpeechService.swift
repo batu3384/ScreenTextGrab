@@ -21,6 +21,7 @@ final class SpeechService: NSObject {
     }
 
     private var activeTextSignature: String?
+    private var activeUtterance: AVSpeechUtterance?
 
     init(
         synthesizer: AVSpeechSynthesizer = AVSpeechSynthesizer(),
@@ -48,6 +49,7 @@ final class SpeechService: NSObject {
     }
 
     func stopSpeaking() {
+        activeUtterance = nil
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
@@ -67,6 +69,7 @@ final class SpeechService: NSObject {
         utterance.volume = 1
 
         activeTextSignature = text
+        activeUtterance = utterance
         state = .speaking
         synthesizer.speak(utterance)
     }
@@ -100,15 +103,19 @@ final class SpeechService: NSObject {
 extension SpeechService: AVSpeechSynthesizerDelegate {
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         Task { @MainActor [weak self] in
-            self?.activeTextSignature = nil
-            self?.state = .idle
+            guard let self, self.activeUtterance === utterance else { return }
+            self.activeUtterance = nil
+            self.activeTextSignature = nil
+            self.state = .idle
         }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor [weak self] in
-            self?.activeTextSignature = nil
-            self?.state = .idle
+            guard let self, self.activeUtterance === utterance else { return }
+            self.activeUtterance = nil
+            self.activeTextSignature = nil
+            self.state = .idle
         }
     }
 }

@@ -133,7 +133,9 @@ final class OCRService: OCRProviding, @unchecked Sendable {
                         bestResult = (pass.label, result, score)
                     }
 
-                    if result.averageConfidence >= 0.82 && text.count >= 3 {
+                    let syntheticBand = pass.label.contains("subtitle-bottom") || pass.variant.name.contains("subtitle-band")
+                    let tooShortForEarlyExit = text.count < 12 && (captureMode.isSubtitleFocused || captureMode.isTableFocused)
+                    if result.averageConfidence >= 0.82 && text.count >= 3 && !syntheticBand && !tooShortForEarlyExit {
                         STGLog.ocr.info("OCR early success on pass=\(pass.label, privacy: .public)")
                         // Return the best result found so far, not just the current pass.
                         // An earlier pass may have produced higher-quality text even if this
@@ -156,7 +158,8 @@ final class OCRService: OCRProviding, @unchecked Sendable {
             variants: variants,
             sourceRect: sourceRect,
             captureMode: captureMode,
-            tableGuides: tableGuides
+            tableGuides: tableGuides,
+            languageSelection: languageSelection
         ) {
             STGLog.ocr.info(
                 "OCR selected VisionKit pass=\(imageAnalyzerResult.label, privacy: .public) score=\(imageAnalyzerResult.score)"
@@ -590,7 +593,8 @@ final class OCRService: OCRProviding, @unchecked Sendable {
         variants: [OCRVariant],
         sourceRect: CGRect,
         captureMode: CaptureMode,
-        tableGuides: [CGFloat]
+        tableGuides: [CGFloat],
+        languageSelection: OCRLanguageSelection?
     ) async throws -> (label: String, result: OCRResult, score: Float)? {
         guard ImageAnalyzer.isSupported else {
             return nil
@@ -598,7 +602,7 @@ final class OCRService: OCRProviding, @unchecked Sendable {
 
         let analyzer = ImageAnalyzer()
         var configuration = ImageAnalyzer.Configuration(.text)
-        configuration.locales = Self.currentRecognitionLanguages()
+        configuration.locales = Self.currentRecognitionLanguages(languageSelection)
 
         var best: (label: String, result: OCRResult, score: Float)?
 

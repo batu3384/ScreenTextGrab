@@ -37,6 +37,14 @@ final class ScreenCaptureService: ScreenCaptureProviding, @unchecked Sendable {
         var acceptedCandidates: [CaptureCandidate] = []
         var rejectedCandidates: [CaptureCandidate] = []
 
+        if request.singleStrategy {
+            return try await captureSingleStrategy(
+                quartzSelectionRect: quartzSelectionRect,
+                selectionRect: selectionRect,
+                request: request
+            )
+        }
+
         if let systemCandidate = await Self.captureViaSystemScreencapture(quartzRect: quartzSelectionRect) {
             Self.classifyCandidate(systemCandidate, accepted: &acceptedCandidates, rejected: &rejectedCandidates)
         }
@@ -118,6 +126,32 @@ final class ScreenCaptureService: ScreenCaptureProviding, @unchecked Sendable {
             domain: "ScreenCaptureService",
             code: -2,
             description: "All capture strategies failed"
+        )
+    }
+
+    private func captureSingleStrategy(
+        quartzSelectionRect: CGRect,
+        selectionRect: CGRect,
+        request: CaptureRequest
+    ) async throws -> [CaptureCandidate] {
+        let targetDisplay = request.environment.bestDisplay(
+            for: selectionRect,
+            preferredDisplayID: request.preferredDisplay?.displayID
+        )
+        if let targetDisplay {
+            let bounded = quartzSelectionRect.intersection(CGDisplayBounds(targetDisplay.displayID)).standardized
+            if bounded.width > 1, bounded.height > 1,
+               let candidate = await Self.captureViaDisplayFilter(quartzSelectionRect: bounded, display: targetDisplay) {
+                return [candidate]
+            }
+        }
+        if let candidate = await Self.captureViaSystemScreencapture(quartzRect: quartzSelectionRect) {
+            return [candidate]
+        }
+        throw CapturePipelineError.captureFailed(
+            domain: "ScreenCaptureService",
+            code: -2,
+            description: "Watch capture strategy failed"
         )
     }
 
@@ -213,15 +247,19 @@ final class ScreenCaptureService: ScreenCaptureProviding, @unchecked Sendable {
         ]
 
         do {
-            let status: Int32 = try await withCheckedThrowingContinuation { continuation in
-                process.terminationHandler = { terminatedProcess in
-                    continuation.resume(returning: terminatedProcess.terminationStatus)
+            let status: Int32 = try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int32, Error>) in
+                    process.terminationHandler = { terminatedProcess in
+                        continuation.resume(returning: terminatedProcess.terminationStatus)
+                    }
+                    do {
+                        try process.run()
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
                 }
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: error)
-                }
+            } onCancel: {
+                process.terminate()
             }
 
             guard status == 0,

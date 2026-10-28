@@ -114,7 +114,19 @@ final class SelectionView: NSView {
         NSColor.black.withAlphaComponent(0.25).setFill()
         bounds.fill()
 
-        guard let rect = currentRect else { return }
+        guard let rect = currentRect else {
+            let hint = L10n.pair("Sürükle. ESC iptal.", "Drag to select. ESC cancels.") as NSString
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 16, weight: .semibold),
+                .foregroundColor: NSColor.white
+            ]
+            let size = hint.size(withAttributes: attributes)
+            hint.draw(
+                at: NSPoint(x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2),
+                withAttributes: attributes
+            )
+            return
+        }
 
         NSColor.clear.setFill()
         rect.fill(using: .copy)
@@ -179,8 +191,6 @@ final class SelectionView: NSView {
         isSelecting = false
         if rect.width > 5 && rect.height > 5 {
             onSelectionComplete?(rect)
-        } else {
-            onCancel?()
         }
     }
 
